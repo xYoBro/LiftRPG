@@ -7455,3 +7455,84 @@
       '- Return valid JSON only. No fences, no commentary.'
     ]).join('\n');
   };
+
+  // ── THE MENU REPAIR (D265) ─────────────────────────────────────────────────
+  //
+  // WHAT EARNED IT. `meta.artifactIdentity.attachmentStrategy` is a closed
+  // three-token menu. Across the author's Codex proving runs on 2026-08-20 the
+  // shellIdentity stage failed SIX consecutive paid attempts on that one field,
+  // every one of them a prose description of how the book carries its apparatus
+  // written into a slot that takes a token — with the menu, the glosses and the
+  // gate's own teachable error all in front of the model each time. Each attempt
+  // re-sent ~128.7k input tokens; the rest of every answer was accepted.
+  //
+  // This prompt asks the ONE question that was never asked on its own: given
+  // what you wrote, which member of this list did you mean? It is deliberately
+  // the narrowest prompt in the file — no doctrine, no voice, no book, no
+  // surrounding content. The field, the list, the sentence the model wrote, and
+  // the ask. A model that answers a smaller question with the answer to a bigger
+  // one is the defect this exists to route around, so the question is made as
+  // small as it can be made.
+  //
+  // WHAT IT MAY NOT DO. It may not accept a new sentence, and it may not accept
+  // a token off the list — the caller refuses an off-menu answer before anything
+  // is merged, and the stage re-rolls exactly as it would have. Nothing here
+  // truncates, guesses, or picks a default; the model picks or the repair fails.
+  //
+  // THE MENU IS PASSED IN, from the SCHEMA's own enum by way of the constraint
+  // walker. It is never restated in this file: a menu written here would be the
+  // second copy of a closed list, which is the defect `enumMenusAreTaught()` and
+  // every parity pass in this tree exist to prevent. The per-member GLOSSES stay
+  // at their teaching seats (the stage prompt that owns the field) — they are
+  // prose in that stage's own words, with no structured home to harvest from,
+  // and inventing one for this prompt would be a second author of the meaning.
+  window.buildEnumRepairPrompt = function (stageName, fields) {
+    var list = fields || [];
+    var rows = list.map(function (f, i) {
+      var wrote = f.wrote === undefined || f.wrote === null ? '' : String(f.wrote);
+      return [
+        '### ' + (i + 1) + '. `' + f.path + '`',
+        '- The ONLY legal values, exactly as written:',
+        '  ' + f.menu.map(function (m) { return '"' + m + '"'; }).join(' | '),
+        '- What you sent instead:',
+        '```',
+        wrote,
+        '```',
+        ''
+      ].join('\n');
+    });
+    return [
+      '# Menu Correction — ' + stageName,
+      '',
+      'Your answer for ' + stageName + ' was accepted in every respect but one: '
+        + (list.length === 1
+          ? 'one field is a CLOSED MENU and you wrote something that is not on it.'
+          : list.length + ' fields are CLOSED MENUS and you wrote values that are not on them.'),
+      'Nothing else about the answer is in question, and nothing else may change.',
+      '',
+      '## The Fields',
+      ''
+    ].concat(rows, [
+      '## What To Do',
+      '- For each field, read what you wrote and pick the ONE menu value that best matches',
+      '  the intent behind it. You are not being asked to change your mind — you are being',
+      '  asked which of these ' + (list.length === 1 ? 'values' : 'menus\' values')
+        + ' your intent already is.',
+      '- Copy the value EXACTLY: same spelling, same hyphens, same case, no quotes of your own,',
+      '  no extra words, no explanation appended. The check is an exact string match against',
+      '  the list above and anything else fails again.',
+      '- Do NOT write a sentence, a description, or a phrase of your own into these fields.',
+      '  That is what failed. These fields hold a token from a list and nothing else.',
+      '- If no value is a perfect fit, pick the CLOSEST one. There is no other option and no',
+      '  way to decline: an empty or invented value fails identically to the one you sent.',
+      '',
+      '## Output Contract',
+      'Return ONLY this object:',
+      '{ "fixes": [ { "path": "<exact path from above>", "value": "<one value from that field\'s menu>" } ] }',
+      '',
+      '- One entry per field listed above, and no entries for anything else.',
+      '- `path` must be echoed EXACTLY as written above, character for character.',
+      '- `value` must be one of the values listed for that path, character for character.',
+      '- Return valid JSON only. No fences, no commentary.'
+    ]).join('\n');
+  };

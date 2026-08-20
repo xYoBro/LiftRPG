@@ -301,7 +301,26 @@ export var STAGE_BUDGETS = {
   // shortest one here because there is no composition to do — the model is
   // shortening sentences it already wrote. A row, not a literal, for the same
   // reason every other stage has one (D97).
-  deltaRepair:    { maxTokens: 4000, timeoutMs: 180000 }
+  deltaRepair:    { maxTokens: 4000, timeoutMs: 180000 },
+  // ── THE ENUM REPAIR (D265) ─────────────────────────────────────────────────
+  // The smallest row in the ladder, and it has to be: the entire answer is one
+  // token per failing field, echoed inside a `{fixes:[{path,value}]}` envelope.
+  // The motivating case is ONE field — `attachmentStrategy`, three legal tokens
+  // — against the 24000 a shellIdentity re-roll costs. Sized on the ladder's own
+  // ~3-4x rule over a deliberately pessimistic worst case (every closed enum on
+  // a shell seat missing at once, ~8 fields, ~40 tokens each pretty-printed):
+  // 1500. Under-sizing is SAFE here in a way it is nowhere else in this table —
+  // a truncated repair fails its own gate and falls through to the re-roll that
+  // was already going to happen — so the row errs small deliberately.
+  //
+  // The timeout is the shortest in the ladder for the same reason the delta
+  // row's is short: there is no composition to do. The model is reading a list.
+  //
+  // No `attempts` column: this row is never a stage on the ladder, so nothing
+  // reads one. The repair is ONE call inside an attempt of the stage it repairs;
+  // the escalation is that stage's own re-roll (see the D265 header in
+  // api-generator.js for why a round loop would buy nothing here).
+  enumRepair:     { maxTokens: 1500, timeoutMs: 120000 }
 };
 
 // ── The delta-repair round bound (D167) ──────────────────────────────────────

@@ -8991,11 +8991,30 @@ function shortValue(value) {
 }
 
 /**
- * collectSchemaConstraintPaths(value, schemaNode, path) -> [{ path, message }]
+ * collectSchemaConstraintPaths(value, schemaNode, path, parts)
+ *   -> [{ path, pathParts, message, kind, menu?, got? }]
  *
  * `message` is the REASON CLAUSE only; the caller owns the field's grammar and
  * the label, which is how one walker serves the stage seats and any later
  * reader without either of them re-wording the other's sentence.
+ *
+ * ── `kind` IS STRUCTURED BECAUSE A READER NEEDED IT (D265) ──────────────────
+ *
+ * The enum repair in api-generator.js takes a cheap remedy for exactly ONE of
+ * the four constraint families and the full re-roll for the other three, so it
+ * has to ask "which family is this finding?" — and the only place that fact
+ * lived was inside an English sentence this walker composes. Regex-parsing our
+ * own error text for a fact we already knew is D93 with extra steps: two
+ * answers to one question, and the second one breaks silently the day someone
+ * improves the wording.
+ *
+ * So every finding now carries the branch that raised it:
+ *   `type` | `enum` | `maxLength` | `required`
+ * and the enum branch additionally carries `menu` (the schema's own array, by
+ * reference to the schema — never a copy assembled here) and `got` (the value
+ * that missed). Nothing existing reads these; the string readers
+ * (`schemaConstraintErrorsForStage`, adversarial-forge, the floors rows) are
+ * untouched by construction because `path` and `message` did not move.
  *
  * ── `required` IS SKIPPED AT THE ROOT, AND THAT IS THE POINT ────────────────
  *
@@ -9028,47 +9047,63 @@ function shortValue(value) {
  * `scripts/validate.mjs` refuses the assembled booklet against the full schema.
  * What is lost is redundancy, not coverage.
  */
-export function collectSchemaConstraintPaths(value, schemaNode, path) {
+export function collectSchemaConstraintPaths(value, schemaNode, path, parts) {
   var found = [];
   var node = resolveSchemaRef(schemaNode);
   if (!node || typeof node !== 'object') return found;
   var here = path || '';
-  var add = function (p, message) { found.push({ path: p, message: message }); };
+  // THE COORDINATE, CARRIED RATHER THAN PARSED (D265). The walker knows the
+  // steps it descended; a reader that needs to WRITE at a finding's coordinate
+  // (the enum repair) would otherwise have to parse `a.b[0].c` back into steps —
+  // a second implementation of a fact this function already holds, and the one
+  // that breaks the day a key contains a dot. Array steps stay NUMBERS so
+  // `formatFieldPath(pathParts)` reproduces `path` exactly.
+  var hereParts = parts || [];
+  var add = function (p, pp, message, extra) {
+    found.push(Object.assign({ path: p, pathParts: pp.slice(), message: message }, extra || {}));
+  };
 
   if (value === undefined) return found;
 
   // ── The scalar constraints ────────────────────────────────────────────────
   if (node.type !== undefined && !typeSatisfies(jsonSchemaTypeOf(value), node.type)) {
     var want = Array.isArray(node.type) ? node.type.join('` or `') : node.type;
-    add(here, 'is ' + shortValue(value) + ' (a ' + jsonSchemaTypeOf(value)
+    add(here, hereParts, 'is ' + shortValue(value) + ' (a ' + jsonSchemaTypeOf(value)
       + '); the schema declares this field `' + want + '`. Send the value in that type — a '
       + 'number written as a string, or a single value where a list is declared, is refused by '
-      + 'the booklet schema whatever the value says.');
+      + 'the booklet schema whatever the value says.', { kind: 'type' });
     // Type is wrong, so every other constraint below would be reporting on a
     // value the model has to rewrite anyway. One error, one repair.
     return found;
   }
   if (Array.isArray(node.enum) && (value === null || typeof value !== 'object')) {
     if (node.enum.indexOf(value) === -1) {
-      add(here, 'is ' + shortValue(value) + ', which is not on the menu. The schema declares a '
+      add(here, hereParts, 'is ' + shortValue(value) + ', which is not on the menu. The schema declares a '
         + 'CLOSED list for this field and the only legal values are: '
         + node.enum.map(function (v) { return '`' + String(v) + '`'; }).join(' | ')
         + '. A near-miss is refused exactly like a nonsense value — pick one of those, or say '
-        + 'what you wanted in prose somewhere the schema allows prose.');
+        + 'what you wanted in prose somewhere the schema allows prose.',
+      // The menu is the SCHEMA'S array, sliced (a copy of the reference's
+      // contents, never a list re-derived here), and the value that missed. The
+      // repair reader needs both and must not re-walk the schema to find them —
+      // a second resolution of "which menu is this field's" is the second
+      // answer D93 exists to prevent.
+      { kind: 'enum', menu: node.enum.slice(), got: value });
     }
   }
   if (typeof node.maxLength === 'number' && typeof value === 'string'
       && value.length > node.maxLength) {
-    add(here, 'is ' + value.length + ' characters against a schema ceiling of '
+    add(here, hereParts, 'is ' + value.length + ' characters against a schema ceiling of '
       + node.maxLength + '. Cut it to ' + node.maxLength + ' or fewer — this is a hard limit in '
-      + 'the booklet schema, not a style note.');
+      + 'the booklet schema, not a style note.', { kind: 'maxLength' });
   }
 
   // ── The containers ────────────────────────────────────────────────────────
   if (Array.isArray(value)) {
     if (!node.items) return found;
     value.forEach(function (entry, i) {
-      found = found.concat(collectSchemaConstraintPaths(entry, node.items, here + '[' + i + ']'));
+      found = found.concat(collectSchemaConstraintPaths(entry, node.items,
+        here + '[' + i + ']', hereParts.concat([i])));
     });
     return found;
   }
@@ -9079,9 +9114,9 @@ export function collectSchemaConstraintPaths(value, schemaNode, path) {
   if (here) {
     constraintRequired(node).forEach(function (key) {
       if (!Object.prototype.hasOwnProperty.call(value, key) || value[key] === undefined) {
-        add(here + '.' + key, 'is REQUIRED by the booklet schema and is missing. '
+        add(here + '.' + key, hereParts.concat([key]), 'is REQUIRED by the booklet schema and is missing. '
           + 'Every required field must be present — an object that omits one cannot be rendered, '
-          + 'and there is no default the engine can substitute.');
+          + 'and there is no default the engine can substitute.', { kind: 'required' });
       }
     });
   }
@@ -9092,7 +9127,8 @@ export function collectSchemaConstraintPaths(value, schemaNode, path) {
     var child = children[key];
     if (!child) return;                          // unknown keys are the OTHER sweep's finding
     found = found.concat(
-      collectSchemaConstraintPaths(value[key], child, (here ? here + '.' : '') + key));
+      collectSchemaConstraintPaths(value[key], child, (here ? here + '.' : '') + key,
+        hereParts.concat([key])));
   });
   return found;
 }

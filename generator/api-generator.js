@@ -2066,6 +2066,283 @@ async function runDeltaRepairRounds(ctx) {
   return { repaired: null, ledger: ledger, notes: notes };
 }
 
+// ── THE ENUM REPAIR (D265) ──────────────────────────────────────────────────
+//
+// WHAT EARNED IT, measured on the author's Codex proving runs (2026-08-20): the
+// shellIdentity stage failed 3+3 attempts across two runs on ONE field —
+// `meta.artifactIdentity.attachmentStrategy`, a closed three-token menu — with
+// the model writing a prose description of how the book carries its apparatus
+// into it every single time ("All companion state is copied or marked inside
+// the bound…"). Each of those six attempts re-sent ~128.7k input tokens. The
+// answer was otherwise complete: every floor passed, every other field was
+// accepted, and the whole stage was thrown away over a one-token miss.
+//
+// The teaching half of that defect was fixed where teaching belongs (the menu,
+// the glosses, the lead-in and the shape line, all in prompt_rules.js), and the
+// wire half was fenced on the transports that can force a schema. THIS is the
+// mechanical backstop for the door that has NEITHER — Codex is prompt-only
+// (D264) — so a stubborn model behaviour can never again burn a stage ladder on
+// a value that is one token away from legal.
+//
+// THE SHAPE, and every clause of it is a refusal:
+//
+//  · SCOPE IS ENUM-ONLY. The repair fires only when EVERY blocking failure of
+//    the attempt is a closed-enum constraint finding. Not `maxLength` — a
+//    machine shortening a sentence would be authoring, silently. Not `type` or
+//    `required` — those are structural, and a structural defect can change what
+//    the fields beside it should say (partitionDeltaRepair's argument, verbatim:
+//    the cheap remedy is only correct when the expensive one has nothing else to
+//    fix). A MIXED list takes the full re-roll exactly as it does today.
+//  · THE CLASSIFICATION IS STRUCTURED, never parsed. `kind` comes off the
+//    walker's own branch (validation.js), so a re-worded error message cannot
+//    silently widen or narrow what this fires on.
+//  · IT IS A VALUE REPLACEMENT AT AN EXISTING PATH — the safest write class
+//    under D185's no-invent law. The path is one the model itself wrote; only
+//    what sits at it changes, and `applyDeltaFixes`'s byte-identity proof
+//    asserts that nothing else in the payload moved.
+//  · AN ILLEGAL ANSWER IS A FAILED REPAIR. A returned value that is not a
+//    member of that path's own menu is refused before anything is merged, and
+//    the ordinary re-roll follows. A repair that could land an off-menu value
+//    would be re-introducing the defect it exists to remove.
+//  · IT RE-GATES. The patched payload re-runs the stage's own validator, the
+//    key sweep and the constraint sweep. Green banks; red on ANYTHING falls
+//    through to the full retry path with the attempt ladder untouched.
+//
+// ATTEMPTS ECONOMICS, stated plainly because a repair that quietly bought an
+// attempt would be worse than the re-roll it replaces: the repair sits INSIDE
+// the attempt that failed, exactly as a delta round does. It consumes no
+// attempt of its own. A repair that succeeds ends the attempt in the ordinary
+// success path (banked, `complete` emitted, checkpoint written). A repair that
+// fails throws the ORIGINAL error, carrying the ORIGINAL payload and the
+// ORIGINAL blocking list — so the retry directive teaches the next attempt
+// about what the model actually produced, not about a patch it never saw — and
+// that throw consumes the attempt it was always going to consume. No
+// double-charge in either direction.
+//
+// ONE CALL, not a round loop. A model that will not pick from a three-token
+// menu when handed nothing but the menu will not pick differently when asked
+// the identical question twice; the re-roll is the escalation, and delta's
+// four-round loop is justified by a convergence (character counts) this defect
+// does not have.
+var ENUM_REPAIR_BUDGET_KEY = 'enumRepair';
+
+/**
+ * partitionEnumRepair(findings) -> { eligible, reason, targets, structural }
+ *
+ * THE CLASSIFIER, pure and side-effect-free — the enum sibling of
+ * `partitionDeltaRepair`, and deliberately as narrow.
+ */
+function partitionEnumRepair(findings) {
+  var all = (findings || []).slice();
+  if (!all.length) return { eligible: false, reason: 'no-constraint-findings', targets: [], structural: [] };
+
+  var targets = [];
+  var structural = [];
+  var seenPath = {};
+  all.forEach(function (f) {
+    // NOT AN ENUM FINDING → structural, and the whole list goes to the re-roll.
+    if (f.kind !== 'enum') { structural.push(f.message); return; }
+    // A menu this repair cannot answer in the wire's only type. Every closed
+    // menu in the booklet schema is a list of strings today; a numeric or
+    // boolean menu would need a merge that writes non-strings, and widening the
+    // merge for a case that does not exist is how a guard stops being one.
+    if (!Array.isArray(f.menu) || !f.menu.length
+        || !f.menu.every(function (m) { return typeof m === 'string'; })) {
+      structural.push(f.message);
+      return;
+    }
+    if (!Array.isArray(f.pathParts) || !f.pathParts.length) { structural.push(f.message); return; }
+    // Two findings naming ONE path would make "which value wins" a question,
+    // and a merge with a question in it is not a merge (D167's rule).
+    if (seenPath[f.path]) { structural.push(f.message); return; }
+    seenPath[f.path] = true;
+    targets.push({
+      path: f.path,
+      pathParts: f.pathParts.slice(),
+      menu: f.menu.slice(),
+      got: f.got,
+      message: f.message,
+      // Never presence-class: this repair replaces a value the model wrote. It
+      // creates nothing, and `applyDeltaFixes` enforces that from this flag.
+      presence: false
+    });
+  });
+
+  if (structural.length) {
+    return { eligible: false, reason: 'mixed-with-non-enum', targets: targets, structural: structural };
+  }
+  return { eligible: true, reason: '', targets: targets, structural: [] };
+}
+
+/**
+ * enumRefusalRecord(partition) -> telemetry record
+ *
+ * D168's law at this seat: a decision to re-roll a whole stage rather than ask
+ * one question may not be invisible. Zero counts because nothing was spent.
+ */
+function enumRefusalRecord(partition) {
+  return {
+    calls: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    fields: [],
+    picks: [],
+    resolved: false,
+    refused: partition.reason || 'ineligible',
+    structural: (partition.structural || []).slice(),
+    claimed: (partition.targets || []).map(function (t) { return t.path; }),
+    notes: []
+  };
+}
+
+/**
+ * runEnumRepairCall(ctx) -> { repaired, ledger, notes }
+ *
+ * One call, one merge under the delta guard, one re-gate at the caller.
+ */
+async function runEnumRepairCall(ctx) {
+  var payload = ctx.payload;
+  var targets = ctx.targets;
+  var notes = [];
+  var ledger = {
+    calls: 0, inputTokens: 0, outputTokens: 0,
+    fields: targets.map(function (t) { return t.path; }),
+    picks: [], resolved: false, refused: '', structural: [], notes: notes
+  };
+
+  var builder = (typeof window !== 'undefined') && window.buildEnumRepairPrompt;
+  // THE WIRE ENVELOPE IS DELTA'S, deliberately. Both repairs answer the same
+  // question — "here are the paths, send the value for each" — and a second
+  // schema for one envelope is the second home that drifts. The PROMPT is its
+  // own, because delta's frame ("rewrite the sentence shorter", "match the
+  // voice") is the wrong instruction for picking one token off a list.
+  var schema = (typeof window !== 'undefined') && window.STRUCTURED_SCHEMA_DELTA_REPAIR;
+  if (typeof builder !== 'function') {
+    notes.push('enum repair prompt builder unavailable');
+    return { repaired: null, ledger: ledger, notes: notes };
+  }
+
+  var budget = stageBudget(ENUM_REPAIR_BUDGET_KEY, ctx.settings.requestTimeoutMs);
+  var repairSettings = Object.assign({}, ctx.settings, {
+    requestTimeoutMs: budget.requestTimeoutMs({ attempt: 0, error: null })
+  });
+
+  var fields = targets.map(function (t) {
+    return {
+      path: t.path,
+      menu: t.menu.slice(),
+      wrote: t.got,
+      requirement: t.message
+    };
+  });
+
+  // THE PANEL MUST BE TOLD (D165/D110). A repair is a paid call inside an
+  // attempt; without an event the reader sees a stage that stopped reporting.
+  // It rides the `delta_repair` phase because it IS that phase's class — a
+  // targeted repair of named fields instead of a re-roll — and the panel
+  // already renders it correctly. `repairKind` says which one it was for any
+  // reader that cares; nothing branches on it.
+  ctx.emit('Repairing ' + ctx.stageName + ': '
+    + (fields.length === 1
+      ? 'one field took a value that is not on its menu'
+      : fields.length + ' fields took values that are not on their menus')
+    + ' (' + fields.map(function (f) { return f.path; }).join(', ')
+    + '). Asking for the menu choice only — the rest of the answer is kept.', {
+    phase: 'delta_repair',
+    repairKind: 'enum',
+    round: 1,
+    maxRounds: 1,
+    fields: ledger.fields.slice(),
+    fieldCount: fields.length
+  });
+
+  var response;
+  try {
+    response = await callProviderStructured(repairSettings, builder(ctx.stageName, fields),
+      schema || null, budget.maxTokens({ attempt: 0, error: null }),
+      ctx.stageName + ' enum repair', { signal: runAbortSignal(repairSettings) });
+  } catch (err) {
+    // A STOP IS NOT A FAILED REPAIR (DR-23) — hand it to runJsonStage's stop
+    // branch rather than buying a re-roll of the answer the operator cancelled.
+    if (isUserAbortError(err)) throw err;
+    notes.push('enum repair call failed: ' + String((err && err.message) || err || 'unknown'));
+    return { repaired: null, ledger: ledger, notes: notes };
+  }
+  ledger.calls += 1;
+  var usage = (response && response.usage && response.usage.usage) || null;
+  if (usage) {
+    ledger.inputTokens += safeNumber(usage.inputTokens);
+    ledger.outputTokens += safeNumber(usage.outputTokens);
+  }
+  // Spend is spend (D96/D113): the repair call rides the stage's own usage
+  // totals, so the cost meter and the checkpoint ledger stay honest.
+  recordStageUsage(ctx.telemetry, response);
+
+  var fixes = normalizeDeltaFixes(response && response.result);
+
+  // ── THE MENU FENCE, BEFORE ANY MERGE ──────────────────────────────────────
+  // The one refusal the delta guard does not carry, and the reason this repair
+  // is safe: a value that is not a member of THAT path's own menu is the very
+  // defect being repaired, so accepting it would be laundering it. The whole
+  // response is discarded rather than filtered — the same stance
+  // `applyDeltaFixes` takes toward a fix naming a path nobody asked about.
+  var byPath = {};
+  targets.forEach(function (t) { byPath[t.path] = t; });
+  var offMenu = [];
+  fixes.forEach(function (fix) {
+    var t = fix && typeof fix.path === 'string' ? byPath[fix.path] : null;
+    if (!t) return;                                  // applyDeltaFixes refuses it by path
+    if (typeof fix.value !== 'string' || t.menu.indexOf(fix.value) === -1) {
+      offMenu.push(t.path + ' → ' + JSON.stringify(fix.value));
+    }
+  });
+  if (offMenu.length) {
+    notes.push('repair returned a value that is not on the menu: ' + offMenu.join('; '));
+    ledger.refused = 'off-menu-answer';
+    ctx.emit(ctx.stageName + ': the menu repair answered with a value that is still not on the '
+      + 'menu (' + offMenu[0] + '), so it was discarded and the stage will be rewritten in full.', {
+      phase: 'delta_repair',
+      repairKind: 'enum',
+      round: 1,
+      maxRounds: 1,
+      rejected: offMenu.slice()
+    });
+    return { repaired: null, ledger: ledger, notes: notes };
+  }
+
+  var merge = applyDeltaFixes(payload, targets, fixes);
+  if (!merge.ok) {
+    notes.push('merge rejected: ' + merge.rejected.join('; '));
+    ledger.refused = 'merge-rejected';
+    ctx.emit(ctx.stageName + ': the menu repair answered about fields nobody asked about, so it '
+      + 'was discarded and the stage will be rewritten in full (' + merge.rejected[0] + ').', {
+      phase: 'delta_repair',
+      repairKind: 'enum',
+      round: 1,
+      maxRounds: 1,
+      rejected: merge.rejected.slice()
+    });
+    return { repaired: null, ledger: ledger, notes: notes };
+  }
+
+  // What was actually picked, path by path, so the run log can say the true
+  // sentence ("enum repair: meta.artifactIdentity.attachmentStrategy →
+  // single-dominant") rather than a count.
+  ledger.picks = fixes.filter(function (f) { return f && byPath[f.path]; })
+    .map(function (f) { return { path: f.path, value: f.value }; });
+  return { repaired: merge.merged, ledger: ledger, notes: notes };
+}
+
+/**
+ * describeEnumPicks(picks) -> string
+ *
+ * The reader's sentence. Names the field and the token — a count would tell
+ * nobody whether the machine picked the right thing.
+ */
+function describeEnumPicks(picks) {
+  return (picks || []).map(function (p) { return p.path + ' → ' + p.value; }).join(', ');
+}
+
 // ── CROSS-STAGE REPAIR ROUTING (D143) ───────────────────────────────────────
 // D128 proved that doctrine routed to the wrong stage lies to the model: six
 // attempts, six identical failures, because no retry ladder saves a prompt that
@@ -2663,6 +2940,14 @@ function createStageTelemetry(stageKey, stageName) {
     // SUBSET of `usage` below, not an addition to it: a delta call is spend,
     // and it rides the same meter as every other call in the run.
     deltaRepair: null,
+    // Set when the constraint gate found ONLY off-menu enum values and the
+    // pipeline asked for the menu choice instead of re-rolling (D265). Null is
+    // "no menu repair happened", which is almost every stage. Its own slot
+    // rather than a share of `deltaRepair`'s: both can fire inside one attempt
+    // (delta resolves the validator, the constraint gate then finds an off-menu
+    // value), and one slot for two records is one record lost. Token counts
+    // here are a SUBSET of `usage`, never an addition to it.
+    enumRepair: null,
     usage: blankUsageTotals(),
     estimatedCostUsd: 0,
     pricing: null
@@ -2696,6 +2981,17 @@ function summarizeStageTelemetry(telemetry) {
         notes: (telemetry.deltaRepair.notes || []).slice(),
         structural: (telemetry.deltaRepair.structural || []).slice(),
         claimed: (telemetry.deltaRepair.claimed || []).slice()
+      })
+      : null,
+    // Same snapshot discipline: every array copied, because a summary outlives
+    // the stage object that owns it.
+    enumRepair: telemetry && telemetry.enumRepair
+      ? Object.assign({}, telemetry.enumRepair, {
+        fields: (telemetry.enumRepair.fields || []).slice(),
+        picks: (telemetry.enumRepair.picks || []).slice(),
+        notes: (telemetry.enumRepair.notes || []).slice(),
+        structural: (telemetry.enumRepair.structural || []).slice(),
+        claimed: (telemetry.enumRepair.claimed || []).slice()
       })
       : null,
     usage: {
@@ -3066,25 +3362,49 @@ function unknownKeyErrorsForStage(config, result) {
  * D256 pointed here at a single row `stage-schema-constraints` that was never
  * written; the four rows above are that pointer, made real.
  */
-function schemaConstraintErrorsForStage(config, result) {
+function schemaConstraintFindingsForStage(config, result) {
   var scopes = config && config.unknownKeyScopes;
   if (!Array.isArray(scopes) || scopes.length === 0) return [];
-  var errors = [];
+  var findings = [];
   scopes.forEach(function (scope) {
     var node = resolveSchemaNodeAt(scope.schemaPath);
     if (!node) return;   // already reported loudly by the key sweep's anti-vacuity arm
     var unit = readStageUnitAt(result, scope.from);
     if (!unit || typeof unit !== 'object') return;
     var label = scope.label || scope.from || '';
+    // The scope's own offset from the stage's payload. The walker reports
+    // coordinates relative to the UNIT; a repair has to write into `result`, so
+    // the two are composed here — once, where the scope is in hand — rather
+    // than at any reader.
+    var scopeParts = scope.from ? String(scope.from).split('.') : [];
     collectSchemaConstraintPaths(unit, node, '').forEach(function (finding) {
       // OUR DEBRIS IS NOT THE MODEL'S DEFECT — the same filter, and the same
       // reason, as the key sweep above: this gate runs after config.autoRepair,
       // and autoRepairWeek writes `_overflowRepairs` onto the week it repairs.
       if (String(finding.path).split(/[.[]/).some(function (seg) { return seg.charAt(0) === '_'; })) return;
-      errors.push('`' + joinUnknownKeyPath(label, finding.path) + '` ' + finding.message);
+      findings.push({
+        // The LABELLED path — what the error sentence says and therefore the
+        // only coordinate the model is ever shown or asked to echo.
+        path: joinUnknownKeyPath(label, finding.path),
+        // The ABSOLUTE coordinate on this stage's payload. Different from the
+        // labelled path whenever a scope's label is not its `from` (a week scope
+        // labels `week` and reads the root), which is exactly why the display
+        // string may never be used as a write coordinate.
+        pathParts: scopeParts.concat(finding.pathParts || []),
+        kind: finding.kind || '',
+        menu: finding.menu || null,
+        got: finding.got,
+        message: '`' + joinUnknownKeyPath(label, finding.path) + '` ' + finding.message
+      });
     });
   });
-  return errors;
+  return findings;
+}
+
+// The string list every existing reader takes, DERIVED from the findings above
+// so the sentence and the structure can never disagree about what failed.
+function schemaConstraintErrorsForStage(config, result) {
+  return schemaConstraintFindingsForStage(config, result).map(function (f) { return f.message; });
 }
 
 // ── THE RUN'S STOP SIGNAL (DR-23) ────────────────────────────────────────────
@@ -3492,19 +3812,95 @@ async function runJsonStage(settings, config) {
       // same way. Ordered AFTER the key sweep deliberately: an invented key
       // often carries an off-menu value too, and the key sweep's "delete it"
       // is the cheaper of the two repairs to be told first.
-      var constraintErrors = schemaConstraintErrorsForStage(config, result);
+      var constraintFindings = schemaConstraintFindingsForStage(config, result);
+      var constraintErrors = constraintFindings.map(function (f) { return f.message; });
       if (constraintErrors.length > 0) {
-        var conErr = new Error(constraintErrors.join('; '));
-        conErr.errorType = 'schema';
-        conErr.retryable = true;
-        conErr.budgetBreachCount = 0;
-        conErr.blockingCount = constraintErrors.length;
-        conErr.finishReason = attemptFinishReason;
-        conErr._failedOutput = result;
-        conErr._blockingErrors = constraintErrors;
-        conErr._stageKey = config.stageKey || '';
-        conErr.repairRoute = describeRepairRoute(conErr, config.stageName);
-        throw conErr;
+        // ── THE ENUM REPAIR BEFORE THE RE-ROLL (D265) ─────────────────────
+        // Everything above this line has PASSED on this attempt — the stage's
+        // own validator, the delta path if it ran, and the key sweep — so the
+        // constraint findings in hand are the attempt's ENTIRE blocking set.
+        // That is what makes "are these findings all enum?" the same question
+        // as "are this attempt's blocking failures all enum?", and it is the
+        // only reason the classification can be trusted at this seat.
+        var enumPartition = partitionEnumRepair(constraintFindings);
+        var enumResolved = false;
+        if (!enumPartition.eligible) {
+          // The refusal leaves a trace (D168): from outside, "considered and
+          // declined" and "never ran" are otherwise the same picture.
+          stageTelemetry.enumRepair = enumRefusalRecord(enumPartition);
+          console.info('[LiftRPG] ' + config.stageName + ' menu repair not applicable ('
+            + enumPartition.reason + ') — re-rolling the stage.');
+        } else {
+          var enumOutcome = await runEnumRepairCall({
+            settings: settings,
+            stageName: config.stageName,
+            payload: result,
+            targets: enumPartition.targets,
+            telemetry: stageTelemetry,
+            emit: function (message, meta) {
+              emitPipelineEvent(config.onProgress, config.stageIndex || 0,
+                config.getTotalStages ? config.getTotalStages() : 0, message,
+                Object.assign({
+                  stageKey: config.stageKey || '',
+                  stageName: config.stageName,
+                  attempt: attempt,
+                  attemptCount: attemptCount
+                }, meta));
+            }
+          });
+          stageTelemetry.enumRepair = enumOutcome.ledger;
+          if (enumOutcome.repaired) {
+            // ── THE RE-GATE ───────────────────────────────────────────────
+            // Every gate this attempt already cleared is asked again, on the
+            // patched payload. The identity proof says only the named enum
+            // values moved — but a floor is entitled to an opinion about those
+            // values, and "green → banked" has to mean green on everything the
+            // ordinary success path means it on.
+            var reValidation = config.validate ? config.validate(enumOutcome.repaired) : '';
+            var reKeys = unknownKeyErrorsForStage(config, enumOutcome.repaired);
+            var reConstraints = schemaConstraintErrorsForStage(config, enumOutcome.repaired);
+            var reBlocking = validationFailed(reValidation)
+              ? classifyValidationErrors(extractErrorList(reValidation)).blocking
+              : [];
+            if (!reBlocking.length && !reKeys.length && !reConstraints.length) {
+              result = enumOutcome.repaired;
+              enumResolved = true;
+              stageTelemetry.hadRepair = true;
+              stageTelemetry.enumRepair.resolved = true;
+              console.info('[LiftRPG] ' + config.stageName + ' menu-repaired ('
+                + describeEnumPicks(enumOutcome.ledger.picks) + ') — no re-roll needed.');
+            } else {
+              // Red on something. The ORIGINAL payload and the ORIGINAL
+              // blocking list are what get thrown below — the retry has to
+              // teach the next attempt about what the model actually wrote,
+              // not about a patch it never saw.
+              stageTelemetry.enumRepair.refused = 'regate-failed';
+              enumOutcome.ledger.notes.push('re-gate failed after patch: '
+                + reBlocking.concat(reKeys, reConstraints).slice(0, 3).join(' | '));
+              console.warn('[LiftRPG] ' + config.stageName
+                + ' menu repair patched but the re-gate still failed — re-rolling.');
+            }
+          } else {
+            console.warn('[LiftRPG] ' + config.stageName + ' menu repair did not resolve: '
+              + enumOutcome.notes.join('; '));
+          }
+        }
+        // A resolved repair falls through to the ordinary success path below:
+        // same banking, same `complete` event, same checkpoint, with the repair
+        // recorded in telemetry.
+        if (!enumResolved) {
+          var conErr = new Error(constraintErrors.join('; '));
+          conErr.errorType = 'schema';
+          conErr.retryable = true;
+          conErr.budgetBreachCount = 0;
+          conErr.blockingCount = constraintErrors.length;
+          conErr.finishReason = attemptFinishReason;
+          conErr._failedOutput = result;
+          conErr._blockingErrors = constraintErrors;
+          conErr._stageKey = config.stageKey || '';
+          conErr.repairRoute = describeRepairRoute(conErr, config.stageName);
+          throw conErr;
+        }
       }
 
       var summary = summarizeStageTelemetry(stageTelemetry);
@@ -8185,6 +8581,16 @@ window.LiftRPGAPI = {
     // without driving a paid stage.
     unknownKeyErrorsForStage: unknownKeyErrorsForStage,
     schemaConstraintErrorsForStage: schemaConstraintErrorsForStage,
+    // The structured half of the same sweep (D265). The string list above is
+    // DERIVED from this, so a gate holding one holds both.
+    schemaConstraintFindingsForStage: schemaConstraintFindingsForStage,
+    // ── The enum-repair seam (D265), exported for the gates ─────────────────
+    // The classifier is pure — findings in, a partition out — so the harness can
+    // prove what fires the repair and what does not without a transport.
+    partitionEnumRepair: partitionEnumRepair,
+    enumRefusalRecord: enumRefusalRecord,
+    describeEnumPicks: describeEnumPicks,
+    enumRepairBudgetKey: ENUM_REPAIR_BUDGET_KEY,
     // ── The delta-repair seam (D167), exported for the gates ────────────────
     // Pure functions with no transport, no DOM and no window dependency, so the
     // floors harness can hold them to their contracts with no port and no
