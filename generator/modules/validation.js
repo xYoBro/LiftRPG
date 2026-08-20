@@ -4210,25 +4210,128 @@ export function briefTranscriptionFloorErrors(units, brief, where) {
   return errors;
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// THE SHELL GATE — one function, five entry points (the shell split)
+// ══════════════════════════════════════════════════════════════════════════
+//
+// `shell` used to be one call authoring four sibling booklet surfaces, and this
+// was one gate over all of them. It is now four sequential sub-stages, and each
+// owns the floors whose EVIDENCE IT WROTE — the D200-3b idiom read at a finer
+// seat: a gate that cannot see its evidence reports a pass, and a gate asked
+// for evidence a later stage has not written yet reports a failure nobody can
+// fix.
+//
+// ONE IMPLEMENTATION, NOT FIVE. The arms below are selected, never duplicated:
+// a second copy of the currency-parity floor written out at a sub-gate is the
+// two-algorithms defect (D93) with the added cruelty that the two copies would
+// grade the same book. `validateShellSchema` (the union) keeps its exact
+// pre-split behaviour and is what the guided wizard, the forge ladder and every
+// replay caller still run.
+//
+// THE UNIT EACH SUB-GATE IS HANDED IS THE ACCUMULATED SHELL, not the sub-stage's
+// own payload. It has to be: `theme.visualArchetype`'s obedience evidence lives
+// at `meta.artifactIntent.selectionReason`, which the IDENTITY stage wrote three
+// calls earlier. The api-generator merges before it validates; a sub-gate handed
+// a bare payload would fail every book for evidence it was structurally
+// incapable of carrying.
+//
+// THE LABEL IS THE ROUTE. Each sub-gate stamps its own stage-label prefix
+// (`Shell Spine → …`), and `REPAIR_STAGE_LABEL_KEYS` reads that prefix to decide
+// which stage owns the fix. Before the split every one of these said `Shell →`
+// whether the defect was in the cover or in the economy graph, so a repair
+// re-paid the whole monolith to fix a palette.
+// `themeSeat` IS THE SEVERITY, and it is a structural property of the arm set
+// rather than a branch on the stage key (2026-08-20). The theme arm is the only
+// one whose missing output was advisory: `arm.identity && !shell.meta` and
+// `arm.rules && !shell.rulesSpread` are both errors, and the asymmetry was
+// PRE-SPLIT RESIDUE — when theme was one quarter of a monolith payload, a shell
+// that returned no theme had already failed on `meta` or `cover`, so the warning
+// never had to carry the weight. The split gave theme its own paid call, and the
+// residue became a hole: `dropKey: theme` at `shellTheme` drew no retry, no
+// wait, no failure (the fault campaign's HOLLOW_SUCCESS), and the book rendered
+// on default tokens. The wire schema does not save it — `required` under
+// `response_format` at `strict:false` is instruction, not enforcement (D162), so
+// this validator is the only enforcement there is.
+//
+// SCOPED TO THE SUB-STAGE SEAT BY RULING. The union arm (`shell`, the guided
+// wizard's row) keeps its warning: that door authors the whole shell in one
+// prompt, its other arms already error on a payload this thin, and promoting
+// there would change a hand-assembly path nobody asked to change. The flag says
+// "the theme IS this stage's paid output", which is true at exactly one seat.
+var SHELL_ARM_SETS = {
+  shell: { identity: true, rules: true, theme: true, spine: true },
+  shellIdentity: { identity: true },
+  shellRules: { rules: true },
+  shellTheme: { theme: true, themeSeat: true },
+  shellSpine: { spine: true }
+};
+
+// The operator-facing label each seat stamps on its own errors. Keys are stage
+// keys; `REPAIR_STAGE_LABEL_KEYS` below carries the reverse map, and the two are
+// asserted against each other by the floors harness.
+var SHELL_STAGE_LABELS = {
+  shell: 'Shell',
+  shellIdentity: 'Shell Identity',
+  shellRules: 'Shell Rules',
+  shellTheme: 'Shell Theme',
+  shellSpine: 'Shell Spine'
+};
+
 /**
  * Shell structural validation. Runs after shell stage (Stage 3).
  * Returns { valid: boolean, errors: string[] }
+ *
+ * THE UNION GATE. Byte-identical in behaviour to its pre-split self: every arm,
+ * the `Shell` label, and `identityAxesForStage('shell')`'s family union for the
+ * obedience floors.
  */
 export function validateShellSchema(shell, expectedOptions) {
+  return validateShellStage(shell, expectedOptions, 'shell');
+}
+
+/** Sub-stage 1 of 4 — `meta` identity: world contract, voice, register, shape, artifact identity + intent, economy. */
+export function validateShellIdentitySchema(shell, expectedOptions) {
+  return validateShellStage(shell, expectedOptions, 'shellIdentity');
+}
+
+/** Sub-stage 2 of 4 — cover and rulesSpread. */
+export function validateShellRulesSchema(shell, expectedOptions) {
+  return validateShellStage(shell, expectedOptions, 'shellRules');
+}
+
+/** Sub-stage 3 of 4 — theme, designLanguage, arrangement. */
+export function validateShellThemeSchema(shell, expectedOptions) {
+  return validateShellStage(shell, expectedOptions, 'shellTheme');
+}
+
+/** Sub-stage 4 of 4 — meta.playSpine. */
+export function validateShellSpineSchema(shell, expectedOptions) {
+  return validateShellStage(shell, expectedOptions, 'shellSpine');
+}
+
+/** The stage-label prefix a shell seat stamps. One home, read by the gates and by the harness. */
+export function shellStageLabel(stageKey) {
+  return SHELL_STAGE_LABELS[String(stageKey || '')] || '';
+}
+
+function validateShellStage(shell, expectedOptions, stageKey) {
+  var arm = SHELL_ARM_SETS[stageKey] || SHELL_ARM_SETS.shell;
+  var WHERE = SHELL_STAGE_LABELS[stageKey] || 'Shell';
+  var AXIS_STAGE = stageKey;
   var errors = [];
   var warnings = [];
   // THE VERDICT CARRIES ITS OWN REMEDIES (the week gate's shape, D167). A floor
   // that can name one field and one coordinate publishes them here so the stage
   // can rewrite that field instead of re-rolling the whole shell.
   var deltaTargets = [];
-  if (!shell) { return { valid: false, errors: ['Shell is null'], deltaTargets: [] }; }
+  if (!shell) { return { valid: false, errors: [WHERE + ' is null'], deltaTargets: [] }; }
   normalizeShellShape(shell);
   // Hard failures: match pre-restructure checks exactly
-  if (!shell.meta) errors.push('Missing meta');
-  if (!shell.cover) errors.push('Missing cover');
-  if (!shell.rulesSpread) {
+  if (arm.identity && !shell.meta) errors.push('Missing meta');
+  if (arm.rules && !shell.cover) errors.push('Missing cover');
+  if (arm.rules && !shell.rulesSpread) {
     errors.push('Missing rulesSpread');
-  } else {
+  } else if (arm.rules) {
     if (!shell.rulesSpread.leftPage) errors.push('rulesSpread missing leftPage');
     if (!shell.rulesSpread.rightPage) errors.push('rulesSpread missing rightPage');
     if (shell.rulesSpread.leftPage && !Array.isArray(shell.rulesSpread.leftPage.sections)) {
@@ -4245,7 +4348,7 @@ export function validateShellSchema(shell, expectedOptions) {
       });
     }
   }
-  if (shell.meta) {
+  if (arm.identity && shell.meta) {
     if (ACCEPTED_SCHEMA_VERSIONS.indexOf(String(shell.meta.schemaVersion)) === -1) {
       errors.push('meta.schemaVersion must be one of ' + ACCEPTED_SCHEMA_VERSIONS.join(', ') + ', got: ' + shell.meta.schemaVersion);
     }
@@ -4255,13 +4358,13 @@ export function validateShellSchema(shell, expectedOptions) {
     // weekCount, totalSessions, passwordLength are injected by JS post-generation
     // (enforceBookletDerivedFields in assembly.js). Not validated against LLM output.
   }
-  if (shell.theme && shell.theme.visualArchetype) {
+  if (arm.theme && shell.theme && shell.theme.visualArchetype) {
     if (VALID_ARCHETYPES.indexOf(shell.theme.visualArchetype) === -1) {
       errors.push('Unknown visualArchetype: "' + shell.theme.visualArchetype + '"');
     }
   }
   // ── Theme palette validation (renderer reads all 6 for 27 CSS vars) ──────
-  if (shell.theme) {
+  if (arm.theme && shell.theme) {
     if (!shell.theme.palette || typeof shell.theme.palette !== 'object') {
       errors.push('theme.palette missing — renderer cannot set CSS variables');
     } else {
@@ -4284,13 +4387,20 @@ export function validateShellSchema(shell, expectedOptions) {
   // none, so every countable surface in it drew in the default instrument.
   // Opt-in like every other floor: the guided-build wizard and the manual API
   // hand-assemble shells and owe nothing here (see floorsOn).
-  if (floorsOn(expectedOptions)) {
+  if (floorsOn(expectedOptions) && arm.identity) {
     var shellDialect = String(((shell.meta || {}).artifactIdentity || {}).componentDialect || '').trim();
+    // THE SEAT PREFIX (the shell split). These three floors pushed BARE
+    // messages, so `repairOwnerForError` read no prefix and returned '' — a
+    // blocking identity defect that the repair router could not route anywhere.
+    // Harmless while the shell was one stage (there was nowhere else to send
+    // it); a hole once there are four seats, because the whole promise of the
+    // split is that a defect re-enters the quarter that owns it. Added at the
+    // push site, so every floorAnchor in the teaching registry still matches.
     if (!shellDialect) {
-      errors.push('meta.artifactIdentity.componentDialect is unset — declare the instrument this book counts in: '
+      errors.push(WHERE + ' → meta.artifactIdentity.componentDialect is unset — declare the instrument this book counts in: '
         + VALID_COMPONENT_DIALECTS.join(' | '));
     } else if (VALID_COMPONENT_DIALECTS.indexOf(shellDialect) === -1) {
-      errors.push('meta.artifactIdentity.componentDialect "' + shellDialect + '" is not a dialect this engine draws: '
+      errors.push(WHERE + ' → meta.artifactIdentity.componentDialect "' + shellDialect + '" is not a dialect this engine draws: '
         + VALID_COMPONENT_DIALECTS.join(' | '));
     }
 
@@ -4310,7 +4420,7 @@ export function validateShellSchema(shell, expectedOptions) {
     var economy = (shell.meta || {}).economy;
     var currencyLabel = String((economy && economy.currencyLabel) || '').trim();
     if (!currencyLabel) {
-      errors.push('meta.economy.currencyLabel is unset — name the ONE thing this world\'s '
+      errors.push(WHERE + ' → meta.economy.currencyLabel is unset — name the ONE thing this world\'s '
         + 'workout pays out, in its own words. Every session markStrip earns it, every week '
         + 'reckoning spends it, and every reckoning sentence must print this exact phrase; '
         + 'with no label authored the pipeline invents one after the fact and grades every '
@@ -4343,7 +4453,7 @@ export function validateShellSchema(shell, expectedOptions) {
       ((((expectedOptions || {}).gameRulebook) || {}).economy || {}).currency || ''
     ).trim();
     if (currencyLabel && rulebookCurrency && currencyLabel !== rulebookCurrency) {
-      var currencyMismatch = 'meta.economy.currencyLabel is "' + currencyLabel
+      var currencyMismatch = WHERE + ' → meta.economy.currencyLabel is "' + currencyLabel
         + '" but the rulebook you were given names the currency "' + rulebookCurrency
         + '" — the rulebook\'s currency IS this book\'s currency, and the shell must carry it'
         + ' VERBATIM. The player is taught one word in the rules and then reads a different'
@@ -4369,15 +4479,26 @@ export function validateShellSchema(shell, expectedOptions) {
     // The brief rides expectedOptions for the D144 unearned-packet arm; every
     // other arm of this helper reads meta alone, and a caller that passes no
     // brief simply does not run that arm (see the helper's header).
-    errors = errors.concat(artifactIntentFloorErrors(shell.meta, 'Shell',
+    errors = errors.concat(artifactIntentFloorErrors(shell.meta, WHERE,
       (expectedOptions || {}).brief, (expectedOptions || {}).seedAssignments));
+  }
 
+  // ── THE OBEDIENCE FLOORS: the axis slice IS the arm selector ─────────────
+  // No `arm.*` guard, and that is the point rather than an omission. Each seat
+  // is checked against `identityAxesForStage(AXIS_STAGE)` — its own quarter of
+  // the die and nothing else — which is D149's law read at the finer seat: a
+  // stage checked against axes it was never shown is the derived-or-strict
+  // trap. `shellRules` authors no axis, so its slice is empty and this is a
+  // no-op there BY DERIVATION, never by a hand-written exclusion. The union
+  // gate passes `'shell'`, which the family accessor expands to all four
+  // sub-stages' axes — the same 32 rows, in the same order, it always read.
+  if (floorsOn(expectedOptions)) {
     // ── The obedience floor (VISION §11) ──
     // The whole shell unit, not `shell.meta`: `theme.visualArchetype` is an
     // identity axis and lives beside meta, not inside it. Silent without seed
     // context, which is the same condition under which the stage was shown no
     // GIVENS at all.
-    errors = errors.concat(seedObedienceFloorErrors(shell, 'Shell', 'shell',
+    errors = errors.concat(seedObedienceFloorErrors(shell, WHERE, AXIS_STAGE,
       (expectedOptions || {}).seedAssignments));
 
     // ── The obedience floor's REPORT half (the voice die, W3) ──
@@ -4389,16 +4510,19 @@ export function validateShellSchema(shell, expectedOptions) {
     // from the corpus, and blocking on an uncalibrated band fails books for a
     // shape nobody has measured. Promotion to blocking is an author ruling on
     // measured evidence, not a flag flip.
-    warnings = warnings.concat(seedObedienceFloorWarnings(shell, 'Shell', 'shell',
+    warnings = warnings.concat(seedObedienceFloorWarnings(shell, WHERE, AXIS_STAGE,
       (expectedOptions || {}).seedAssignments));
+  }
 
+  // ── THE RULES SEAT'S FLOORS (cover + rulesSpread) ────────────────────────
+  if (floorsOn(expectedOptions) && arm.rules) {
     // ── The rules page teaches THIS game's vocabulary (W1) ──
     // Same options rail the currency-parity floor above reads, and the same
     // anti-vacuity law: no rulebook in the options, no check. The shell seat is
     // SHOWN this rulebook (generateShellPrompt's rulebookGiven), so the demand
     // is answerable at the seat it is asked of.
     errors = errors.concat(rulesTeachingFloorErrors(shell.rulesSpread,
-      (expectedOptions || {}).gameRulebook, 'Shell'));
+      (expectedOptions || {}).gameRulebook, WHERE));
 
     // ── The book says where you are before it says what to do (W3) ──
     // No options rail and no silence condition: unlike the rulebook floors
@@ -4406,14 +4530,20 @@ export function validateShellSchema(shell, expectedOptions) {
     // unconditional because the answer is — every book has a situation and a
     // cast, and a book that declines to say so has declined to be legible, not
     // declined a feature. Shell seat only; see the floor's own header.
-    errors = errors.concat(orientationFloorErrors(shell.rulesSpread, 'Shell'));
+    errors = errors.concat(orientationFloorErrors(shell.rulesSpread, WHERE));
 
     // ── The file posts WHAT and WHEN; the week posts WHERE and HOW ──
     // Same seat, same unit, same silence rule as the orientation floor above.
     // Silent when the tracker page carries no instruction at all: the field is
     // optional in the artifact contract, and this floor is about what it SAYS.
-    errors = errors.concat(assemblyDisclosureFloorErrors(shell.rulesSpread, 'Shell'));
+    errors = errors.concat(assemblyDisclosureFloorErrors(shell.rulesSpread, WHERE));
+  }
 
+  // ── THE THEME SEAT'S FLOORS (theme + designLanguage + arrangement) ───────
+  // One sitting, one press: the archetype is the floor the design language is
+  // composed onto and the arrangement is how that object's page is put
+  // together, so the three surfaces share a seat and share a gate.
+  if (floorsOn(expectedOptions) && arm.theme) {
     // ── The design-language floor (W6's close) ──
     // Here and ONLY here, and the asymmetry with every floor beside it is a
     // finding rather than an omission. SCHEMA_DESIGN_LANGUAGE and
@@ -4437,7 +4567,7 @@ export function validateShellSchema(shell, expectedOptions) {
     // a ceiling decision, not a validator one. Until then the S+F pipeline
     // authors no design language and its books render as their archetype, which
     // is exactly what the pre-W6 behaviour was.
-    errors = errors.concat(designLanguageFloorErrors(shell.meta, 'Shell'));
+    errors = errors.concat(designLanguageFloorErrors(shell.meta, WHERE));
 
     // ── The arrangement floor (ARRANGEMENT.md phase A) ──
     // BOTH seats, and the contrast with the paragraph above is the whole
@@ -4447,8 +4577,15 @@ export function validateShellSchema(shell, expectedOptions) {
     // generateSkeletonPrompt, so the S+F compiler seat runs the same floor on
     // the same surface, and neither pipeline is blocked on something its own
     // prompt never named.
-    errors = errors.concat(arrangementFloorErrors(shell.meta, 'Shell'));
+    errors = errors.concat(arrangementFloorErrors(shell.meta, WHERE));
+  }
 
+  // ── THE SPINE SEAT'S FLOORS (meta.playSpine) ─────────────────────────────
+  // The three cross-reference-dense floors, and the reason the split's biggest
+  // relative win lands here: this seat is now handed a FINISHED rulebook and a
+  // FINISHED identity, so every one of these compares the graph against a
+  // printed given rather than against a decision the same call made earlier.
+  if (floorsOn(expectedOptions) && arm.spine) {
     // ── The closure floors (W4a) ──
     // The standard pipeline runs the compiler HERE, so the spine is declared
     // here or nowhere on this path. The shell carries no week material, only
@@ -4457,7 +4594,7 @@ export function validateShellSchema(shell, expectedOptions) {
     errors = errors.concat(collectSpineSkeletonFloorErrors(
       (shell.meta || {}).playSpine,
       { weekCount: Number((expectedOptions || {}).weekCount) || 0 },
-      'Shell',
+      WHERE,
       // The SAME array the pre-flight floor below is handed — derivePlannedWeekShapes'
       // output (D166's one deload derivation). It funds the deload exhale exemption
       // on the tension floor; a caller with no plan gets no exemption.
@@ -4474,7 +4611,7 @@ export function validateShellSchema(shell, expectedOptions) {
     errors = errors.concat(collectRulebookSpineParityErrors(
       (expectedOptions || {}).gameRulebook,
       (shell.meta || {}).playSpine,
-      'Shell'
+      WHERE
     ));
 
     // ── The earliest-stage pre-flight (D143) ──
@@ -4493,14 +4630,14 @@ export function validateShellSchema(shell, expectedOptions) {
         // stage has already failed for its absence.
         mechanicGrammarFamily: ((shell.meta || {}).artifactIntent || {}).mechanicGrammarFamily
       },
-      'Shell'
+      WHERE
     ));
   }
 
-  if (shell.meta) {
+  if (arm.identity && shell.meta) {
     if (!shell.meta.blockTitle) errors.push('meta.blockTitle missing');
-    if (!shell.meta.worldContract) warnings.push('Shell → meta: missing worldContract');
-    if (!shell.meta.artifactIdentity) warnings.push('Shell → meta: missing artifactIdentity');
+    if (!shell.meta.worldContract) warnings.push(WHERE + ' → meta: missing worldContract');
+    if (!shell.meta.artifactIdentity) warnings.push(WHERE + ' → meta: missing artifactIdentity');
 
     // narrativeVoice — render.js reads .person and .tense
     var nv = shell.meta.narrativeVoice;
@@ -4521,7 +4658,7 @@ export function validateShellSchema(shell, expectedOptions) {
   }
 
   // ── Cover required fields (renderer reads all three) ──────────────────────
-  if (shell.cover) {
+  if (arm.rules && shell.cover) {
     if (!shell.cover.title) errors.push('cover.title missing');
     if (!shell.cover.designation) errors.push('cover.designation missing');
     if (!shell.cover.tagline) errors.push('cover.tagline missing');
@@ -4531,15 +4668,27 @@ export function validateShellSchema(shell, expectedOptions) {
   }
 
   // ── Rules spread right page instruction ───────────────────────────────────
-  if (shell.rulesSpread && shell.rulesSpread.rightPage) {
+  if (arm.rules && shell.rulesSpread && shell.rulesSpread.rightPage) {
     if (!shell.rulesSpread.rightPage.instruction) {
       errors.push('rulesSpread.rightPage.instruction missing');
     }
   }
 
-  if (!shell.theme) warnings.push('Shell → theme: missing entirely');
+  // ── The theme seat's own output ───────────────────────────────────────────
+  // Two severities, one demand, selected by the arm set (see SHELL_ARM_SETS'
+  // header for why). Unconditional rather than under floorsOn(), on its
+  // siblings' precedent: "the stage returned nothing" is a structural failure of
+  // the call, not a generation-policy heuristic, and the two arms that already
+  // error on it are ungated too.
+  if (arm.theme && !shell.theme) {
+    if (arm.themeSeat) {
+      errors.push(WHERE + ' → theme is missing entirely — this stage exists to author it');
+    } else {
+      warnings.push(WHERE + ' → theme: missing entirely');
+    }
+  }
   if (warnings.length > 0) {
-    console.warn('[LiftRPG] Shell advisory:', warnings.join('; '));
+    console.warn('[LiftRPG] ' + WHERE + ' advisory:', warnings.join('; '));
   }
   return {
     valid: errors.length === 0,
@@ -7022,8 +7171,24 @@ var REPAIR_STAGE_LABEL_KEYS = {
   'story plan': 'campaignPlan',
   'campaign plan': 'campaignPlan',
   'skeleton': 'skeleton',
-  'shell': 'shell',
-  'booklet setup': 'shell',
+  // ── THE SHELL SPLIT: four seats behind one retired label ─────────────────
+  // Every shell floor used to write `Shell → …` whatever the defect was, so a
+  // palette typo and an unwired economy edge routed to the same 32,000-token
+  // re-roll. Each sub-stage now stamps its own prefix (SHELL_STAGE_LABELS
+  // above) and repairs land on the seat that wrote the field.
+  'shell identity': 'shellIdentity',
+  'shell rules': 'shellRules',
+  'shell theme': 'shellTheme',
+  'shell spine': 'shellSpine',
+  // The legacy prefixes, kept and pointed at the EARLIEST sub-stage. A bare
+  // `Shell → …` now only reaches here from the guided wizard's union gate or
+  // from a replayed pre-split checkpoint, and neither says which quarter it
+  // means. Routing to identity is the only conservative answer: it is the seat
+  // everything else is written against, so re-authoring from there is a
+  // superset of any narrower repair, where guessing `shellTheme` for an
+  // identity defect would re-pay a stage and fix nothing.
+  'shell': 'shellIdentity',
+  'booklet setup': 'shellIdentity',
   'world detail': 'knowing',
   'knowing': 'knowing',
   // D173. The rulebook stage's own floors carry this prefix, so a defect found
