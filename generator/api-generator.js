@@ -198,7 +198,8 @@ import {
   // reads the SAME walker the critic's revision floor and the assembled-booklet
   // pass read; there is no second description of what a legal key is anywhere
   // in this file. See unknownKeyErrorsForStage below.
-  collectUnknownKeyPaths
+  collectUnknownKeyPaths,
+  collectSchemaConstraintPaths
 } from './modules/validation.js';
 
 // The anchor the walker above resolves against. Imported here for exactly one
@@ -2985,6 +2986,67 @@ function unknownKeyErrorsForStage(config, result) {
   return errors;
 }
 
+/**
+ * schemaConstraintErrorsForStage(config, result) -> [message]
+ *
+ * ── THE OTHER HALF OF THE SCHEMA, AT THE SAME SEATS (the forge's HOLE 2) ────
+ *
+ * D197's sweep directly above asks "is every KEY in this unit declared?". This
+ * asks the rest of the same question — is every VALUE the shape the schema
+ * declares — and it does so through the SAME `unknownKeyScopes` table, the same
+ * schema node resolution, and the same derived-never-described law. Splitting
+ * the scopes into two tables would be the second roster that drifts.
+ *
+ * WHY IT HAD TO EXIST. `mechanicGrammarFamily: 'attrition-spiral'` is declared
+ * `enum: VALID_MECHANIC_GRAMMAR_FAMILIES` in `booklet-schema.mjs`, is refused by
+ * `npm run validate`, and cleared EVERY paid stage — measured by
+ * `scripts/adversarial-forge.mjs`, where it stood as a frozen HOLE. The
+ * delivery path never runs the canonical validator, so the first reader that
+ * could refuse it was a human opening a terminal after the money was spent, and
+ * that is why every delivered book to date fails `npm run validate` while every
+ * stage reported success.
+ *
+ * SEVERITY IS BLOCKING, and it is the same argument the key sweep makes: a unit
+ * that cannot pass the canonical validator is a unit that cannot ship, the
+ * remedy is always available to the model (pick a menu value, cut the string,
+ * send the declared type, supply the field), and refusing it at the stage that
+ * wrote it costs one retry instead of a whole book.
+ *
+ * THE TEACHING HALF, one row per arm, in scripts/floor-teaching-registry.mjs:
+ * `stage-schema-enum` (teaching DERIVED — `enumMenusAreTaught()` in validate.mjs
+ * requires every value of every closed menu to be published in prompt_rules.js,
+ * which is what seventy-two hand-written rows would have approximated badly),
+ * `stage-schema-maxlength-*` (one row per schema ceiling, each anchored on the
+ * sentence that states its number, with the row set held to the schema's own
+ * ceilings by the registry gate's census), and `stage-schema-type` /
+ * `stage-schema-required` (argued self-evident on each stage prompt's own shape
+ * block plus the structured transports' wire schema — with the unforced-stage
+ * residual stated on the rows rather than implied).
+ *
+ * D256 pointed here at a single row `stage-schema-constraints` that was never
+ * written; the four rows above are that pointer, made real.
+ */
+function schemaConstraintErrorsForStage(config, result) {
+  var scopes = config && config.unknownKeyScopes;
+  if (!Array.isArray(scopes) || scopes.length === 0) return [];
+  var errors = [];
+  scopes.forEach(function (scope) {
+    var node = resolveSchemaNodeAt(scope.schemaPath);
+    if (!node) return;   // already reported loudly by the key sweep's anti-vacuity arm
+    var unit = readStageUnitAt(result, scope.from);
+    if (!unit || typeof unit !== 'object') return;
+    var label = scope.label || scope.from || '';
+    collectSchemaConstraintPaths(unit, node, '').forEach(function (finding) {
+      // OUR DEBRIS IS NOT THE MODEL'S DEFECT — the same filter, and the same
+      // reason, as the key sweep above: this gate runs after config.autoRepair,
+      // and autoRepairWeek writes `_overflowRepairs` onto the week it repairs.
+      if (String(finding.path).split(/[.[]/).some(function (seg) { return seg.charAt(0) === '_'; })) return;
+      errors.push('`' + joinUnknownKeyPath(label, finding.path) + '` ' + finding.message);
+    });
+  });
+  return errors;
+}
+
 // ── THE RUN'S STOP SIGNAL (DR-23) ────────────────────────────────────────────
 //
 // ONE CARRIER, and it is `settings` — the same idiom `_systemPrompt`,
@@ -3379,6 +3441,30 @@ async function runJsonStage(settings, config) {
         keyErr._stageKey = config.stageKey || '';
         keyErr.repairRoute = describeRepairRoute(keyErr, config.stageName);
         throw keyErr;
+      }
+
+      // ── THE CONSTRAINT GATE (the forge's HOLE 2) ────────────────────────
+      // The key sweep above asks whether every field is DECLARED; this asks
+      // whether every value is the SHAPE the schema declares — off-menu enum,
+      // over-ceiling string, wrong type, missing required. Same scope table,
+      // same derivation from booklet-schema.mjs, same failure shape, and the
+      // same remedy class ("send what the schema says"), so it is thrown the
+      // same way. Ordered AFTER the key sweep deliberately: an invented key
+      // often carries an off-menu value too, and the key sweep's "delete it"
+      // is the cheaper of the two repairs to be told first.
+      var constraintErrors = schemaConstraintErrorsForStage(config, result);
+      if (constraintErrors.length > 0) {
+        var conErr = new Error(constraintErrors.join('; '));
+        conErr.errorType = 'schema';
+        conErr.retryable = true;
+        conErr.budgetBreachCount = 0;
+        conErr.blockingCount = constraintErrors.length;
+        conErr.finishReason = attemptFinishReason;
+        conErr._failedOutput = result;
+        conErr._blockingErrors = constraintErrors;
+        conErr._stageKey = config.stageKey || '';
+        conErr.repairRoute = describeRepairRoute(conErr, config.stageName);
+        throw conErr;
       }
 
       var summary = summarizeStageTelemetry(stageTelemetry);
@@ -7933,6 +8019,7 @@ window.LiftRPGAPI = {
     // contract (including its `_x` exemption and its anti-vacuity behaviour)
     // without driving a paid stage.
     unknownKeyErrorsForStage: unknownKeyErrorsForStage,
+    schemaConstraintErrorsForStage: schemaConstraintErrorsForStage,
     // ── The delta-repair seam (D167), exported for the gates ────────────────
     // Pure functions with no transport, no DOM and no window dependency, so the
     // floors harness can hold them to their contracts with no port and no
