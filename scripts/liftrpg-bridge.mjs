@@ -240,7 +240,19 @@ const BACKENDS = {
     // could do. It was already being parsed here and then dropped on the floor;
     // nothing downstream had ever seen it.
     billing: 'measured',
-    billingSource: 'the Claude Code CLI\'s own accounting'
+    billingSource: 'the Claude Code CLI\'s own accounting',
+    // ── CAN THIS DOOR FORCE A SCHEMA ON THE WIRE? (2026-08-20) ───────────────
+    // Another capability column, read once in handleChatCompletions and nowhere
+    // else (D237's law). `--json-schema` on this CLI takes our schemas as
+    // written, so this door genuinely forces.
+    //
+    // ABSENT MEANS NO, ON PURPOSE. A backend added later that forgets this
+    // column degrades to an announced refusal rather than to a silent claim of
+    // forcing — the fail-safe direction, because the failure this column exists
+    // to prevent is invisible: "a stage that believes it was forced when it was
+    // only asked is a defect" (this file's own gemini note, written before the
+    // codex door proved it).
+    forcesSchema: true
   },
   codex: {
     prefix: '/codex',
@@ -262,7 +274,42 @@ const BACKENDS = {
     // streaming path reads this and relays the accumulated text as a single
     // chunk instead of assuming deltas that never come — a streaming client
     // that got an empty stream would be the D102 failure exactly.
-    streamsTextDeltas: false
+    streamsTextDeltas: false,
+    // ── NO WIRE-LEVEL SCHEMA FORCING ON THIS DOOR (2026-08-20) ───────────────
+    // Found on the author's first real Codex proving run, first stage, first
+    // call. `--output-schema` exists, and it is NOT the loose forcing this
+    // pipeline's schemas are written for: the CLI hands the file to OpenAI's
+    // STRICT structured-output validator, which rejected the very first stage
+    //
+    //   [Game Rulebook] API error: Codex CLI: Invalid schema for response_format
+    //   'codex_output_schema': In context=(), 'additionalProperties' is required
+    //   to be supplied and to be false.
+    //
+    // `context=()` is the ROOT object. Satisfying it would only have moved the
+    // error inward — measured over the eight evaluated STRUCTURED_SCHEMA_*
+    // objects: 70 of 72 object nodes carry no `additionalProperties`, so the
+    // cascade is 70 deep. And strict mode's SECOND demand is the one that
+    // decides this: every property must appear in `required`, optionals
+    // rewritten as nullable unions. That would force 59 currently-optional
+    // properties to be answered — `weekPlan[].isDeload`, `exercises[].
+    // weightField`, `gameRulebook.unprintableWants` among them — inviting an
+    // explicit `null` where absence is legal today. Explicit-null is a FILED
+    // defect class here (D117: repsPerSet −1/null reached a printed rep box),
+    // and the canonical schema type-rejects a null where it expects an array or
+    // a boolean. Transforming the schemas would buy wire enforcement at the
+    // price of null-stuffing all eight stages plus a null-stripping pass to
+    // undo it. Declined on that evidence, not on taste.
+    //
+    // So this door asks rather than forces, and SAYS SO — see
+    // schemaForcingRefusal(). Nothing here is a workaround: it is the same
+    // arrangement every unforced stage in this pipeline already runs under
+    // ("forcing a schema is a CAPABILITY, never a format" — D162), with the
+    // prompt carrying the shape and the stage validator carrying the teeth.
+    forcesSchema: false,
+    schemaForcingBlocker: 'Its --output-schema is validated under OpenAI STRICT '
+      + 'structured-output rules (every object node must declare additionalProperties '
+      + 'false, and every property must be listed as required), which this pipeline\'s '
+      + 'stage schemas are not written for.'
   },
   gemini: {
     prefix: '/gemini',
@@ -698,6 +745,53 @@ function withBillingFacts(usage, backend, costUsd) {
   return out;
 }
 
+// ── THE DEGRADATION ANNOUNCES ITSELF (2026-08-20) ────────────────────────────
+// A backend that cannot force a schema must not quietly answer as though it
+// had. Silently dropping the forcing would leave the client's meta reading
+// `response_mode: 'json_schema'` for a stage that was merely ASKED — the
+// precise shape D162/D163 forbid, and the one this file already names in its
+// gemini note ("a stage that believes it was forced when it was only asked is
+// a defect").
+//
+// THE CHANNEL IS THE ONE THAT ALREADY EXISTS, and this is why the wording
+// below is load-bearing rather than prose. The client's refusal matcher
+// (error-classify.js structuredOutputRefusalReason) is CONJUNCTIVE — a refusal
+// word AND a forcing subject — and provider-blind by design. Hitting it makes
+// the whole D162 apparatus fire on its own:
+//
+//   callOpenAICompatStructured  sees the 400, isStructuredOutputUnsupportedMessage
+//                               matches -> err.structuredUnsupported = true
+//   callProviderStructured      shouldFallbackFromStructured -> re-calls unforced,
+//                               console.warns SCHEMA FORCING LOST, and stamps
+//                               meta.response_mode = 'freeform_fallback' plus
+//                               meta.structuredFallback { stageName, reason,
+//                               providerMessage }
+//   the stage runner            turns that into a pipeline event and a run-report
+//                               line naming the stage and this door's own words
+//
+// So the run log says the stage ran unforced, in the mechanism already built
+// and already tested for exactly this — no client edit, no second announcement
+// path, no new vocabulary downstream.
+//
+// TWO PROPERTIES OF THIS STRING ARE ASSERTED BY --self-test, because both
+// failure modes are silent:
+//   · it MUST match structuredOutputRefusalReason (refusal word + subject) or
+//     the stage hard-fails instead of degrading, and the author's run dies at
+//     the first stage exactly as it did today;
+//   · it MUST NOT match isLikelyTruncationError, which callProviderStructured
+//     checks SECOND and which rethrows past the fallback. So: no "truncated",
+//     no "max_tokens", no "unexpected end", no "finish_reason".
+//
+// The refusal is a 400 and costs NOTHING — it is returned before any child is
+// spawned, so the fallback's second call is the only call this door pays for.
+function schemaForcingRefusal(backend) {
+  return 'Bridge: the ' + (backend.label || 'backend') + ' does not support the '
+    + 'response_format / json_schema forcing this request asked for. '
+    + (backend.schemaForcingBlocker ? backend.schemaForcingBlocker + ' ' : '')
+    + 'Re-send this stage without response_format: the prompt states the required JSON '
+    + 'shape, and the stage validator is the enforcement on this door.';
+}
+
 // ── Spawning one generation ──────────────────────────────────────────────────
 // Resolves { text, usage, stopReason, model, costUsd } or rejects with an Error
 // carrying `.rateLimited` / `.status` so the HTTP layer can shape it.
@@ -931,6 +1025,16 @@ function generate({ prompt, system, schema, model, maxTokens, onDelta, onActivit
 // — the raw JSON arrives as the agent message's TEXT, so the schema path needs
 // no separate extraction. The `-o` file received the identical string.
 //
+//   *** THAT PROBE'S SCHEMA WAS A TWO-FIELD TOY, AND THAT IS WHY IT PASSED. ***
+//   Corrected 2026-08-20 by the author's first real proving run: `--output-schema`
+//   is validated under OpenAI's STRICT structured-output rules, which no schema
+//   this pipeline owns satisfies. The bridge no longer sends the flag at all and
+//   refuses the forcing out loud instead — the reasoning, the measurement and the
+//   rejected alternative are on the codex BACKENDS row. The transcript above is
+//   kept because it is still a true record of what the binary emits; what was
+//   wrong was the generalisation drawn from it, not the capture. A probe whose
+//   fixture is simpler than production proves the fixture.
+//
 // A failed turn, from the probe that found the model wall:
 //   {"type":"item.completed","item":{"id":"item_0","type":"error","message":
 //     "Model metadata for `gpt-5.4` not found. Defaulting to fallback metadata…"}}
@@ -962,6 +1066,10 @@ function generate({ prompt, system, schema, model, maxTokens, onDelta, onActivit
 //   enforced by nothing. A truncation retry on this door escalates a ceiling
 //   the wire never carried. That is a known hole, not an oversight, and it is
 //   the open ruling named on the BACKENDS table.
+// · NO USABLE SCHEMA FORCING. `--output-schema` exists and is strict-only, so
+//   this door ASKS for a shape and never forces one. It says so on every
+//   schema-bearing request rather than answering as though it had forced —
+//   schemaForcingRefusal(), and the `forcesSchema` column that routes to it.
 // · NO SYSTEM-PROMPT CHANNEL. There is no --system-prompt flag, so the system
 //   message is folded into the prompt under a labelled delimiter below.
 // · NO MODEL MENU. Every concrete id tried (gpt-5, gpt-5-codex, gpt-5.1-codex,
@@ -1030,24 +1138,19 @@ function generateCodex({ prompt, system, schema, model, maxTokens, onActivity, o
     const requested = String(model == null ? '' : model);
     if (CLI_DEFAULT_SENTINELS.indexOf(requested) === -1) args.push('-m', requested);
 
-    // The schema is a FILE on this CLI. Written per call and removed when the
-    // call settles, whichever way it settles.
-    let schemaPath = '';
+    // NO --output-schema IS EVER WRITTEN ON THIS DOOR (2026-08-20). It used to
+    // be: the schema was staged to a temp file and passed, and OpenAI's strict
+    // validator rejected the request before the model ran. The reasoning, the
+    // measurements and the rejected alternative live on the codex BACKENDS row.
+    //
+    // handleChatCompletions refuses a schema-bearing request for this backend
+    // before it ever reaches here, so this guard is unreachable through HTTP.
+    // It exists anyway, because the ONLY bad version of this function is one
+    // that accepts a schema and quietly ignores it — a direct caller must be
+    // told no, not humoured.
     if (schema) {
-      try {
-        schemaPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'liftrpg-codex-schema-')), 'schema.json');
-        fs.writeFileSync(schemaPath, JSON.stringify(schema));
-        args.push('--output-schema', schemaPath);
-      } catch (err) {
-        return reject(Object.assign(
-          new Error('Bridge: could not stage the codex output schema: ' + (err && err.message)),
-          { status: 500 }));
-      }
-    }
-    function cleanupSchema() {
-      if (!schemaPath) return;
-      try { fs.rmSync(path.dirname(schemaPath), { recursive: true, force: true }); } catch (_e) { /* gone */ }
-      schemaPath = '';
+      return reject(Object.assign(
+        new Error(schemaForcingRefusal(BACKENDS.codex)), { status: 400 }));
     }
 
     let child;
@@ -1089,7 +1192,6 @@ function generateCodex({ prompt, system, schema, model, maxTokens, onActivity, o
       if (settled) return;
       settled = true;
       clearWatchdog();
-      cleanupSchema();
       reject(Object.assign(new Error(message), extra || {}));
     }
     function onSilence() {
@@ -1185,7 +1287,6 @@ function generateCodex({ prompt, system, schema, model, maxTokens, onActivity, o
       if (settled) return;
       settled = true;
       clearWatchdog();
-      cleanupSchema();
       if (fatal) {
         // A quota wall on this backend is expected, not exceptional, and is
         // mapped onto the wire format's structural throttle shape exactly as
@@ -1384,6 +1485,16 @@ async function handleChatCompletions(req, res, backendName) {
 
   log(backendName + ' · ' + (wantsStream ? 'stream' : 'one-shot') + (schema ? '+schema' : '')
     + ' · model=' + (body.model || 'default') + ' · prompt=' + prompt.length + ' chars');
+
+  // THE CAPABILITY GATE, ahead of every spawn and ahead of the stream headers
+  // so the refusal can still carry a status code. One read of one column; see
+  // schemaForcingRefusal() for why the message's wording is a contract and not
+  // prose. `!== true` rather than `=== false`: a backend row that forgets the
+  // column refuses honestly instead of claiming a capability nobody checked.
+  if (schema && backend.forcesSchema !== true) {
+    log(backendName + ' · refusing wire-level schema forcing (this door asks; it cannot force)');
+    return sendJson(req, res, 400, errorBody(schemaForcingRefusal(backend), 'bridge_error'));
+  }
 
   if (!wantsStream) {
     try {
@@ -2313,8 +2424,7 @@ async function selfTest() {
   {
     const res = await codexPost({
       model: 'default',
-      messages: [{ role: 'system', content: 'SYSTEM-MARKER' }, { role: 'user', content: 'USER-MARKER' }],
-      response_format: { type: 'json_schema', json_schema: { schema: { type: 'object', properties: { a: { type: 'string' } } } } }
+      messages: [{ role: 'system', content: 'SYSTEM-MARKER' }, { role: 'user', content: 'USER-MARKER' }]
     }, 'echo-invocation');
     const seen = JSON.parse((await res.json()).choices[0].message.content);
     const argv = seen.argv;
@@ -2335,10 +2445,122 @@ async function selfTest() {
     ok('codex: the system message is folded into the prompt, not dropped',
       seen.stdin.includes('SYSTEM-MARKER') && seen.stdin.includes('USER-MARKER')
         && seen.stdin.includes('END INSTRUCTIONS'), seen.stdin.slice(0, 120));
-    // --output-schema takes a PATH. Asserted by reading the file back.
-    ok('codex: the schema reaches the CLI as a readable FILE, not inline JSON',
-      argv.includes('--output-schema') && seen.schemaText.includes('"properties"'),
-      seen.schemaText.slice(0, 120));
+    // RETARGETED 2026-08-20. This slot used to assert the opposite — that the
+    // schema reached the CLI as a readable FILE — and it was green while the
+    // author's first real Codex run died on that very flag. The fixture was a
+    // two-field toy; strict mode rejects everything this pipeline actually
+    // owns. The assertion now pins the world that replaced it: on a request
+    // with NO schema, nothing schema-shaped is sent, which is also the negative
+    // half of the refusal assertions below.
+    ok('codex: a schemaless request sends no --output-schema and stages no file',
+      !argv.includes('--output-schema') && !seen.schemaText,
+      argv.join(' '));
+  }
+
+  // ── THE SCHEMA-FORCING REFUSAL (2026-08-20) ────────────────────────────────
+  // The defect: `--output-schema` is strict-only, so every forced stage 400'd
+  // at the API before the model ran. The fix must not merely stop sending the
+  // flag — dropping it silently would answer a forced stage as though it had
+  // been forced, which is the one shape D162/D163 forbid.
+  //
+  // Every assertion below is on a SILENT failure mode. Read together they are
+  // the whole contract: nothing is spawned, nothing is paid, the client's own
+  // matcher reads it as a capability miss and degrades WITH an announcement,
+  // and the two predicates that could route it to a hard failure instead are
+  // pinned negative.
+  {
+    const before = liveChildren.size;
+    const res = await codexPost({
+      model: 'default',
+      messages: msg,
+      response_format: { type: 'json_schema', json_schema: { name: 'game_rulebook', strict: false, schema: { type: 'object', properties: { a: { type: 'string' } } } } }
+    }, 'echo-invocation');
+    const out = await res.json();
+    const message = String((out.error && out.error.message) || '');
+
+    ok('codex: a schema-bearing request is refused, not answered as if forced',
+      res.status === 400 && !!out.error, res.status + ' ' + JSON.stringify(out).slice(0, 160));
+    // THE ONE THAT COSTS MONEY IF IT REGRESSES. The refusal is a capability
+    // statement, so it must arrive before anything is spawned — the fallback's
+    // second call is then the only call this door pays for.
+    ok('codex: the refusal spawns no child and pays for nothing',
+      liveChildren.size === before, before + ' -> ' + liveChildren.size);
+    ok('codex: the refusal names the flag it will not send and why',
+      /--output-schema/.test(message) && /STRICT/.test(message), message.slice(0, 200));
+
+    // ── THE ANNOUNCEMENT CHANNEL, asserted through the client's own predicates
+    // rather than a copy of them. This is the whole degradation mechanism: if
+    // this matcher stops firing, the stage HARD-FAILS and the author's run dies
+    // at stage one exactly as it did on 2026-08-20.
+    ok('codex: the refusal reads to the client as a structured-output capability miss',
+      classify.structuredOutputRefusalReason(message) === 'response_format',
+      'matched ' + JSON.stringify(classify.structuredOutputRefusalReason(message)));
+    ok('codex: the client will therefore DEGRADE the stage rather than fail it',
+      classify.shouldFallbackFromStructured({ status: res.status, message }));
+    // The second predicate callProviderStructured consults, and it is checked
+    // with an OR that RETHROWS past the fallback. A refusal that reads as a
+    // truncation is a refusal that never degrades — silently, and only on the
+    // real run.
+    ok('codex: the refusal does not read as a truncation (which would bypass the fallback)',
+      !classify.isLikelyTruncationError({ message }));
+    // Permanent, so the escalation ladder must not spend three attempts on it.
+    ok('codex: the refusal is fatal for this attempt, not retryable and not a throttle',
+      res.status < 500 && res.status !== 429 && res.status !== 503
+        && !classify.isLikelyThrottleError({ status: res.status, message }), 'got ' + res.status);
+  }
+  {
+    // THE STREAMING HALF, and it exists because a mutation survived without it.
+    // Deleting the capability gate in handleChatCompletions left every
+    // assertion above green: generateCodex's own defensive guard rejects the
+    // same way, so the ONE-SHOT path is indistinguishable. The streaming path
+    // is not. A rejection that arrives after openStream() cannot carry a status
+    // code — it rides an SSE `error` frame, which readOpenAICompatStream marks
+    // RETRYABLE, so a permanent capability miss would be retried through the
+    // whole escalation ladder instead of degrading once. The gate must
+    // therefore fire BEFORE the headers, and this is what says so.
+    const before = liveChildren.size;
+    process.env.BRIDGE_CODEX_SCENARIO = 'schema';
+    const res = await fetch(base + '/codex/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: 'default', stream: true, messages: msg,
+        response_format: { type: 'json_schema', json_schema: { name: 'game_rulebook', strict: false, schema: { type: 'object', properties: { a: { type: 'string' } } } } }
+      })
+    });
+    const raw = await res.text();
+    ok('codex: a STREAMING schema request is refused with a status, not mid-stream',
+      res.status === 400 && !/^data: /m.test(raw) && !raw.includes('[DONE]'),
+      res.status + ' ' + raw.slice(0, 160));
+    ok('codex: the streaming refusal carries the same words the one-shot one does',
+      classify.structuredOutputRefusalReason(String((JSON.parse(raw).error || {}).message || '')) === 'response_format',
+      raw.slice(0, 160));
+    ok('codex: the streaming refusal spawns no child either',
+      liveChildren.size === before, before + ' -> ' + liveChildren.size);
+  }
+  {
+    // THE OTHER HALF: the same request WITHOUT response_format is the call the
+    // client's fallback actually makes, and it must succeed. A refusal that
+    // degraded into a door that then refused everything would be a worse
+    // failure than the one being fixed.
+    const res = await codexPost({ model: 'default', messages: msg }, 'ok');
+    const out = await res.json();
+    ok('codex: the unforced retry the fallback makes is answered normally',
+      res.status === 200 && out.choices[0].message.content === 'PROBE',
+      res.status + ' ' + JSON.stringify(out).slice(0, 140));
+  }
+  {
+    // THE CAPABILITY COLUMN IS REAL, not a codex-shaped branch. The claude door
+    // declares forcing and must be untouched by all of the above — the
+    // regression to fear is a gate that learned "schema" instead of "backend".
+    ok('claude: the live door still declares wire-level schema forcing',
+      BACKENDS.claude.forcesSchema === true);
+    ok('codex: the door declares its incapacity on the table, not in a branch',
+      BACKENDS.codex.forcesSchema === false && !!BACKENDS.codex.schemaForcingBlocker);
+    // Absent-means-no. A backend row added later that forgets the column must
+    // refuse honestly rather than claim a capability nobody checked.
+    ok('a backend that declares nothing is treated as unable to force',
+      ({}).forcesSchema !== true);
   }
   {
     const res = await codexPost({ model: 'gpt-5-codex', messages: msg }, 'echo-invocation');

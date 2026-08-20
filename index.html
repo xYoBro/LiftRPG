@@ -4553,6 +4553,7 @@
           caveats: [
             'No output ceiling: the Codex CLI has no maximum-output setting, so LiftRPG’s per-stage token budget is written into the prompt and enforced by nothing. It also reports every answer as finished, so a stage that was cut off arrives looking complete.',
             'Fixed overhead on every call: Codex wraps each request in its own agent framing, measured at about 17,300 input tokens on a call whose prompt was six words, and it is charged again at every stage of the build. This door is not billed per token, so the run log shows exact token counts and no dollar figure — the framing is why those counts run well above the text LiftRPG actually sent.',
+            'Schema enforcement is prompt-level here: the Codex CLI only accepts stricter schemas than LiftRPG’s stages use, so this door asks for each stage’s JSON shape in words rather than holding the model to it on the wire. The Claude door forces the shape instead. Stages that answer in the wrong shape are still caught by the same validators either way, and the run log names any stage that ran unforced.',
             'Landed, not proven: real calls through the real CLI return real answers, and no full book has been built through this backend end to end.'
           ]
         },
