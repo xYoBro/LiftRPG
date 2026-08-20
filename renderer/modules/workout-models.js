@@ -185,11 +185,17 @@ function buildProgressionTargetModel(progressionTarget) {
 function buildFormModel(formSpec) {
   const spec = (formSpec && typeof formSpec === 'object') ? formSpec : {};
   const form = resolveSessionCardForm(spec.form);
-  if (form === 'bare') return { form: 'bare', markInstruction: '', rulesPointer: '' };
+  if (form === 'bare') {
+    return { form: 'bare', markInstruction: '', rulesPointer: '', openingRitual: '' };
+  }
   return {
     form,
     markInstruction: String(spec.markInstruction || '').trim(),
-    rulesPointer: String(spec.rulesPointer || '').trim()
+    rulesPointer: String(spec.rulesPointer || '').trim(),
+    // The book's own printed session ritual (gameRulebook.sessionShape.ritual.cue).
+    // Empty for every book written before the field existed, and an empty string
+    // draws nothing — so the pre-ritual render is unchanged by construction.
+    openingRitual: String(spec.openingRitual || '').trim()
   };
 }
 

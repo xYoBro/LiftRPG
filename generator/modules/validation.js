@@ -5289,6 +5289,17 @@ function rulebookTaughtText(rulebook) {
     parts.push(String((item || {}).verb || ''));
     parts.push(String((item || {}).on || ''));
   });
+  // THE RITUAL IS TAUGHT MATERIAL BY THE STRONGEST ARGUMENT AVAILABLE, and the
+  // verb list's reason raised one level: the cue is not merely part of the
+  // rules, it is the part PRINTED ON EVERY SESSION PAGE. A surface the player
+  // is instructed to act on at the top of every workout is the most taught
+  // thing in the book, and a graph→rules arm that called it untaught would be
+  // reporting the opposite of what the pages say.
+  var ritual = ((rulebook || {}).sessionShape || {}).ritual;
+  if (ritual && typeof ritual === 'object') {
+    parts.push(String(ritual.cue || ''));
+    parts.push(String(ritual.on || ''));
+  }
   return parts.join('\n').toLowerCase();
 }
 
@@ -5552,6 +5563,47 @@ export function validateGameRulebookStage(result, options) {
     }
   }
 
+  // ── THE SESSION RITUAL (the play-legibility root cause, 2026-08-19) ─────
+  // VISION §4.0's "printed at the point of use, shaped as a form" was ratified
+  // and unbuilt: the first delivered book taught "roll two d10 at the start of
+  // the session" on a rules page and printed nothing on the page the player
+  // opens at the gym. `sessionShape.answer` is a designer's paragraph and never
+  // prints, by ruling — so nothing carried the answer to "what do I do now" to
+  // the one place it is asked.
+  //
+  // THREE DEMANDS AND A GRAMMAR CHECK, all of them here rather than at the
+  // spine seat, because every one is answerable from this document ALONE. The
+  // fourth half — that `on` names a surface the economy graph touches — needs
+  // both sides and lives in collectRulebookSpineParityErrors with the verbs'.
+  {
+    var ritual = (rulebook.sessionShape || {}).ritual;
+    if (!ritual || typeof ritual !== 'object' || Array.isArray(ritual)) {
+      errors.push(S + 'gameRulebook.sessionShape.ritual is missing — the answer above is a design'
+        + ' note that never prints, so without this the player opens a session page at the gym'
+        + ' with no indication of what to do first. Write the opening move as one printed'
+        + ' imperative (`cue`) on one named surface (`on`)');
+    } else {
+      var cue = String(ritual.cue === undefined || ritual.cue === null ? '' : ritual.cue).trim();
+      if (!cue) {
+        errors.push(S + 'gameRulebook.sessionShape.ritual.cue is empty — this is the sentence the'
+          + ' session card prints, and an empty one prints nothing at the moment it is needed');
+      } else if (cue.length > band.ritualCueMaxChars) {
+        errors.push(S + 'gameRulebook.sessionShape.ritual.cue is ' + cue.length
+          + ' characters against a ceiling of ' + band.ritualCueMaxChars
+          + '. This prints at the top of every session page and is read mid-set: past two printed'
+          + ' lines it stops being a cue and becomes a paragraph the player skips. Say the one'
+          + ' thing they do first');
+      }
+      var ritualOn = String(ritual.on === undefined || ritual.on === null ? '' : ritual.on).trim();
+      if (!parseSurfaceRef(ritualOn).valid) {
+        errors.push(S + 'gameRulebook.sessionShape.ritual.on '
+          + (ritualOn ? '"' + ritualOn + '" is not a surface ref' : 'is empty')
+          + ' — the ritual happens somewhere, and the next stage has to wire it to that surface;'
+          + ' write it in the `kind:id` grammar from the Surface refs section');
+      }
+    }
+  }
+
   if (!String(((rulebook.economy || {}).currency) || '').trim()) {
     errors.push(S + 'gameRulebook.economy.currency is empty — the economy owes the name this'
       + ' world calls its currency, because that exact phrase is what the book prints and'
@@ -5625,6 +5677,20 @@ export function collectRulebookSpineParityErrors(rulebook, spine, stageLabel) {
       + '`, and no `playSpine.economyGraph` edge names that surface. A verb performed on a'
       + ' node no edge touches is a system nothing validates and nothing simulates');
   });
+  // 2b. THE SESSION RITUAL happens on a surface the graph touches. The verbs'
+  //     check exactly, and separate because the repair is different: a verb
+  //     with a dead surface is a rule nobody performs, and a RITUAL with a dead
+  //     surface is a rule printed on every session page pointing at nothing —
+  //     the loudest version of the same failure, on the surface the player
+  //     reads most often.
+  var ritualOn = String((((rulebook.sessionShape || {}).ritual) || {}).on || '').trim();
+  if (ritualOn && !hasNode(ritualOn)) {
+    errors.push(S + 'the rulebook prints an opening ritual on `' + ritualOn
+      + '` at the top of every session page, and no `playSpine.economyGraph` edge names that'
+      + ' surface. This is the one instruction the player reads every session, so a ritual'
+      + ' aimed at a node no edge touches is the book\'s most-read sentence pointing at'
+      + ' nothing — wire the surface or move the ritual to one the economy already reaches');
+  }
   // 3-4. the win condition and the password path reach the graph
   [['winCondition', 'requires', 'the win condition requires'],
     ['passwordPath', 'elements', 'the password is assembled from']].forEach(function (row) {

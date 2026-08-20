@@ -776,9 +776,13 @@ var processParticulars = {
 //                          important rule in the book, because it is the only
 //                          one that can fail silently and take the whole ending
 //                          with it.
-// Questions 5-8 carry no companion and that is a ruling, not a gap: a session's
-// shape, a week's shape, what can go badly and the teaching order are read by
-// people, and a structured mirror of them would be paperwork no floor reads.
+//   sessionShape.ritual    the fifth companion, added 2026-08-19. See the long
+//                          note at the property itself: the ruling below is
+//                          narrowed here on its own premise, because a floor
+//                          now reads this one and a renderer now prints it.
+// Questions 6-8 carry no companion and that is a ruling, not a gap: a week's
+// shape, what can go badly and the teaching order are read by people, and a
+// structured mirror of them would be paperwork no floor reads.
 //
 // Refs are PLAIN STRINGS here for D129's reason, stated once at spineEconomyGraph
 // below and true for the same grammar: parseSurfaceRef matches
@@ -845,7 +849,55 @@ var gameRulebook = {
         _x: xt
       }
     },
-    sessionShape: rulebookProseAnswer,
+    // THE FIFTH COMPANION (the play-legibility root cause, 2026-08-19).
+    //
+    // The paragraph above says questions 5-8 carry no companion because "a
+    // session's shape, a week's shape, what can go badly and the teaching order
+    // are read by people, and a structured mirror of them would be paperwork no
+    // floor reads." That ruling stands for 6, 7 and 8 and is NARROWED here, on
+    // its own premise: a floor now reads this one, and a renderer now prints it.
+    //
+    // WHAT WENT WRONG WITHOUT IT. §4.0's "printed at the point of use, shaped as
+    // a form" was ratified and unbuilt. The first delivered book's rules page
+    // said "roll two d10 at the start of the session and read the week's oracle";
+    // the session page the player actually opens at the gym carried no
+    // indication to roll, or why. `sessionShape.answer` is a designer's
+    // paragraph and is right to be — it prints nowhere, by ruling. So the answer
+    // to "what do I do when I open this page" existed in the artifact and was
+    // illegible at the only moment it mattered. That is the D172 class one layer
+    // up: the information is present and unreachable at the point of use.
+    //
+    // `cue` is the one imperative sentence printed as the first step's
+    // instruction on every session card in the taught form (the D206/D212 form
+    // channel — so it sheds with the form, exactly as teaching chrome should).
+    // `on` is the surface the cue acts on, in the same `kind:id` grammar as
+    // `coreVerbs.verbs[].on` and checked the same way: valid grammar at the
+    // rulebook's own stage, a node in the economy graph at the spine seat. A cue
+    // that fires on a surface no edge touches teaches a ritual the machine has
+    // never heard of, which is §3.2's rules→graph failure at the one moment the
+    // player is standing in front of it.
+    //
+    // OPTIONAL IN THE ARTIFACT CONTRACT AND REQUIRED AT THE STAGE GATE — the
+    // D178 split this whole object carries, for its reason: no corpus fixture
+    // has a rulebook at all, the renderer treats an absent cue as no cue and
+    // prints byte-identically, and generation may still not skip it.
+    sessionShape: {
+      type: 'object',
+      required: ['answer'],
+      additionalProperties: false,
+      properties: {
+        answer: nonEmptyString,
+        ritual: {
+          type: 'object',
+          // The manifestPointer idiom: optional, but a ritual with no surface is
+          // a sentence, and a surface with no cue prints nothing.
+          required: ['cue', 'on'],
+          additionalProperties: false,
+          properties: { cue: nonEmptyString, on: nonEmptyString, _x: xt }
+        },
+        _x: xt
+      }
+    },
     weekShape: rulebookProseAnswer,
     whatGoesBadly: rulebookProseAnswer,
     teachingOrder: rulebookProseAnswer,

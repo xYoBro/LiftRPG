@@ -242,7 +242,7 @@ function renderBinaryChoice(binaryChoiceModel) {
  *
  * Text goes in through make()'s textContent, never innerHTML.
  */
-function renderStepMarker(index, note, pointer) {
+function renderStepMarker(index, notes, pointer) {
   const marker = make('div', 'session-step-marker');
 
   const head = make('div', 'session-step-head');
@@ -251,11 +251,20 @@ function renderStepMarker(index, note, pointer) {
   if (pointer) head.appendChild(make('span', 'session-step-pointer', pointer));
   marker.appendChild(head);
 
-  // The instruction rides INSIDE the marker rather than beside it. As a sibling
-  // it would be one more `.session-body` child and would buy one more body gap
-  // the estimate would have to model separately; inside, the marker's height is
-  // head + note and the arithmetic stays one term.
-  if (note) marker.appendChild(make('div', 'session-step-note', note));
+  // The instructions ride INSIDE the marker rather than beside it. As siblings
+  // they would each be one more `.session-body` child and would each buy one
+  // more body gap the estimate would have to model separately; inside, the
+  // marker's height is head + notes and the arithmetic stays one term.
+  //
+  // A LIST, NOT A STRING, because one marker can owe two notes: on a card with
+  // no exercise table the mark strip IS step 1, so the opening ritual and the
+  // marking instruction land on the same marker. Each note is one more flex
+  // child and therefore one more `STEP_NOTE_GAP_PX`, which is exactly what
+  // `taughtChromeHeightPx` charges per note — the render and the estimate
+  // count the same things.
+  (Array.isArray(notes) ? notes : [notes]).forEach((note) => {
+    if (note) marker.appendChild(make('div', 'session-step-note', note));
+  });
 
   return marker;
 }
@@ -273,25 +282,38 @@ function renderStepMarker(index, note, pointer) {
  * alone. The pointer chip prints once, on the first marker, and costs no height
  * at all (it is sized strictly under the head row) — which is why the estimate
  * has no pointer term.
+ *
+ * THE OPENING RITUAL PRINTS ON STEP 1 (VISION §4.0, built 2026-08-19), and step
+ * 1 is where it belongs for the same reason the marking instruction belongs on
+ * the strip: it is the instruction beside the field it fills. The player opens
+ * the book at the gym, and the first thing on the card is the first thing they
+ * do. Before this, that sentence lived only in `sessionShape.answer`, which is
+ * a design document that prints nowhere — so a book could teach "roll at the
+ * start of the session" on a rules page and print nothing at the moment the
+ * session starts.
  */
 function appendTaughtStep(body, child, ctx, isMarkStrip) {
   if (ctx.form === 'taught') {
     ctx.index += 1;
-    const note = isMarkStrip ? ctx.markInstruction : '';
+    const notes = [];
+    if (ctx.index === 1 && ctx.openingRitual) notes.push(ctx.openingRitual);
+    if (isMarkStrip && ctx.markInstruction) notes.push(ctx.markInstruction);
     const pointer = ctx.index === 1 ? ctx.rulesPointer : '';
-    body.appendChild(renderStepMarker(ctx.index, note, pointer));
+    body.appendChild(renderStepMarker(ctx.index, notes, pointer));
   }
   body.appendChild(child);
 }
 
 export function renderWorkoutCard(cardModel) {
   const card = make('article', 'session-card');
-  const formModel = cardModel.form || { form: 'bare', markInstruction: '', rulesPointer: '' };
+  const formModel = cardModel.form
+    || { form: 'bare', markInstruction: '', rulesPointer: '', openingRitual: '' };
   const stepCtx = {
     form: formModel.form,
     index: 0,
     markInstruction: formModel.markInstruction || '',
-    rulesPointer: formModel.rulesPointer || ''
+    rulesPointer: formModel.rulesPointer || '',
+    openingRitual: formModel.openingRitual || ''
   };
 
   const headerText = cardModel.continuationLabel

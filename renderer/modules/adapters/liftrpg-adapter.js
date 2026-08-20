@@ -298,10 +298,24 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
     // `rulesPointer` is the economy's authored noun. Both are strings the BOOK
     // wrote; a renderer that composed its own would print the same teaching in
     // every book, which is the sameness these axes exist to break.
+    // `openingRitual` is the rulebook's own printed cue
+    // (`meta.gameRulebook.sessionShape.ritual.cue`) — the book's answer to "what
+    // do I do when I open this page", which VISION §4.0 ratified as printed at
+    // the point of use and nothing carried there until now. It is the one
+    // rulebook field that reaches a page: the other eight answers are a design
+    // document that never prints, and a renderer that summarised them would
+    // have turned that document into a chapter, which is the failure §4.0 names.
+    //
+    // IT SHEDS WITH THE FORM AND OWES NO SCHEDULE OF ITS OWN. The cue is taught
+    // chrome, so `atomFormForPosition` already decides where it stops: a book
+    // declaring `taught-shed-early` teaches the ritual while it is new and gets
+    // out of the way once the player knows it. A second shed rule here would be
+    // a second answer to a question the form channel already answers.
     const cardFormSpec = {
       form: atomFormForPosition(atomForms, 'sessionCard', week.weekNumber, totalWeeks),
       markInstruction: (week.reckoning && week.reckoning.conversion) || '',
       rulesPointer: ((data.meta || {}).economy || {}).currencyLabel || '',
+      openingRitual: ((((data.meta || {}).gameRulebook || {}).sessionShape || {}).ritual || {}).cue || '',
     };
     const sessionChunks = chunkWeekSessions(week.sessions || [], week, 3, cardFormSpec);
     const primaryGroup = `week-${wi}-chunk-0`;
@@ -363,6 +377,7 @@ export function extractLiftRPGAtoms(data, unlockedEnding = null) {
             formVariant: cardFormSpec.form,
             markInstruction: cardFormSpec.markInstruction,
             rulesPointer: cardFormSpec.rulesPointer,
+            openingRitual: cardFormSpec.openingRitual,
           },
         }));
       }

@@ -183,18 +183,37 @@ export function noteLineCount(text) {
  * ladder (`CARD_LADDER[tier].bodyGap`) and is not a property of the form: each
  * marker is a body child, so each marker also buys one more gap.
  *
+ * THE NOTE TERM IS PER PRINTED NOTE, NOT PER CARD, and that is a correction
+ * made when the second note arrived (the session ritual, 2026-08-19). Every
+ * `.session-step-note` is one more flex child of its marker, so every note buys
+ * one more `STEP_NOTE_GAP_PX` — the old single-gap term was exact while a card
+ * could carry only the mark instruction and would have UNDER-charged by one gap
+ * per extra note the moment a second one printed. Under-charging is the
+ * silent-clipping direction this whole module exists to make impossible, so the
+ * term counts notes rather than summing their lines.
+ *
  * @param {number} stepCount body children the card builds (each gets a marker)
  * @param {number} bodyGapPx `.session-body`'s row-gap at this density
- * @param {number} noteLines printed instruction lines, total across the card
+ * @param {number|number[]} noteLines printed instruction lines. An ARRAY is one
+ *   entry per printed `.session-step-note`, in any order — only the multiset
+ *   matters, because each note costs its own gap wherever it sits. A scalar is
+ *   read as a single note of that many lines, which is what it always meant.
  * @returns {number} px, 0 when the card builds no steps
  */
 export function taughtChromeHeightPx(stepCount, bodyGapPx, noteLines) {
   const steps = Number.isFinite(stepCount) && stepCount > 0 ? Math.floor(stepCount) : 0;
   if (!steps) return 0;
   const gap = Number.isFinite(bodyGapPx) && bodyGapPx > 0 ? bodyGapPx : 0;
-  return steps * STEP_HEAD_HEIGHT_PX
-    + steps * gap
-    + (noteLines > 0 ? STEP_NOTE_GAP_PX + Math.ceil(noteLines) * STEP_NOTE_LINE_PX : 0);
+  // A scalar is one note, never a total: reading a total as one note is the
+  // only interpretation that cannot under-charge, and it is also the meaning
+  // every existing caller had.
+  const notes = Array.isArray(noteLines) ? noteLines : [noteLines];
+  let noteHeight = 0;
+  notes.forEach((entry) => {
+    const lines = Number.isFinite(entry) && entry > 0 ? Math.ceil(entry) : 0;
+    if (lines) noteHeight += STEP_NOTE_GAP_PX + lines * STEP_NOTE_LINE_PX;
+  });
+  return steps * STEP_HEAD_HEIGHT_PX + steps * gap + noteHeight;
 }
 
 // ── THE CSS, EMITTED ────────────────────────────────────────────────────────

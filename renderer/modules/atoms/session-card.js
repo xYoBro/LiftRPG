@@ -35,15 +35,22 @@ import { readTypeMetrics } from '../type-metrics.js';
  * invisible to the estimate — which is precisely the divergence the prime
  * invariant forbids, built in on purpose.
  *
- * So both functions below project the SAME three fields out of `data` through
+ * So both functions below project the SAME four fields out of `data` through
  * this one helper. The engine learns nothing: `formVariant` is an opaque string
  * to it, exactly as `ownsPage` is an opaque boolean.
+ *
+ * `openingRitual` joined them on 2026-08-19 and rides this route for the same
+ * reason the other three do: it is printed chrome that MEASURES (it wraps into
+ * `.session-step-note` lines the estimate charges for), so a field visible to
+ * render and invisible to the estimate would be the divergence the prime
+ * invariant forbids, arriving through the one door left open.
  */
 function formSpecOf(data) {
   return {
     form: data.formVariant,
     markInstruction: data.markInstruction,
     rulesPointer: data.rulesPointer,
+    openingRitual: data.openingRitual,
   };
 }
 

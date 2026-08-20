@@ -1972,10 +1972,33 @@ export var PAGE_FILL_THIN_RATIO = 0.5;
 // on ordinary prose rewards short words. `countRulebookWords` below is the
 // single home of the count, because a floor the model is told in one unit and
 // measured in another is D144's W-3 defect with arithmetic on top.
+// THE ONE CHARACTER CEILING IN A WORD BAND, and it is here rather than as a
+// flat OUTPUT_BUDGETS row for the routing reason the nested object already
+// carries: INST_OUTPUT_BUDGETS is stated to shell / week-final / fragment /
+// ending, four stages that author no part of the rulebook, and a cap stated
+// where it cannot be obeyed is doctrine false at every stage that reads it
+// (D128). It is stated on SCHEMA_GAME_RULEBOOK instead, beside the band, and
+// gameRulebookPromptParity() holds the prompt to this number.
+//
+// WHY IT IS CHARACTERS WHERE ITS EIGHT NEIGHBOURS ARE WORDS. The eight answers
+// are prose a stranger reads once, off-page; the ritual cue is CHROME PRINTED
+// ON EVERY SESSION CARD, inside `.session-step-note`, whose wrap capacity is
+// characters (STEP_NOTE_CHARS_PER_LINE = 78 in
+// renderer/modules/form-metrics/session-card-forms.mjs). 140 is two printed
+// lines at that capacity — the most a cue can occupy and still read as a cue
+// rather than a paragraph the player skips at the gym. It is a DESIGN floor,
+// not a safety mirror: the estimate charges whatever lines the cue produces, so
+// a longer cue would be measured correctly and simply stop being a cue.
+//
+// The key names its unit for the reason the nested object exists at all: the
+// two consumers of this file's scalar caps (`over(text, cap)` and `maxLength`)
+// index scalar top-level keys and cannot reach a nested one, so no character
+// consumer can pick up a word bound or the reverse by accident.
 export var GAME_RULEBOOK_BUDGETS = {
   loadBearingMinWords: 120,
   supportingMinWords: 60,
-  maxTotalWords: 1800
+  maxTotalWords: 1800,
+  ritualCueMaxChars: 140
 };
 
 export var OUTPUT_BUDGETS = {

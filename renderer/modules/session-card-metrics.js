@@ -1028,27 +1028,44 @@ function notesBoxHeight(density) {
  * arriving through the arrangement door.
  *
  * MIRRORS renderWorkoutCard() EXACTLY (workout-primitives.js `appendTaughtStep`):
- * one marker per body child, in render order, and the marking instruction on
- * the mark strip's marker ONLY. Both halves matter. Charging a note when the
- * card carries no strip would bill for a marker the DOM never draws; charging
- * the pointer chip would bill for height the CSS explicitly refuses to take
- * (it is sized strictly under the head row and centred in it).
+ * one marker per body child, in render order, the OPENING RITUAL on the first
+ * marker and the marking instruction on the mark strip's. All of it matters.
+ * Charging a note when the card carries no strip would bill for a marker the
+ * DOM never draws; charging the pointer chip would bill for height the CSS
+ * explicitly refuses to take (it is sized strictly under the head row and
+ * centred in it).
+ *
+ * TWO NOTES ARE POSSIBLE AND ONE MARKER MAY CARRY BOTH — a card with no
+ * exercise table opens on its mark strip, so step 1 and the strip are the same
+ * step. The arithmetic does not care and deliberately does not branch on it:
+ * `taughtChromeHeightPx` charges per printed note, and a note costs the same
+ * gap whichever marker it hangs in. A branch here would be a second model of a
+ * layout the CSS already answers.
  *
  * Zero for the bare form, and that zero is the dormancy guarantee: every
  * fixture in the corpus predates the form set, so this term must contribute
- * nothing at all to their totals — not a rounding difference, not a gap.
+ * nothing at all to their totals — not a rounding difference, not a gap. It is
+ * also zero for a book with no `openingRitual`, which is every book written
+ * before this field existed.
  *
  * @param {object} parts cardComposition() output — bodyChildren is the step count
  * @param {object} session
- * @param {object} formSpec { form, markInstruction }
+ * @param {object} formSpec { form, markInstruction, openingRitual }
  * @param {number} bodyGapPx `.session-body` row-gap at this density
  */
 function rawTaughtChromeHeight(parts, session, formSpec, bodyGapPx) {
   const spec = (formSpec && typeof formSpec === 'object') ? formSpec : {};
   if (resolveSessionCardForm(spec.form) !== 'taught') return 0;
-  // The note prints inside the mark strip's marker, so a card with no strip
-  // charges nothing for it however much instruction was handed down.
-  const noteLines = parts.hasStrip ? noteLineCount(spec.markInstruction) : 0;
+  const noteLines = [];
+  // The ritual prints on the FIRST marker, so it is charged whenever the card
+  // builds any step at all — which `taughtChromeHeightPx` re-checks by
+  // returning 0 on a card with no steps.
+  const ritualLines = noteLineCount(spec.openingRitual);
+  if (ritualLines) noteLines.push(ritualLines);
+  // The mark instruction prints inside the mark strip's marker, so a card with
+  // no strip charges nothing for it however much instruction was handed down.
+  const markLines = parts.hasStrip ? noteLineCount(spec.markInstruction) : 0;
+  if (markLines) noteLines.push(markLines);
   return taughtChromeHeightPx(parts.bodyChildren, bodyGapPx, noteLines);
 }
 
@@ -1082,7 +1099,7 @@ function rawSessionCardHeight(session, density, metrics, formSpec) {
  * @param {object} session — a schema session object
  * @param {number} density — 0.0 (spacious) to 1.0 (maximum compression)
  * @param {object} metrics — readTypeMetrics() output (D121)
- * @param {object} [formSpec] — { form, markInstruction }, the atom's
+ * @param {object} [formSpec] — { form, markInstruction, openingRitual }, the
  *   `data.formVariant` / `data.markInstruction` (ARRANGEMENT §3 clause 3: one
  *   channel to measurement and render). Absent means `bare`, which is
  *   byte-identical to the pre-form estimate — the corpus proves it.
