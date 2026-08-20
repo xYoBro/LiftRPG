@@ -8889,6 +8889,214 @@ export function collectUnknownKeyPaths(value, schemaNode, path) {
   return found;
 }
 
+// ── THE PER-STAGE CONSTRAINT SWEEP (the forge's HOLE 2, 2026-08-20) ─────────
+//
+// D197 gave every paid stage an unknown-KEY sweep DERIVED from the canonical
+// schema — never a described copy — and that closed one half of "does this unit
+// pass the schema?". The other half stood open: a plausible-but-off-menu enum
+// value (`mechanicGrammarFamily: 'attrition-spiral'`), a string past its
+// declared ceiling, a field of the wrong type, a required property simply
+// missing — every one of those clears EVERY paid stage gate and fails only in
+// `npm run validate`, which the delivery path never runs. That is why every
+// delivered book to date has failed the canonical validator (8 / 5 / 1 errors)
+// while every stage reported success.
+//
+// SAME MECHANISM, SAME LAW: one walker, derived from `booklet-schema.mjs`,
+// scoped per stage by the SAME `unknownKeyScopes` table the key sweep uses. A
+// hand-written constraint list would be a second, worse schema (D136) and would
+// drift the week the schema moved.
+//
+// WHY NOT AJV. `scripts/validate.mjs` compiles the schema with Ajv and is the
+// canonical authority. Ajv is a Node dependency; this module runs in the browser
+// with no build step and no vendored copy (D92), so the stage-seat reading has
+// to be hand-walked. That is a real duplication and the mitigation is
+// CONSERVATISM, below — this walker may under-report, and must never report
+// something Ajv would accept.
+//
+// WHAT IT UNDERSTANDS, and every absence is deliberate:
+//   enum       membership, for primitives only
+//   maxLength  string ceilings
+//   type       including `['string','integer']` unions and integer-vs-number
+//   required   missing properties
+// and NOTHING conditional. `allOf` in this schema is used exclusively as a
+// wrapper for `if`/`then`/`else` (measured: 6 allOf, all conditional), and
+// evaluating an `if` correctly would mean writing the validator this comment
+// just explained we cannot write. So a conditional branch is SKIPPED whole —
+// a required property declared only under a `then` is never demanded here, and
+// the canonical validator still catches it downstream. Under-reporting is the
+// only direction this may fail in.
+//
+// `minLength` / `minItems` / `maxItems` / `pattern` / `minimum` are NOT swept.
+// They are catchable by the same walker and were left out of this wave
+// deliberately: each needs its own teaching audit before it can block, and the
+// four above were the four that killed real books.
+
+function jsonSchemaTypeOf(value) {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  if (typeof value === 'number') return Number.isInteger(value) ? 'integer' : 'number';
+  return typeof value;
+}
+
+function typeSatisfies(actualType, declared) {
+  var list = Array.isArray(declared) ? declared : [declared];
+  for (var i = 0; i < list.length; i++) {
+    if (list[i] === actualType) return true;
+    // JSON Schema: every integer is a number. Never the reverse.
+    if (list[i] === 'number' && actualType === 'integer') return true;
+  }
+  return false;
+}
+
+// A schema node's UNCONDITIONAL contributions. `allOf` members carrying an `if`
+// are conditional and contribute nothing — see the header.
+function unconditionalNodes(node) {
+  var out = [node];
+  if (Array.isArray(node.allOf)) {
+    node.allOf.forEach(function (member) {
+      if (member && typeof member === 'object' && member.if === undefined) out.push(member);
+    });
+  }
+  return out;
+}
+
+function constraintChildren(node) {
+  var children = {};
+  unconditionalNodes(node).forEach(function (n) {
+    if (n && n.properties) {
+      Object.keys(n.properties).forEach(function (k) { children[k] = n.properties[k]; });
+    }
+  });
+  return children;
+}
+
+function constraintRequired(node) {
+  var required = [];
+  unconditionalNodes(node).forEach(function (n) {
+    (Array.isArray(n && n.required) ? n.required : []).forEach(function (k) {
+      if (required.indexOf(k) === -1) required.push(k);
+    });
+  });
+  return required;
+}
+
+function shortValue(value) {
+  if (typeof value === 'string') {
+    return value.length > 60 ? '"' + value.slice(0, 57) + '…"' : '"' + value + '"';
+  }
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'an array';
+  if (typeof value === 'object') return 'an object';
+  return String(value);
+}
+
+/**
+ * collectSchemaConstraintPaths(value, schemaNode, path) -> [{ path, message }]
+ *
+ * `message` is the REASON CLAUSE only; the caller owns the field's grammar and
+ * the label, which is how one walker serves the stage seats and any later
+ * reader without either of them re-wording the other's sentence.
+ *
+ * ── `required` IS SKIPPED AT THE ROOT, AND THAT IS THE POINT ────────────────
+ *
+ * A stage does not return a whole booklet; it returns a SLICE. The shell split
+ * makes this vivid — `shellTheme` answers with
+ * `{ theme, meta: { designLanguage, arrangement } }`, a deliberately partial
+ * `meta` — so asking "does this object carry every property `meta` requires?"
+ * at the top of that scope is asking a question the payload was never supposed
+ * to answer. The first draft of this walker did ask it, and the fault
+ * campaign's new shellTheme arms failed with `meta.schemaVersion is REQUIRED`
+ * on a stage that is not the one that writes `schemaVersion`. A gate that
+ * cannot see its evidence reports a verdict it has no right to (D200-3b), and
+ * here it reported the wrong one.
+ *
+ * NESTED LEVELS KEEP THE CHECK, because the reasoning inverts one level down: a
+ * stage returns part of the unit, but any SUB-OBJECT it chose to write, it
+ * wrote whole. `meta.designLanguage` on the theme seat is that seat's own
+ * output, and a required property missing from it is a real defect the seat can
+ * repair.
+ *
+ * DERIVED, NOT DECLARED. The alternative was a `partial: true` flag on the four
+ * shell scopes — a hand-maintained roster whose next omission would block a
+ * paid stage for a field it does not own. The depth of the node is already
+ * known here and needs nobody to remember it.
+ *
+ * STATED RESIDUAL: the top-level required set of a WHOLE-unit scope (`$defs:week`,
+ * `$defs:ending`, `$defs:fragment`, `meta.gameRulebook`) is therefore not checked
+ * by this sweep. It is not unchecked — each of those seats has a hand-written
+ * stage validator that demands its own top-level fields by name, and
+ * `scripts/validate.mjs` refuses the assembled booklet against the full schema.
+ * What is lost is redundancy, not coverage.
+ */
+export function collectSchemaConstraintPaths(value, schemaNode, path) {
+  var found = [];
+  var node = resolveSchemaRef(schemaNode);
+  if (!node || typeof node !== 'object') return found;
+  var here = path || '';
+  var add = function (p, message) { found.push({ path: p, message: message }); };
+
+  if (value === undefined) return found;
+
+  // ── The scalar constraints ────────────────────────────────────────────────
+  if (node.type !== undefined && !typeSatisfies(jsonSchemaTypeOf(value), node.type)) {
+    var want = Array.isArray(node.type) ? node.type.join('` or `') : node.type;
+    add(here, 'is ' + shortValue(value) + ' (a ' + jsonSchemaTypeOf(value)
+      + '); the schema declares this field `' + want + '`. Send the value in that type — a '
+      + 'number written as a string, or a single value where a list is declared, is refused by '
+      + 'the booklet schema whatever the value says.');
+    // Type is wrong, so every other constraint below would be reporting on a
+    // value the model has to rewrite anyway. One error, one repair.
+    return found;
+  }
+  if (Array.isArray(node.enum) && (value === null || typeof value !== 'object')) {
+    if (node.enum.indexOf(value) === -1) {
+      add(here, 'is ' + shortValue(value) + ', which is not on the menu. The schema declares a '
+        + 'CLOSED list for this field and the only legal values are: '
+        + node.enum.map(function (v) { return '`' + String(v) + '`'; }).join(' | ')
+        + '. A near-miss is refused exactly like a nonsense value — pick one of those, or say '
+        + 'what you wanted in prose somewhere the schema allows prose.');
+    }
+  }
+  if (typeof node.maxLength === 'number' && typeof value === 'string'
+      && value.length > node.maxLength) {
+    add(here, 'is ' + value.length + ' characters against a schema ceiling of '
+      + node.maxLength + '. Cut it to ' + node.maxLength + ' or fewer — this is a hard limit in '
+      + 'the booklet schema, not a style note.');
+  }
+
+  // ── The containers ────────────────────────────────────────────────────────
+  if (Array.isArray(value)) {
+    if (!node.items) return found;
+    value.forEach(function (entry, i) {
+      found = found.concat(collectSchemaConstraintPaths(entry, node.items, here + '[' + i + ']'));
+    });
+    return found;
+  }
+  if (!value || typeof value !== 'object') return found;
+
+  // `here` is empty only at the scope root, which is the slice boundary — see
+  // the header for why the question is unanswerable there and sound below it.
+  if (here) {
+    constraintRequired(node).forEach(function (key) {
+      if (!Object.prototype.hasOwnProperty.call(value, key) || value[key] === undefined) {
+        add(here + '.' + key, 'is REQUIRED by the booklet schema and is missing. '
+          + 'Every required field must be present — an object that omits one cannot be rendered, '
+          + 'and there is no default the engine can substitute.');
+      }
+    });
+  }
+
+  var children = constraintChildren(node);
+  Object.keys(value).forEach(function (key) {
+    if (key === '_x') return;                    // the extension namespace, never walked
+    var child = children[key];
+    if (!child) return;                          // unknown keys are the OTHER sweep's finding
+    found = found.concat(
+      collectSchemaConstraintPaths(value[key], child, (here ? here + '.' : '') + key));
+  });
+  return found;
+}
+
 /**
  * Unknown-key paths in one critic-revisable unit, addressed through the
  * schema's own $defs so the unit is judged by exactly the rules it will face
