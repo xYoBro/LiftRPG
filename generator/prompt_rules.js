@@ -428,6 +428,7 @@
     'Optional, at most one per week, and the same REFUSAL RULE governs both: the solver reads what you declared and refuses the puzzle if it cannot prove it is finishable.',
     '- `kind` (string, required) for a word grid: "word-search" | "crossword". No other value is accepted.',
     '- `title` (string, required): diegetic heading. `instruction` (string, optional): what the player does and how the answer is read.',
+    '- `answer` (string, required — BOTH kinds): the code the finished grid yields, written out in full. It is NEVER printed; it is what the solver checks the puzzle against and what the seal or the assembly wants. `answerFrom` is the RULE that derives it and `answer` is the RESULT of applying that rule — you must declare both, and the solver refuses the week when they disagree or when `answer` is empty.',
     '- `grid`: string[] — one string per row, letters A-Z only, every row the same length. **Limits: 6x6 to 12x12 letters.**',
     '- `words`: [{ word, row, col, direction }] — **4-10 words**, each 3-12 letters. `row` and `col` are 1-BASED coordinates of the word\'s FIRST letter, counting from the top-left cell.',
     '- `direction` is one of "E" | "S" | "SE" | "NE" | "W" | "N" | "SW" | "NW". The last four read backwards or up; use them sparingly, they are what makes a board hard.',
@@ -444,6 +445,7 @@
     '- `clue` (required on every entry): this is the writing. A crossword clue is a tiny piece of voice — oblique, in the book\'s register, earned by the fiction. "Holds you, or drowns you" is a clue for ANCHOR; "A type of ship fastening" is a dictionary. Never define the word; characterise the thing.',
     '- `wordGrid.answerFrom.mode` for a crossword is "marked" | "word" ("leftovers" belongs to the search — a crossword has no uncovered letters). "word" { mode, index } names the 1-based entry whose answer IS the key, and that entry must be one the loom placed. "marked" { mode, picks } is the classic: `picks` is an ordered list of { entry, letter }, both 1-based, and the letters they name — read in that order — spell the key. Those cells print shaded.',
     '- YOU CANNOT NAME A GRID SQUARE, because the grid does not exist when you write. That is why `picks` names an ENTRY and a LETTER POSITION instead of a row and a column. The loom converts them once it has woven.',
+    '- DERIVE `answer` YOURSELF AND WRITE IT OUT — you do not need the woven grid to do it, because `picks` indexes YOUR OWN pool. For each pick in order take `entries[entry - 1].answer` and its `letter`-th character (both 1-based) and concatenate them; that string IS `answer`. In "word" mode `answer` is simply `entries[index - 1].answer`. Every entry a pick names must be one you expect the loom to place, so pick from your shortest, most-crossable answers. A week whose `answer` is missing, empty, or disagrees with what the picks spell is REFUSED.',
     '- The finished grid is at most 15x15 and is cropped to whatever the words made — you do not choose a size.',
     '',
   ];
@@ -1462,12 +1464,26 @@
     '- `passwordPath` (object)',
     '  - `answer` (string): how the password to the sealed ending is earned.',
     '  - `elements` (array of surface refs): where the pieces come from, one ref per source.',
-    '- `sessionShape` (object) — `answer` (string) and NO other key.',
+    '- `sessionShape` (object)',
+    '  - `answer` (string): what one session looks like at the table.',
+    // THE POINT-OF-USE HALF (VISION §4.0, built 2026-08-19). The teaching half of
+    // the ritual floors below; every demand they make is stated here.
+    '  - `ritual` (object): the ONE THING the player does on opening a session page, as a form.',
+    '    - `cue` (string, at most 140 characters): one imperative sentence, printed at the top of',
+    '      every session card in this book. Write it as an instruction to a person standing in a',
+    '      gym with a pencil — "Roll two d10 and read the week\'s oracle before your first set."',
+    '      Not a description of the ritual; the ritual itself, in the words the page will print.',
+    '    - `on` (string): the surface ref the cue acts on, in the `kind:id` grammar. It must be a',
+    '      surface the economy graph touches, exactly as a core verb\'s `on` must be.',
+    '    The rest of `sessionShape.answer` never prints. This is the part that does, and it is the',
+    '    only sentence in the book printed at the moment it is needed rather than on a rules page',
+    '    the player read once in week one and will not turn back to mid-set.',
     '- `weekShape` (object) — `answer` (string) and NO other key.',
     '- `whatGoesBadly` (object) — `answer` (string) and NO other key.',
     '- `teachingOrder` (object) — `answer` (string) and NO other key.',
-    '  These four carry `answer` and nothing else — a sibling key of any name beside an answer',
-    '  (`answer_note`, `answer_length_ok`, anything) fails the whole stage.',
+    '  These three carry `answer` and nothing else — a sibling key of any name beside an answer',
+    '  (`answer_note`, `answer_length_ok`, anything) fails the whole stage. `sessionShape` carries',
+    '  `answer` and `ritual`, and no other key either.',
     '- `unprintableWants` (array of strings, may be empty): anything this design wanted that this',
     '  system cannot print. Say it plainly rather than substituting something printable and',
     '  calling it the same thing.',
@@ -1542,8 +1558,23 @@
             },
             required: ['answer', 'elements']
           },
+          // THE FIFTH COMPANION. Forced on the wire like the other four, so the
+          // transport cannot strip the one field the page prints. Still no
+          // `maxLength` on `cue` — the ruling above holds for the whole object:
+          // maxLength is instruction on every transport (D162), the stage
+          // validator is the enforcement, and a bound stated twice in two places
+          // is the drift this file exists to avoid.
           sessionShape: {
-            type: 'object', properties: { answer: { type: 'string' } }, required: ['answer']
+            type: 'object',
+            properties: {
+              answer: { type: 'string' },
+              ritual: {
+                type: 'object',
+                properties: { cue: { type: 'string' }, on: { type: 'string' } },
+                required: ['cue', 'on']
+              }
+            },
+            required: ['answer', 'ritual']
           },
           weekShape: {
             type: 'object', properties: { answer: { type: 'string' } }, required: ['answer']
@@ -2379,8 +2410,8 @@
     // in week one is not a spoiler risk the player chose — it is one the book
     // made for them.
     '',
-    '### A document that confirms the chain\\\'s answers is sealed by honour',
-    'A fragment MAY carry the answers — a confirmation slip, a duplicate ledger, a supervisor\\\'s',
+    '### A document that confirms the chain\'s answers is sealed by honour',
+    'A fragment MAY carry the answers — a confirmation slip, a duplicate ledger, a supervisor\'s',
     'copy of the whole record. That is a real document and often the best one in the book.',
     'But a document that prints EVERY collected value, or the finished password itself, ends',
     'the game the moment it is read, and the player has no way to know that before reading it.',
@@ -2517,7 +2548,9 @@
     '### `sequential-assembly`',
     'The letters, read in week order, are the password. Correct when the fiction is about',
     'accumulation and the last week should feel like arrival. `convergenceProof` shows the',
-    'values, the letters, and the resulting word.',
+    'VALUES and the ROUTE — which week gave which figure, off which surface, and that they',
+    'are read straight through the table in week order. It stops there — the decode itself is',
+    'the move the PLAYER makes, and the proof does not make it for them.',
     '',
     '### `reordering`',
     'The week-order letters are an ANAGRAM of the password. The boss reveals the true reading',
@@ -2528,13 +2561,15 @@
     '- HARD REQUIREMENT: `passwordRevealInstruction` MUST state the final password in exactly',
     '  the form `The password is WORD.` — one sentence, the word in capitals. The tooling that',
     '  seals the ending reads that sentence; without it the anagram gets sealed and the player',
-    '  is locked out of their own booklet at the end of the block. Export redacts the sentence before',
-    '  printing, so stating it spoils nothing.',
+    '  is locked out of their own booklet at the end of the block. Export redacts the word out',
+    '  of that sentence before printing, so stating it THERE, whole, in that exact form, spoils',
+    '  nothing. Read that narrowly: it is a licence for one demanded sentence and one shape,',
+    '  not a general permission to put the password anywhere in the boss prose.',
     '- Do not choose this pattern if the true order cannot be derived from something printed.',
     '',
     '### `red-herring`',
-    'Each week\\\'s surface offers MORE candidate readings than the week needs — several figures,',
-    'marks, or values — and only one is this week\\\'s component. The player must know the',
+    'Each week\'s surface offers MORE candidate readings than the week needs — several figures,',
+    'marks, or values — and only one is this week\'s component. The player must know the',
     'discriminating rule to write the right number in the box.',
     '- The discriminator is established in the fiction and CONFIRMED at the boss, which states',
     '  the rule plainly so the player can check every week against it.',
@@ -2556,6 +2591,28 @@
     'assembly row) and `convergenceProof` stays strict. A pattern changes what the player must',
     'UNDERSTAND, never what the booklet must PRINT.',
     '',
+    // ── THE SPELLED-OUT READING (proving run 3, 2026-08-19) ──────────────────
+    // Placed at the CLOSER, not inside one pattern, because that is the layer
+    // that produced the defect: the leak arrived under `dual-source`, whose own
+    // bullets never mention letters — the model took the licence from
+    // `sequential-assembly`'s old "shows the values, the letters, and the
+    // resulting word" line four sections above and applied it to a different
+    // pattern. A per-pattern fix would be the same whack-a-mole one section
+    // over. This sentence reaches all four.
+    //
+    // Deliberately NOT a ban on quoting an assembled STRING: `reordering` above
+    // hard-requires both the wrong reading and the true one, and `red-herring`
+    // requires the filtered result. The contiguous form is the one the export
+    // scrub can actually see. What it cannot see, and what this forbids, is the
+    // enumeration.
+    'ONE PROHIBITION, EVERY PATTERN. `convergenceProof` may name the values, name their',
+    'sources, and quote an assembled STRING where a pattern above demands one. It must NEVER',
+    'spell a reading out one letter at a time — `By the table: P, R, Y, O, R.` is the shape,',
+    'and it has reached a printed page. Written that way the proof performs the single step',
+    'the last page exists to ask the player to take, and it hands over the answer in a form',
+    'the player has not earned. State the figures and the reading order; stop before the',
+    'letters.',
+    '',
     // ── DERIVE OR DECLARE (author ruling DR-33, 2026-08-18) ──────────────────
     // THE TWO HALVES OF ONE RULE (the D136 F04 idiom). The floor is
     // collectConvergenceChainFloorErrors in validation.js, blocking at the boss
@@ -2571,7 +2628,7 @@
     'convention.',
     'A password that is neither the week-order reading nor a rearrangement of it is a chain',
     'the player cannot walk: they collect the values the booklet asked for, follow the',
-    'booklet\\\'s own table, and arrive at a word the last page rejects. An anagram nobody is',
+    'booklet\'s own table, and arrive at a word the last page rejects. An anagram nobody is',
     'told to unscramble is the same failure wearing a puzzle.',
     'Undeclared non-derivation is a defect, not a style.',
   ];
@@ -2956,7 +3013,7 @@
     'Emit ONLY the winner as the reading. Record the two that lost under',
     '`artifactIntent._x.rejectedReadings` — at least TWO entries, each an object:',
     '- `axis`: the MAJOR axis it differed on — `mechanicGrammarFamily` | `arcFamily` | `povFrame`',
-    '- `value`: what it would have chosen on that axis. It must differ from the winner\\\'s.',
+    '- `value`: what it would have chosen on that axis. It must differ from the winner\'s.',
     '- `oneLiner`: one sentence on what that book would have been.',
     'An entry matching the winner on both family axes is not a rejected reading; it is the same',
     'book described twice, and it means the triptych did not run.',
@@ -3135,7 +3192,7 @@
     '  so they blur fastest of all.',
     '- Refusing a distant family is free and proves nothing. The refusal must forbid the move',
     '  your book will actually be tempted to make in the middle of the block, and it must hold',
-    '  in the built booklet: a `heat` book that refuses `rivalry` and then prints a rival\\\'s weekly standings',
+    '  in the built booklet: a `heat` book that refuses `rivalry` and then prints a rival\'s weekly standings',
     '  has broken its own contract.',
     '',
     '### Step 9: Name the home pull',
@@ -3761,6 +3818,15 @@
     '5. WHAT ONE SESSION LOOKS LIKE AT THE TABLE. From opening the book at the gym to closing it.',
     '   What is read first, what is marked, when the dice come out, what is written, and what is',
     '   deliberately left unfinished for next time.',
+    '   THEN WRITE THE OPENING MOVE AS A FORM (`sessionShape.ritual`). Everything else in this',
+    '   answer is for the designer and never prints. `ritual.cue` is the one sentence that DOES:',
+    '   it is printed at the top of every session page, where the player is standing with the book',
+    '   open and a pencil, and it must tell them what to do first without their turning back to the',
+    '   rules. A rules page that says "roll at the start of each session" and a session page that',
+    '   says nothing is a rule the player will never perform — the rule existed and was illegible',
+    '   at the only moment it mattered. Name the surface it happens on in `ritual.on`, and make it',
+    '   a surface your economy actually touches: a ritual performed on nothing is a ritual nothing',
+    '   pays for.',
     '6. WHAT ONE WEEK LOOKS LIKE. How the sessions add up, what happens at the end of a week, and',
     '   what decision the week ends on.',
     '7. WHAT CAN GO BADLY. What is scarce. What can be lost. Where a player can fall behind, how',
@@ -4457,7 +4523,7 @@
     '  THE INSTRUMENTS — none of these appears unless a book asks for it. This half is where',
     '  the book becomes a particular game rather than a competent one:',
     '  `clock-bank` (fill / drain / race / tug-of-war pressure) · `companion-kit` (dashboards,',
-    '  tracks, stats, inventories) · `door-fork` (the week\\\'s posted choice) ·',
+    '  tracks, stats, inventories) · `door-fork` (the week\'s posted choice) ·',
     '  `sealed-cache` (sealed-by-honour content and its key) ·',
     '  `deduction-board` (a logic grid, a nonogram, a sudoku, a truth-teller board or a sequence —',
     '  machine-proven solvable and unique) ·',
@@ -4536,7 +4602,7 @@
     '  something else. False is a real answer, not a failure — say what the curve does',
     '  instead in `shape`, and give one clause per week in `perWeek`.',
     '',
-    '### The economy\\\'s SHAPE follows the family (choose from this menu)',
+    '### The economy\'s SHAPE follows the family (choose from this menu)',
     'The mechanic grammar family you chose in Step 5 already decided what the world spends',
     'against the player. The economy must move the same way, or the book says one thing and',
     'plays another. Pick the row you chose and build that shape:',
@@ -4550,7 +4616,7 @@
     '| `loyalty-web` | Tugs. Spending on one relationship spends against another; the same currency moves two tracks in opposite directions. |',
     '| `evasion` | Races. Position matters more than accumulation; the player converts marks into distance or cover, and standing still costs. |',
     '| `observance` | Accrues by discipline. Rites kept on schedule earn; a missed observance costs more than it earned. The clock is a calendar. |',
-    '| `rivalry` | Compares. Every player gain is measured against a rival\\\'s standing; the economy prints BOTH sides and the gap is the state. |',
+    '| `rivalry` | Compares. Every player gain is measured against a rival\'s standing; the economy prints BOTH sides and the gap is the state. |',
     '| the seven reconstruction families | Assemble. Marks buy access to gaps — a shaded cell, a decoded line, a named node — and the picture is the state. Nothing spends against the player; the scarcity is what is still unknown. |',
     '',
     'The row is the SHAPE, not the content. Two heat books both rise; what rises, what it',
@@ -6491,7 +6557,7 @@
   // the ship threshold without cited evidence is invalid by law and gets
   // clamped client-side.
   window.CRITIC_RUBRIC = [
-    '## The Rubric — eight dimensions, graded 0-100',
+    '## The Rubric — eleven dimensions, graded 0-100',
     '',
     'Calibration anchors (grade against these, not against hope):',
     '- 50 = the structure is present but inert — components exist, nothing connects.',
@@ -6639,7 +6705,93 @@
     'unlicensable in every genre.',
     'FUNDING: does documentary prose carry real procedural particulars (instruments,',
     'paperwork, order of operations), roughly three per 150 words — or does it',
-    'decorate because it has nothing true to select from?'
+    'decorate because it has nothing true to select from?',
+    '',
+    '## The Gameplay-Excellence Axes — read this before grading the last three',
+    'The eight dimensions above grade the composition. The three below grade the GAME, and',
+    'they are graded against a different question: not "is this book well-formed" but "would a',
+    'person who plays games call this designed". The machine validator has already proved this',
+    'booklet is well-formed — schema, references, completion, no soft-locks. NONE of that is',
+    'evidence on these three dimensions, and citing it is a scoring error.',
+    'THE STANDARD, stated once and binding on all three: a booklet that passes every automated',
+    'floor cleanly can score 40 here, and often should. Valid every time is exactly what a',
+    'template produces. If you find yourself scoring one of these high because nothing is',
+    'broken, you have graded validity again — start over and grade the play.',
+    '',
+    '### decisionWeight',
+    'The player\'s forks, graded as DECISIONS rather than as wiring. `systemIntegration` above',
+    'already asks whether a fork touches board state on both sides; do not re-grade that here.',
+    'This dimension asks whether a correctly-wired fork is a choice a person would stop and',
+    'think about.',
+    'THE FLAVOUR-SWAP TEST, the primary instrument: take a binary choice, door, or spend and',
+    'mentally SWAP the two options\' flavour text while leaving every mechanical cost, grant and',
+    'consequence exactly as printed. Would a rational player\'s pick change? If it would not,',
+    'the fork is flavour with a die attached. Grade it inert and cite both options.',
+    'NO DOMINANT OPTION: is one side strictly better with nothing real given up? A cost that is',
+    'only a sentence — not a printed mark, spend, or closed route — is not a cost. Name the',
+    'option and the cost that is missing.',
+    'DISCERNIBLE: once the player commits, does a NAMED thing on a printed surface differ — a',
+    'mark, a track position, a route, a page they may now open? A consequence the player cannot',
+    'point at did not happen, however faithfully the JSON records it.',
+    'INTEGRATED: does the consequence reappear LATER — a week later, not in the next sentence?',
+    'A fork that resolves and is never mentioned again is a dead end however well it is wired.',
+    'AUTONOMY: does a roll immediately overwrite what the player just chose? Dice may govern',
+    'DEGREE, cost, or flavour; a die that decides the very thing the player was asked to decide',
+    'converts a choice into an instruction, and it reads as imposed even when the graph is',
+    'correct. Cite the fork and the roll that erases it.',
+    'WHAT A FAILURE LOOKS LIKE ON A CLEAN BOOK: every clock resolves, every ref binds, every',
+    'week offers a choice — and every choice is two flavours of the same cost. "A choice is',
+    'present" is a validity property; "the choice is worth making" is not.',
+    '',
+    '### masteryCurve',
+    'The shape of the DEMAND across the whole program, and whether anything is ever lost.',
+    '`fusionPacing` grades how loudly each week SPEAKS against its training load; this grades',
+    'what each week ASKS. A book can be perfectly counterpointed in prose and mechanically flat.',
+    'STALENESS: describe what the player weighs in a session in week 1, then what they weigh in',
+    'the last non-boss week. If those two descriptions are the same sentence, the mechanic was',
+    'fully learned in week 1 and has been repeated ever since — dozens of repetitions of a',
+    'pattern with nothing left to master. Grade that as inert and name both weeks.',
+    'ESCALATION AGAINST THE REAL PROGRAM: does the demand rise with the TRAINING LOAD the',
+    'measured frame reports — more to track, tighter thresholds, harder choices as the body',
+    'gets stronger — or on an arbitrary curve of its own, or not at all? The player is',
+    'measurably improving in the gym. A book whose difficulty ignores that is out of step with',
+    'the clock it claims to run on. Cite weeks by number and load index.',
+    'COMPETENCE: does anything COMPOUND — a track, a stat, a route, a standing licence — so a',
+    'late session is measurably easier, wider, or more capable than an early one? If session 1',
+    'and the last session are mechanically indistinguishable to the player, the book has',
+    'recorded the program without ever registering that the person changed.',
+    'ATTRITION: does at least one mechanism take something AWAY — crossed out, spent, lost,',
+    'downgraded — or does every track only ever fill? Pure accumulation is a generator\'s',
+    'default, and a book where nothing can be lost has no stakes it can print. Name the loss',
+    'channel, or state plainly that the book has none.',
+    'WHAT A FAILURE LOOKS LIKE ON A CLEAN BOOK: every clock legal, every threshold reachable,',
+    'every week complete — and an identical flat demand for the whole block, with no cost',
+    'channel anywhere in the book. The validator says yes to all of that.',
+    '',
+    '### authoredMechanism',
+    'Whether this mechanic set was designed FOR this brief, or filled into a template that',
+    'would have accepted any brief. `worldCohesion` asks whether the NOUNS come from the world',
+    'contract; this asks whether the SHAPES do.',
+    'THE MAD LIBS TEST, the primary instrument: strip every proper noun and themed word from',
+    'the book\'s mechanics and describe what is left as pure shape — what goes in, what',
+    'transforms it, what comes out. Now re-skin that shape with a different archetype\'s',
+    'vocabulary. Would anyone notice it was a different book? If the shape survives the swap',
+    'unchanged, it is filler wearing this brief\'s words. Cite the mechanic and write out the',
+    'shape you extracted, so the claim can be checked.',
+    'CONSONANCE EARNED, NOT LOOKED UP: the brief\'s own words must earn the mechanic, or the die',
+    'assigned it and the book says why. A mechanic paired to its theme by obvious convention',
+    '(urgency, therefore a drain clock) with nothing anywhere stating what in THIS brief chose',
+    'it, is a table lookup rather than a design decision. Quote the brief phrase that should',
+    'have earned it and did not.',
+    'ACCUMULATED STATE: does the mechanic consume or reference something established EARLIER —',
+    'an earlier week\'s choice, an earlier document, the player\'s own recorded numbers? Apply',
+    'the deletion test: if every other page were removed, would this surface read identically?',
+    'A surface that would is generated content sitting next to other content, not composed.',
+    'DEAD ENDS: after an outcome resolves, is it referenced again anywhere? Name the later',
+    'surface that reads it, or record that none does.',
+    'WHAT A FAILURE LOOKS LIKE ON A CLEAN BOOK: schema-valid, reference-complete, floor-passing',
+    'content is precisely what a good template produces. Here, valid-every-time IS the failure',
+    'mode under grade — never accept validity as evidence of authorship.'
   ];
 
   window.CRITIC_EVIDENCE_LAW = [
@@ -6693,6 +6845,15 @@
     '  The last three are the play wiring, and they exist because a dead sink, a key that',
     '  arrives too late, and a week that asks nothing are not fixable by re-keying a surface.',
     '  A "structure" scope with no reopen array is read as "prose", so name the aspect.',
+    'THE GAMEPLAY-EXCELLENCE AXES ARE ALMOST NEVER PROSE FAILURES. A fork whose two options',
+    'cost the same, a demand that never rises, a mechanic that would fit any brief — none of',
+    'these is fixable by rewriting sentences, and a "prose" directive against one of them buys',
+    'a retint and changes nothing. Default them to "structure" and reopen what the finding',
+    'actually needs: `decision` for a dominated or flavour-only fork, `economy` for a book with',
+    'no loss channel or a demand that never compounds, `mechanism` or `motif` for a shape that',
+    'would survive a change of theme, `dynamics` when the week asks the wrong amount for its',
+    'load. Use "prose" on these three only when the mechanism is genuinely sound and the page',
+    'merely describes it badly — say so in the issue when you claim it.',
     'The revision runs under floors you cannot waive and must not ask for: the training itself',
     '(sessions, exercises, sets, reps), every id and cross-reference, and the decode spine',
     '(weekly component values, the boss decoding key) survive every revision unchanged. A',
@@ -6761,7 +6922,10 @@
       '    "worldCohesion":     { "score": 0, "evidence": [], "failures": [] },',
       '    "briefFidelity":     { "score": 0, "evidence": [], "failures": [] },',
       '    "fusionPacing":      { "score": 0, "evidence": [], "failures": [] },',
-      '    "voiceDiscipline":   { "score": 0, "evidence": [], "failures": [] }',
+      '    "voiceDiscipline":   { "score": 0, "evidence": [], "failures": [] },',
+      '    "decisionWeight":    { "score": 0, "evidence": [], "failures": [] },',
+      '    "masteryCurve":      { "score": 0, "evidence": [], "failures": [] },',
+      '    "authoredMechanism": { "score": 0, "evidence": [], "failures": [] }',
       '  },',
       '  "summary": "two sentences: the composition’s strongest through-line and its weakest seam"',
       '}',
@@ -6783,7 +6947,69 @@
   // shape is fixed and only its prose moves, which is what every revision could
   // do before this round. The licence text below is quoted from that constant;
   // the generator tests assert the two surfaces agree.
-  window.buildUnitRevisionPrompt = function (unitLabel, unitJson, directives, contextJson, reopenScopes) {
+  /**
+   * formatUnitFloorGivensBlock(demands) -> string
+   *
+   * THE FLOOR GIVENS AT THE REVISION SEAT — the taught half of the gate every
+   * revision re-enters (D186/D187's two-halves law, applied to the one unit
+   * seat that never received it).
+   *
+   * THE FLOOR IT TEACHES: `unitFloorErrors()` in modules/critic.js re-runs the
+   * unit's own stage validator with the generation floors ON, and the critic
+   * loop DISCARDS any revision whose floor count went up. That gate was never
+   * stated to the reviser. Proving run 3 paid for nine week revisions and
+   * refused nine, every one "dropped generation floors (0 → N)".
+   *
+   * `demands` is harvested from the gate itself by `unitFloorDemands()`, so
+   * every sentence below the header is the FLOOR'S OWN WORDING, carried through
+   * unaltered. Nothing here restates a demand and nothing here copies a cap:
+   * a second copy is the D93 defect, and a prompt that teaches a different set
+   * than the floor demands is worse than silence (D143).
+   *
+   * THE BUDGETS ARE THE OTHER HALF, and on the evidence the louder one. The
+   * presence demands are visible to a reviser holding the unit — it can see the
+   * fields it already has. A CAP is invisible: the model cannot count
+   * characters, the delivered book sat one character under `storyPrompt`'s 220,
+   * and "sharpen this line" is a directive that spends that character.
+   * INST_OUTPUT_BUDGETS is included verbatim — the same section, already parity-
+   * asserted against OUTPUT_BUDGETS, that D186 routed to the week, fragment and
+   * ending seats. This is the fourth seat that authors budgeted prose and the
+   * last one that was never told the budgets.
+   */
+  window.formatUnitFloorGivensBlock = function (demands) {
+    var list = (Array.isArray(demands) ? demands : []).map(function (d) {
+      return String(d == null ? '' : d).trim();
+    }).filter(Boolean);
+    var lines = [
+      '## The Gate This Revision Re-Enters — a GIVEN, and it is checked',
+      '',
+      'Your revised unit goes straight back through the same stage gate the original passed. A',
+      'revision that answers every directive but drops one demand below is DISCARDED and the',
+      'original kept — the critic\'s note goes unanswered and the run pays for nothing. Fix what',
+      'the directives name; leave everything below true.'
+    ];
+    if (list.length) {
+      lines.push('');
+      lines.push('The gate refuses this unit with each message below when the surface it names is');
+      lines.push('missing. They are quoted exactly, and together they are its demand list:');
+      list.forEach(function (d) { lines.push('- ' + d); });
+    }
+    var budgets = (typeof window.INST_OUTPUT_BUDGETS !== 'undefined' && window.INST_OUTPUT_BUDGETS)
+      ? window.INST_OUTPUT_BUDGETS.join('\n')
+      : '';
+    if (budgets) {
+      lines.push('');
+      lines.push('The caps below are enforced on this unit by that same gate, and revision is where');
+      lines.push('they break. A directive asking for a sharper, fuller or clearer line is never a');
+      lines.push('licence to exceed one. Assume the text you were handed already sits close to its');
+      lines.push('cap: to add a clause, cut one.');
+      lines.push('');
+      lines.push(budgets);
+    }
+    return lines.join('\n');
+  };
+
+  window.buildUnitRevisionPrompt = function (unitLabel, unitJson, directives, contextJson, reopenScopes, floorGivens) {
     var directiveLines = (directives || []).map(function (d, i) { return (i + 1) + '. ' + d; });
     var REOPEN_LICENCES = {
       beat: 'what this unit is ABOUT may change — its position in the arc, what is at '
@@ -6838,7 +7064,12 @@
       '  decodingKey are already sealed into the ending\'s password. Changing one breaks a',
       '  puzzle the reader only opens at the end of the block.',
       '- Prose may change freely WHERE A DIRECTIVE POINTS. Adjacent prose stays.',
-      '',
+      ''
+      // THE GATE'S OWN DEMANDS, when the caller holds them. Absent or empty,
+      // the prompt is BYTE-IDENTICAL to the one this builder always produced —
+      // the demotion proof every derived block in this file carries, and the
+      // reason the corpus harness's prose-only row still reads the old prompt.
+    ], (floorGivens ? [String(floorGivens), ''] : []), [
       '## World Context (stay inside it — no new nouns, no stray lore)',
       contextJson,
       '',

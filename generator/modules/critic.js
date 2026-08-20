@@ -438,6 +438,20 @@ export function formatSpineFrameBlock(frame) {
   var thin = w.decisions.filter(function (row) { return row.decisions === 0; });
   lines.push('  decisions per week: ' + w.decisions.map(function (r) { return 'w' + r.week + ':' + r.decisions; }).join(' ')
     + (thin.length ? ' — ' + thin.length + ' week(s) ask nothing' : ''));
+  // ── The decisions row is decisionWeight's measured half (2026-08-19) ───────
+  // The walker counts forks; it cannot judge them, and it has never claimed to.
+  // But the COUNT is the one hard fact available on that dimension, and a row
+  // of identical per-week counts is the flat-demand signal masteryCurve exists
+  // to catch. Naming its readers here is what keeps the new dimensions from
+  // being graded on impression alone — the frame is measurement, and a critic
+  // told which measurement answers which dimension cites it instead of
+  // inventing. It stays a POINTER, never a verdict: the walker cannot see
+  // whether a counted fork is dominated, discernible, or reasserted later,
+  // which is precisely the gap the two dimensions were added to cover.
+  lines.push('  read that row twice: its ZEROES are decisionWeight evidence (a week that asks'
+    + ' nothing), and its FLATNESS across the program is masteryCurve evidence (a demand that'
+    + ' never rises). A non-zero count is not a pass on either — the walker counts forks and'
+    + ' cannot tell a real choice from two flavours of one cost.');
   if (w.softLocks.length) {
     lines.push('  SOFT-LOCKS the walker found: ' + w.softLocks.join(', ')
       + ' — these are structural failures, not taste; systemIntegration cannot score at threshold'
@@ -758,16 +772,53 @@ export function revisionInventsKeys(unitType, original, revised) {
 // Compared as a DELTA by the caller, never as an absolute: a book generated
 // before the floors, or hand-loaded, may already be failing them, and a
 // pre-existing failure must not veto an improvement the critic asked for.
-export function unitFloorErrors(unitType, unit, booklet) {
+//
+// ── THE OPTIONS ARE THE GATE'S REACH (author ruling, 2026-08-19) ─────────────
+// This function used to pass a deliberately minimal options object, and that
+// minimality WAS the defect it looked like a safety margin: six floors that run
+// when the unit is first generated — cadence conformance, the currency-verbatim
+// demand, citation pinpoints, clock reachability, brief transcription and the
+// spine's per-week closure floors — were silent here, so a revision could delete
+// the surface an accepted week printed and pass a gate named "the same door the
+// unit came out of". That is the D144 ungated-caller idiom seen from the inside:
+// nothing was wrong, nothing was armed. The author ruled all six armed.
+//
+// DERIVED FROM THE BOOKLET, not handed in, for the same reason the demands are
+// harvested rather than restated: a caller assembling this bag is exactly how it
+// went narrow the first time. The assembled booklet already carries every piece
+// of evidence these floors read — the spine, the rulebook, the declared currency
+// and the shell family all live under `meta` by the time the critic runs. The
+// BRIEF is the one fact no booklet carries (it is input, never content — see
+// briefTranscriptionFloorErrors), so it is the one parameter, and an absent
+// brief leaves that floor correctly silent rather than inventing its evidence.
+//
+// `spineStageLabel` is deliberately NOT passed. Its only job is routing a spine
+// defect back to the stage that authored it, and this seat is not a repair seat
+// — it discards the revision and keeps the original. collectSpineWeekFloorErrors
+// documents the unprefixed message as the honest answer for a caller with no
+// stage to name, and before/after read the same options, so the delta compares
+// like for like.
+export function unitFloorErrors(unitType, unit, booklet, brief) {
   if (!unit || typeof unit !== 'object') return [];
+  var meta = ((booklet || {}).meta) || {};
+  var briefText = brief == null ? '' : brief;
   if (unitType === 'week') {
-    var intent = (((booklet || {}).meta) || {}).artifactIntent || {};
+    var intent = meta.artifactIntent || {};
     var result = validateWeekSchema(unit, !!(unit.isBossWeek || unit.bossEncounter), {
       generationFloors: true,
       weekNumber: unit.weekNumber,
       currentWeekNumber: unit.weekNumber,
       isDeload: !!unit.isDeload,
-      mechanicGrammarFamily: intent.mechanicGrammarFamily || ''
+      mechanicGrammarFamily: intent.mechanicGrammarFamily || '',
+      // The spine arms three of the six at once: the per-week closure floors
+      // (mute clock, door ledger row, differsBy), cadence conformance, and the
+      // BLOCKING arm of clock reachability. No spine on the booklet, no check.
+      playSpine: meta.playSpine || null,                              // arms cadence + spine closure + clock reachability
+      // The rulebook arms clock reachability's report-class prose arm only.
+      gameRulebook: meta.gameRulebook || null,                        // arms clock reachability's prose arm
+      currencyLabel: (meta.economy || {}).currencyLabel || '',        // arms the currency-verbatim demand
+      shellFamily: (meta.artifactIdentity || {}).shellFamily || '',   // arms citation pinpoints
+      brief: briefText
     });
     return (result && result.errors) || [];
   }
@@ -776,7 +827,16 @@ export function unitFloorErrors(unitType, unit, booklet) {
     // list is read off `.errors` rather than wrapped from a single string. A
     // budget failure now arrives as one error per breach, which is what the
     // revision loop wants anyway: it quotes each defect to the reviser.
-    var verdict = validateFragmentsStage({ fragments: [unit] }, [], { generationFloors: true });
+    //
+    // Of the six, only brief transcription has a fragment arm — the other five
+    // read week surfaces. `componentInputs` (the answer-bearing seal floor) is
+    // armed at the fragment stage gate and NOT here; that is a seventh silent
+    // floor, outside the six the author ruled on, and it is filed rather than
+    // armed on this wave.
+    var verdict = validateFragmentsStage({ fragments: [unit] }, [], {
+      generationFloors: true,
+      brief: briefText
+    });
     return (verdict && verdict.errors) || [];
   }
   if (unitType === 'ending') {
@@ -788,6 +848,78 @@ export function unitFloorErrors(unitType, unit, booklet) {
     });
   }
   return [];
+}
+
+// ── THE REVISION SEAT'S TAUGHT HALF (the two-halves law, D186/D187) ──────────
+// `unitFloorErrors` above is the gate a revision re-enters. Nothing ever told
+// the reviser what that gate checks: `buildUnitRevisionPrompt` printed the
+// unit, the critic's directives and the world context, and not one floor
+// demand. The reopen licences made it worse rather than better — `dynamics`
+// invites a marking change without the marking menu, `economy` invites a
+// reckoning rewrite without the sink demands, `mechanism` invites a door re-key
+// without the door demand. Every unit seat in the pipeline got its budgets and
+// its givens in D150/D183/D186; this one seat was missed, and it is the seat
+// that rewrites whole budgeted units.
+//
+// MEASURED, on proving run 3 (evals/proving-run/console-run3.log): nine week
+// revisions paid for, nine rejected, every one "dropped generation floors
+// (0 → N)". The delivered book was written flush against its caps — the longest
+// `storyPrompt` used 219 of its 220 characters, the longest `doorOptionLean` 89
+// of 90 — so a critic directive asking for a sharper line breached a budget the
+// reviser was never shown. Twenty-one characters is the entire distance between
+// an accepted revision and a discarded one, and the loop could not accept one.
+//
+// DERIVED FROM THE GATE ITSELF, never restated. The demands are harvested by
+// asking `unitFloorErrors` — the SAME function the revision is judged by — what
+// an identity-only unit of this shape owes. The teaching is therefore the
+// floor's own sentences: there is ONE string, the floor writes it, and a floor
+// reworded tomorrow teaches its new wording today. This is why no demand is
+// spelled out here and no cap is copied — a second copy is the D93 defect, and
+// a prompt teaching a different set than the floor demands is worse than
+// silence (D143).
+//
+// SHAPE-AWARE, because the probe carries the shape selectors the gate branches
+// on: a boss week is asked about `bossEncounter` and never about the door or
+// the weeklyComponent a boss week does not owe.
+//
+// WHAT THIS DOES NOT DO, restated after the 2026-08-19 arming. The six floors
+// named in the old form of this note are no longer silent at the gate — see
+// `unitFloorErrors` above — and the teaching extends to them BY CONSTRUCTION,
+// because it is the gate's own output for a probe of this shape. But the probe
+// is IDENTITY-ONLY, and that bounds what can be harvested from any floor:
+//
+//   · A PRESENCE-CLASS demand is taught, because an empty unit is missing the
+//     surface and the floor says so. The spine's closure floors are the new
+//     case worth naming: an empty week prints no door and no clock, so they
+//     raise nothing on the probe and teach nothing — a reviser that ADDS a
+//     clock the spine does not read is refused by a demand it was never shown.
+//   · A TEXT-CLASS demand (the currency phrase is wrong, a citeRef carries no
+//     pinpoint, six words are copied from the brief) fires only on a field that
+//     EXISTS and is wrong, so an empty probe cannot draw it out either.
+//
+// That bound is a property of harvesting rather than a defect in it, and it is
+// not new: `stakesLine` present-but-out-of-band has always been untaught for the
+// same reason. It is stated here so the next reader does not mistake a short
+// demand list for a narrow gate. Fixing it means a probe that carries deliberate
+// violations, which is a second authored copy of the floors — the exact thing
+// this derivation exists to avoid.
+export function unitFloorDemands(unitType, unit, booklet, brief) {
+  if (!unit || typeof unit !== 'object') return [];
+  var probe;
+  if (unitType === 'week') {
+    probe = {
+      weekNumber: unit.weekNumber,
+      isBossWeek: !!(unit.isBossWeek || unit.bossEncounter),
+      isDeload: !!unit.isDeload
+    };
+  } else if (unitType === 'fragment') {
+    probe = { id: unit.id, documentType: unit.documentType };
+  } else if (unitType === 'ending') {
+    probe = { id: unit.id, variant: unit.variant };
+  } else {
+    return [];
+  }
+  return unitFloorErrors(unitType, probe, booklet, brief);
 }
 
 export function unitLabel(unitType, unitRef) {

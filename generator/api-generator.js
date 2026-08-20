@@ -96,6 +96,7 @@ import {
   revisionPreservesIdentity,
   revisionInventsKeys,
   unitFloorErrors,
+  unitFloorDemands,
   unitLabel
 } from './modules/critic.js';
 
@@ -3899,7 +3900,13 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
     try {
       verdictRaw = await runJsonStage(settings, {
         stageKey: 'critic',
-        stageName: 'Composition Critic — round ' + round,
+        // ROUND n OF UP TO m, NOT ROUND n (D110's second form). This name is
+        // the only sentence the run panel has for a stage the rail cannot
+        // draw: the loop's length is bounded, never fixed, so "round 2" alone
+        // leaves a reader unable to tell a review that is nearly done from one
+        // that has two more graded reads to buy. Accuracy over precision — the
+        // ceiling is knowable and the actual count is not.
+        stageName: 'Composition Critic — round ' + round + ' of up to ' + maxRounds,
         buildPrompt: (function (dj, mf, ff) {
           return function () { return window.buildCriticPrompt(dj, brief, mf, ff); };
         })(digestJson, machineFindings, frameBlocks),
@@ -3965,15 +3972,37 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
       // D111, hand-loaded, or a fixture) can still be improved, while a revision
       // that DROPS a surface is refused. Absolute would veto the whole loop on
       // any pre-existing failure.
-      var floorsBefore = unitFloorErrors(target.unitType, original, booklet).length;
+      // THE BRIEF IS THE ONE PIECE OF EVIDENCE THE BOOKLET DOES NOT CARRY.
+      // Everything else these floors read — the spine, the rulebook, the
+      // declared currency, the shell family — is derived from `booklet` inside
+      // unitFloorErrors, so this seat cannot go narrow again by forgetting an
+      // option (author ruling, 2026-08-19).
+      var beforeErrors = unitFloorErrors(target.unitType, original, booklet, brief);   // R-ARM revision-brief-before
+      var floorsBefore = beforeErrors.length;
+      // THE TAUGHT HALF OF THE LINE ABOVE (the two-halves law at the revision
+      // seat). `floorsBefore`/`floorsAfter` is the gate; until now nothing told
+      // the reviser that gate existed, so a revision could answer every
+      // directive and still be thrown away for a demand it was never shown.
+      // Derived from the gate itself — same function, same options — so the two
+      // halves cannot drift. '' if the prompt surface is missing, which leaves
+      // the revision prompt byte-identical to the one this loop always built.
+      var floorGivens = (typeof window.formatUnitFloorGivensBlock === 'function')
+        ? window.formatUnitFloorGivensBlock(unitFloorDemands(target.unitType, original, booklet, brief))   // R-ARM revision-brief-teaching
+        : '';
       var revised;
       try {
         revised = await runJsonStage(settings, {
           stageKey: 'critic-revise',
-          stageName: (structural ? 'Structural Revision — ' : 'Composition Revision — ') + label,
-          buildPrompt: (function (lbl, oj, dirs, reopen) {
-            return function () { return window.buildUnitRevisionPrompt(lbl, oj, dirs, contextJson, reopen); };
-          })(label, JSON.stringify(original), target.directives, structural ? target.reopen : []),
+          // WHICH REVISION OF HOW MANY (D110's second form). A round revises as
+          // many units as its verdict named — `targets.length`, known the
+          // moment the round starts and knowable nowhere else. Without it the
+          // panel showed a run of unrelated-looking revision stages with no
+          // sense of how many were left to pay for.
+          stageName: (structural ? 'Structural Revision — ' : 'Composition Revision — ') + label
+            + ' (' + (ti + 1) + ' of ' + targets.length + ')',
+          buildPrompt: (function (lbl, oj, dirs, reopen, givens) {
+            return function () { return window.buildUnitRevisionPrompt(lbl, oj, dirs, contextJson, reopen, givens); };
+          })(label, JSON.stringify(original), target.directives, structural ? target.reopen : [], floorGivens),
           maxAttempts: 2,
           rateLimiter: ctx.rateLimiter || null,
           budgetEnforce: !!ctx.budgetEnforce,
@@ -4002,11 +4031,24 @@ async function runCriticLoop(settings, booklet, brief, ctx) {
       // this — a booklet with no oracle is legal (fixtures have none), so only
       // the stage gate knows that a GENERATED week owes one. Without it, a
       // reopened mechanical assignment could delete the surface it re-decided.
-      var floorsAfter = unitFloorErrors(target.unitType, revised, booklet).length;
+      var afterErrors = unitFloorErrors(target.unitType, revised, booklet, brief);   // R-ARM revision-brief-after
+      var floorsAfter = afterErrors.length;
       if (floorsAfter > floorsBefore) {
+        // NAME THE FLOORS, DO NOT COUNT THEM (proving run 3). "0 → 5" happened
+        // nine times in one run and told the author nothing about what the
+        // reviser dropped or which teaching was missing — the diagnosis cost a
+        // separate reading of the delivered book. The dropped set is the
+        // difference against the errors the unit already had, so a pre-existing
+        // failure is never reported as something this revision broke.
+        var beforeSeen = {};
+        beforeErrors.forEach(function (e) { beforeSeen[String(e)] = true; });
+        var dropped = afterErrors.filter(function (e) { return !beforeSeen[String(e)]; })
+          .map(function (e) { return String(e); });
         console.warn('[LiftRPG] ' + label + ' revision dropped generation floors ('
-          + floorsBefore + ' → ' + floorsAfter + ') — rejected.');
-        roundRecord.rejected.push({ unit: label, structural: structural, reason: 'generation-floor' });
+          + floorsBefore + ' → ' + floorsAfter + ') — rejected:'
+          + dropped.map(function (e) { return '\n    · ' + e; }).join(''));
+        roundRecord.rejected.push({ unit: label, structural: structural,
+          reason: 'generation-floor', dropped: dropped });
         continue;
       }
       // Validity floor, part 3 (W3 corrective wave, F06): the schema-filtered

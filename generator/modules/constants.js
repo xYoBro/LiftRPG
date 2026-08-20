@@ -635,7 +635,44 @@ export var CRITIC_DIMENSIONS = [
   // Voice discipline (docs/voice/VOICE.md): the critic is the audit seat for
   // the prose laws no regex can reach — multi-hand distinctness, terminal
   // position, unlicensed genre moves. The B-class tic scan feeds it facts.
-  { id: 'voiceDiscipline', name: 'Voice Discipline' }
+  { id: 'voiceDiscipline', name: 'Voice Discipline' },
+
+  // ── THE GAMEPLAY-EXCELLENCE AXES (2026-08-19) ────────────────────────────
+  // WHY THREE MORE, when eight dimensions already grade the book.
+  //
+  // The EDPCG frame (Yannakakis & Togelius) names four components of a
+  // generative pipeline: representation, generator, quality-evaluation, and a
+  // PLAYER-EXPERIENCE MODEL. This project has the first two and an unusually
+  // heavy validity layer — schema, layout, closure floors, the sim walker's
+  // soft-locks. What it has never had is a quality signal that references what
+  // a READER should decide, feel, and notice, held apart from whether the book
+  // is well-formed. Without that fourth component every "quality score"
+  // re-derives validity, and Goodhart does the rest: technically clean books
+  // that do not read as designed. That is the author's standing complaint, and
+  // it is a missing component, not a missing sentence in an existing rubric.
+  //
+  // THE TEST EACH OF THESE MUST PASS, and the reason they are separate ids:
+  // each must be able to score LOW on a book that passes every existing floor
+  // cleanly. A dimension that can only fail what the validator already fails is
+  // decoration. Stated per dimension in the rubric, and each one's flat case is
+  // pinned in check-generation-floors.mjs.
+  //
+  // WHAT THEY ARE NOT. `systemIntegration` asks whether the parts REFERENCE
+  // each other — a wiring question, answerable from the JSON graph, and it is
+  // exactly the question the floors and the sim walker already answer best.
+  // These three ask the questions the graph cannot: whether a fork that is
+  // correctly wired is a real DECISION, whether a mechanic correctly repeated
+  // thirty times still asks anything by week six, and whether a shape that
+  // validates against this brief would validate identically against any other.
+  // A book can satisfy every arrow in the graph and fail all three.
+  //
+  // REPORT-AND-REVISE, never blocking (D19). They feed revision targeting the
+  // same way the other eight do. VISION's own law — a green critic score is a
+  // floor, not a success — applies to these hardest, because they are the ones
+  // most tempting to teach the model to game.
+  { id: 'decisionWeight', name: 'Decision Weight & Autonomy' },
+  { id: 'masteryCurve', name: 'Mastery Curve & Attrition' },
+  { id: 'authoredMechanism', name: 'Authored Mechanism (anti-template)' }
 ];
 
 // ── Structural revision reach (Teeth T4 — the surgeon) ──────────────────────
