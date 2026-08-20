@@ -1083,7 +1083,15 @@
       '- meta.passwordEncryptedEnding: omit it or leave it empty; trusted tooling seals the ending later',
       '- meta.artifactIdentity is required. It is a renderer-facing contract, not flavor text.',
       '- meta.artifactIdentity.shellFamily must be one of: field-survey, classified-packet, ship-logbook, witness-binder, court-packet, devotional-manual, household-archive, technical-manual',
-      '- meta.artifactIdentity.attachmentStrategy must be one of: split-technical, single-dominant, narrative-support, appendix-split',
+      // THE MENU IS VALID_ATTACHMENT_STRATEGIES, EXACTLY (2026-08-20). This line
+      // offered a fourth value, `appendix-split`, that the schema has never
+      // accepted — `check-generation-floors.mjs` uses that very token as its
+      // example of an off-menu value the constraint sweep must REFUSE. The
+      // renderer's adapter implements a branch for it, and widening the enum to
+      // match is a deferred product decision; until it is made, a prompt that
+      // offers what the gate refuses can only produce a blocked stage the model
+      // obeyed its instructions to fail.
+      '- meta.artifactIdentity.attachmentStrategy must be one of: split-technical, single-dominant, narrative-support',
       '',
       '### World Contract',
       'meta.worldContract is the single most important string in the booklet.',
@@ -3503,6 +3511,15 @@
       rulebookGiven: (typeof window.formatGameRulebookGiven === 'function')
         ? window.formatGameRulebookGiven(options.gameRulebook)
         : '',
+      // THE AMENDABLE PROJECTION (2026-08-20), built separately and used by the
+      // IDENTITY seat alone. The other three sub-stages must read the rulebook
+      // as settled: by the time 3b teaches the rules and 3d projects the spine,
+      // the amendment junction has already run and `options.gameRulebook` IS
+      // the amended document. Offering the channel again there would invite a
+      // second rename against a rulebook the first one already moved.
+      rulebookAmendableGiven: (typeof window.formatGameRulebookGiven === 'function')
+        ? window.formatGameRulebookGiven(options.gameRulebook, { amend: true })
+        : '',
       campaignSummary: compactJson({
         weekCount: weekCount,
         topology: campaignPlan.topology || {},
@@ -3537,7 +3554,7 @@
       '`meta.playSpine`, `meta.arrangement` or `meta.designLanguage` — three later stages of',
       'this same run author those, against what you decide here.',
       '',
-      ctx.rulebookGiven ? ctx.rulebookGiven + '\n' : '',
+      ctx.rulebookAmendableGiven ? ctx.rulebookAmendableGiven + '\n' : '',
       '## SCHEMA CONTRACT',
       window.buildStageSchema('shellIdentity'),
       '',

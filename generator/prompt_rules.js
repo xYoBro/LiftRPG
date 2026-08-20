@@ -675,6 +675,20 @@
     '  promptFragmentRelationship: "fragments-deepen"|"fragments-contradict"|"fragments-parallel"|"fragments-precede"',
     '- `storySpine` (object): { premise, protagonistDrive, centralTension, midpointShift, finalCost } — 5 sentences total',
     '- `artifactIdentity` (object): { artifactClass, shellFamily, boardStateMode, attachmentStrategy, componentDialect }',
+    // ── THE CLOSED FIELDS, MARKED ON THE SHAPE LINE (run 4b, 2026-08-20) ────
+    // The menus for these four are stated below, each at its own field. This
+    // line is what a model reads when it decides WHAT SHAPE to emit, and on a
+    // prompt-only door (Codex, D264) there is no wire schema behind it to catch
+    // a miss. A live run failed `attachmentStrategy` three consecutive times by
+    // writing a prose description into a three-token menu, with the menu
+    // present below and the teachable error echoed on every retry — so the
+    // shape line now says which fields are closed AT the moment the shape is
+    // read, and names where the sentence belongs instead.
+    '  FOUR OF THESE ARE CLOSED MENUS — `shellFamily`, `boardStateMode`, `attachmentStrategy`',
+    '  and `componentDialect` take ONE TOKEN from their menu below, copied exactly. Never a',
+    '  phrase, never a description, never a token you invented that sounds right. If you want',
+    '  to explain the choice, `artifactIntent.selectionReason` is the field that takes',
+    '  sentences; these four do not.',
     '  `componentDialect` is REQUIRED and is a CLOSED enum: "segments" | "beads" | "gauge" | "tally".',
     '  It is the instrument this book counts in — how every clock, track and tick strip is DRAWN.',
     '  segments: a pie or bar cut into wedges. beads: a counted string. gauge: a dial reading.',
@@ -689,8 +703,22 @@
     // A required field with a closed menu nobody states is the run-3 ambush
     // shape exactly, and `enumMenusAreTaught()` in validate.mjs now fails the
     // build on the next one. Quoted from the constant, both directions asserted.
-    '  `attachmentStrategy` is REQUIRED and is a CLOSED enum: "split-technical" | "single-dominant"',
-    '  | "narrative-support". It is how this artifact carries its technical apparatus —',
+    // ── THE LEAD-IN WAS THE TRIGGER (runs 4b/4c, 2026-08-20) ───────────────
+    // The menu and the per-member glosses below have been at this field site
+    // since D257, and the field still failed SIX consecutive paid attempts
+    // across two runs — every one of them a prose description of how this
+    // particular book carries its apparatus ("Bound-in continuity fields,
+    // traceable map routes, return..."). The old lead-in read "It is how this
+    // artifact carries its technical apparatus —", which is a question about
+    // THIS artifact, and the model answered the question it was asked. The
+    // glosses sat underneath as example answers rather than as the menu.
+    // Rewritten so the imperative comes FIRST and the glosses are labelled as
+    // what they are: descriptions of the tokens, never values themselves.
+    '  `attachmentStrategy` is REQUIRED and is a CLOSED enum. COPY ONE OF THESE THREE TOKENS',
+    '  EXACTLY: "split-technical" | "single-dominant" | "narrative-support".',
+    '  The lines below say what each token MEANS so you can pick between them. They are',
+    '  descriptions of the tokens, NOT values — never write one of them into the field, and',
+    '  never write your own sentence about how this book carries its apparatus:',
     '  split-technical: the working surfaces sit apart from the prose, in their own section.',
     '  single-dominant: one surface dominates and everything else serves it.',
     '  narrative-support: the working surfaces are folded into the prose they belong to.',
@@ -1209,7 +1237,19 @@
                 enum: ['survey-grid', 'node-graph', 'timeline-reconstruction', 'testimony-matrix',
                   'ledger-board', 'route-tracker', 'profile-assembly', 'player-drawn']
               },
-              attachmentStrategy: { type: 'string' },
+              // ── THE THIRD FENCE (run 4b, 2026-08-20) ────────────────────
+              // This sat as a bare `{ type: 'string' }` between two
+              // enum-constrained siblings while being REQUIRED and closed to
+              // three values by VALID_ATTACHMENT_STRATEGIES. On a structured
+              // door the transport therefore enforced nothing, and a live run
+              // burned three attempts writing a prose description here. Quoted
+              // rather than imported for this file's standing reason; diffed
+              // both directions against the constant by
+              // `attachmentStrategyWireFence()` in validate.mjs.
+              attachmentStrategy: {
+                type: 'string',
+                enum: ['split-technical', 'single-dominant', 'narrative-support']
+              },
               // Teeth Round F2. Required HERE by generation policy for the same
               // reason the recorded reading is: this literal is what a compat
               // transport enforces, and an optional bounded choice is a choice
@@ -4087,6 +4127,65 @@
         'deadline does not sound like a book whose core verb is tending something slowly. The',
         'same order governs `authorRegisters`: the hands differ because their writers hold',
         'different positions in the conflict these rules describe.',
+        ''
+      ]);
+    }
+    // ── THE FLAVOUR-AMENDMENT CHANNEL (2026-08-20) ─────────────────────────
+    // THE IDENTITY SEAT'S OWN OFFER, and it lives here rather than in an INST_
+    // section for the two reasons the header already gives, both binding:
+    //   1. D128's law. This rule is answerable ONLY where a rulebook exists.
+    //      The guided wizard's single `shell` prompt runs no rulebook stage,
+    //      and `shellSplitRoutingParity()` makes the four sub-rows' union
+    //      EQUAL the `'shell'` row — so an INST_ section routed to
+    //      shellIdentity is forced onto the wizard prompt too, where it would
+    //      be exactly the false section D128 names.
+    //   2. The bundle ceiling. Same arithmetic as the prose demand above.
+    //
+    // WHY THE CHANNEL EXISTS, stated to the model as the fact it is: the rules
+    // above were written FIRST, from the brief alone, before this world had
+    // been developed. Their surface names are the only part of them that a
+    // developed world can legitimately improve — and the model at this seat is
+    // the first one in the run that has both documents in front of it.
+    if (opts.amend) {
+      lines = lines.concat([
+        'ONE THING ABOVE IS AMENDABLE, AND ONLY ONE: THE NAMES.',
+        'These rules were written FIRST — from the brief alone, before this world existed. The',
+        'GAME they describe is settled and you may not touch it. But the rules had to NAME the',
+        'surfaces the game is played on before there was a world to name them out of, so some of',
+        'those names are placeholders that the world you are developing right now can do better.',
+        'You are the first stage in this run holding both documents. If — and only if — this',
+        'world has EARNED a better name for one of them, propose the rename in',
+        '`meta.rulebookAmendments`:',
+        '',
+        '  "rulebookAmendments": { "renames": [',
+        '    { "from": "clock:Pressure", "to": "clock:The Tide Ledger",',
+        '      "why": "the tide office keeps its count in a ledger; Pressure was a brief-word" }',
+        '  ] }',
+        '',
+        'THE RULES OF THIS CHANNEL, all four binding:',
+        // THE MENU IS BYTE-QUOTED from RENAMEABLE_REF_KINDS in
+        // contract-constants.mjs — quoted rather than imported for the reason
+        // every enum in this file is (classic browser script, no ES imports) —
+        // and `rulebookAmendmentMenuParity()` in validate.mjs diffs it both
+        // directions. A kind the applier accepts and this line never offers is
+        // a rename nobody knows they may make; a kind offered here and refused
+        // by the applier spends the model's attention on a discard.
+        '- ONLY these kinds may be renamed: `clock`, `map`, `companion`. Every other surface',
+        '  takes its id from the week and',
+        '  session numbers or from a registry handle, and a name there is a surface no book can',
+        '  print. A rename targeting one is discarded.',
+        '- THE KIND NEVER CHANGES. `clock:X` may become `clock:Y` and nothing else.',
+        '- THE CURRENCY IS NOT RENAMEABLE. It is printed verbatim on the page and checked',
+        '  verbatim by the floors. Leave it exactly as the rules above spell it.',
+        '- NOTHING STRUCTURAL MOVES. No verb is added or removed, no requirement changes, no',
+        '  element joins or leaves the password path. This channel changes NAMES.',
+        '',
+        'EARNED MEANS EARNED: the `why` names the thing in THIS world — its institution, its',
+        'object, its own noun — that the new name comes from. "It sounds better" is not a',
+        'reason and the rename will be discarded. SILENCE IS THE NORMAL ANSWER. A world that',
+        'has not earned a better name leaves `meta.rulebookAmendments` out entirely, and the',
+        'rules above stand exactly as written. Proposing renames you cannot justify is worse',
+        'than proposing none.',
         ''
       ]);
     }

@@ -585,6 +585,8 @@ import {
   BRANCH_OPTIONS,
   BRANCH_REF_PATTERN,
   parseBranchRef,
+  RENAMEABLE_REF_KINDS,
+  applyRulebookAmendments,
   PIPELINE_DEBRIS_KEYS,
   readPipelineDebris,
   writePipelineDebris,
@@ -683,6 +685,14 @@ export {
   BRANCH_OPTIONS,
   BRANCH_REF_PATTERN,
   parseBranchRef,
+  // ── The rulebook flavour-amendment channel (2026-08-20) ────────────────
+  // The applier is PURE and lives beside the ref grammar it is written in,
+  // because the fences it enforces ARE that grammar's kinds. One home, three
+  // readers: the pipeline junction, check-generation-floors and
+  // check-shell-split — a second copy would be a second answer to "was this
+  // rename legal", which is the whole question.
+  RENAMEABLE_REF_KINDS,
+  applyRulebookAmendments,
   // ── Pipeline debris (D128) ─────────────────────────────────────────────
   // `_x` is the only lawful home for non-contract data and always was; the
   // pipelines wrote ten keys at top level anyway, where the schema rejects

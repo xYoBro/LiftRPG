@@ -3793,6 +3793,249 @@ export function parseSurfaceRef(ref) {
   return out;
 }
 
+// ── THE RULEBOOK FLAVOUR-AMENDMENT CHANNEL (2026-08-20) ─────────────────────
+//
+// THE DEFECT IT REPAIRS. `gameRulebook` runs FIRST on both pipelines — before
+// the codex, before the campaign plan, before any world exists. It is handed
+// the brief and the workout and nothing else, and it must coin the names of the
+// surfaces the game is played on: `clock:Relief Ledger`, `map:Waystation`,
+// `companion:The Assessor`. Those names are therefore drawn from a brief-shaped
+// imagination and can never be re-informed by the world that gets developed
+// three stages later. Measured on real runs: `cipher:Ledger`, `map:Waystation`,
+// every clock name — all coined pre-world, all placeholder-grade, all printed.
+// The book then wears the rudder's first guesses forever, which weakens the
+// exact fusion the product exists to make.
+//
+// THE CHANNEL. `shellIdentity` is the first seat where the developed world
+// exists AND the last seat before the rules are taught (`shellRules`) and the
+// spine is projected (`shellSpine`). It may therefore propose FLAVOUR-level
+// renames of the rulebook's free-named surfaces, which are applied
+// deterministically here, in memory, before those two seats are prompted.
+//
+// WHAT THIS IS NOT. It is not a re-design channel. Nothing structural moves: no
+// verb is added or removed, no requirement changes, no element leaves the
+// password path, no kind changes. A rename that cannot be applied is DROPPED —
+// never blocking, never a retry, never a paid stage. Amendments are an
+// enhancement and are structurally incapable of failing a run, which is why
+// this whole surface owes no blocking floor and therefore no
+// floor-teaching-registry row.
+//
+// THE THREE FENCES, each with its own reason:
+//
+//   1. ONLY THE FREE-NAMED KINDS.  See RENAMEABLE_REF_KINDS below.
+//   2. KIND IS PRESERVED.  `clock:X` -> `clock:Y` only. A rename that changed
+//      kind would move a surface from one printer to another, which is a
+//      structural edit wearing a flavour edit's clothes.
+//   3. THE CURRENCY IS UNTOUCHABLE.  `economy.currency` is woven VERBATIM
+//      through the currency-mention floors, the week gates and the printed
+//      page, and a prose rewrite that moved it would silently break all three.
+//      Excluded here AND guarded against collision (a rename whose source name
+//      IS the currency is refused, because the prose pass could not tell the
+//      two apart). A currency-rename channel is a real want and a DIFFERENT
+//      wave: it needs the label to move on `meta.economy` and every floor that
+//      quotes it, in one change.
+export var RENAMEABLE_REF_KINDS = ['clock', 'map', 'companion'];
+
+// The kinds this channel refuses, stated as data so the gate can read the
+// reason rather than re-derive it:
+//
+//   week session markStrip reckoning oracle cipher door
+//       FIXED-FORM. Their ids are DERIVED from week and session numbers
+//       (`W3`, `W3.2`) by deriveWeekSurfaces() — a narrative label there names
+//       a surface no LiftRPG book can print. validation.js's
+//       FIXED_FORM_REF_KINDS owns that law; validate.mjs asserts this set is
+//       disjoint from it, so the two can never come to disagree.
+//
+//   fragment seal
+//       AUTHORED, but their ids are REGISTRY handles minted by the campaign
+//       plan (`F.07`) and referenced by every later stage. Renaming one here
+//       would orphan the registry.
+//
+//   ending
+//       AUTHORED, but the ending's name is the password's destination and is
+//       carried by the seal, the assembly page and the convergence pattern.
+//       Out of scope by the same argument as the currency.
+export var UNRENAMEABLE_REF_KINDS = [
+  'week', 'session', 'markStrip', 'reckoning', 'oracle', 'cipher', 'door',
+  'fragment', 'seal', 'ending'
+];
+
+// Every rulebook field that carries a surface ref, as a path into the rulebook
+// object. DERIVED USE, HAND-WRITTEN LIST — and the list is gate-asserted against
+// booklet-schema.mjs's `meta.gameRulebook` in validate.mjs, because a
+// ref-carrying field added to the schema and not to this list would be silently
+// left un-rewritten: the rename would reach three fields and miss the fourth,
+// which is the two-names-for-one-surface incoherence this channel exists to
+// remove. Each entry is { path, list } — `list` true when the field is an
+// array of refs rather than a single one.
+export var RULEBOOK_REF_FIELDS = [
+  { path: ['winCondition', 'requires'], list: true },
+  { path: ['coreVerbs', 'verbs', '[]', 'on'], list: false },
+  { path: ['passwordPath', 'elements'], list: true },
+  { path: ['sessionShape', 'ritual', 'on'], list: false }
+];
+
+// The rulebook's prose fields — the second half of a rename. A ref rewritten in
+// `coreVerbs.verbs[].on` while the answer beside it still says "tick the Relief
+// Ledger" is the same incoherence read from the other end.
+export var RULEBOOK_PROSE_FIELDS = [
+  ['winCondition', 'answer'], ['coreVerbs', 'answer'], ['economy', 'answer'],
+  ['passwordPath', 'answer'], ['sessionShape', 'answer'], ['weekShape', 'answer'],
+  ['whatGoesBadly', 'answer'], ['teachingOrder', 'answer'],
+  ['sessionShape', 'ritual', 'cue']
+];
+
+function escapeForRegExp(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function readPath(obj, parts) {
+  var node = obj;
+  for (var i = 0; i < parts.length; i++) {
+    if (!node || typeof node !== 'object') return undefined;
+    node = node[parts[i]];
+  }
+  return node;
+}
+
+/**
+ * applyRulebookAmendments(rulebook, amendments) -> { rulebook, applied, rejected }
+ *
+ * PURE. Never mutates `rulebook` — the banked stage payload stays pristine (the
+ * split's own law) and the amended document is a fresh deep copy. Two calls with
+ * the same arguments return byte-identical results, which is what lets a resume
+ * re-derive the amended rulebook from two banked stages with no checkpoint key
+ * of its own (the D98/D149 recover-for-free pattern).
+ *
+ * WITH NO LEGAL AMENDMENT THE RETURNED DOCUMENT IS BYTE-IDENTICAL TO THE INPUT.
+ * That is the demotion proof and it is asserted by the harnesses: a book whose
+ * identity stage proposes nothing is the book this repo built yesterday.
+ *
+ * `applied` and `rejected` are the record. `rejected` rows carry `why` so the
+ * run log can say which rename was refused and on which fence — a silent drop
+ * is indistinguishable from a channel that does not work.
+ */
+export function applyRulebookAmendments(rulebook, amendments) {
+  var out = { rulebook: rulebook, applied: [], rejected: [] };
+  if (!rulebook || typeof rulebook !== 'object' || Array.isArray(rulebook)) return out;
+
+  var renames = (amendments && Array.isArray(amendments.renames)) ? amendments.renames : [];
+  if (!renames.length) return out;
+
+  var currency = String(((rulebook.economy || {}).currency) || '').trim().toLowerCase();
+  var seenTargets = {};
+  var legal = [];
+
+  for (var i = 0; i < renames.length; i++) {
+    var row = renames[i] || {};
+    var from = parseSurfaceRef(row.from);
+    var to = parseSurfaceRef(row.to);
+    var why = String(row.why == null ? '' : row.why).trim();
+    // `reason` and not `why`: the INPUT row's `why` is the model's argument FOR
+    // the rename, and a rejection record that reused the key would read as the
+    // model having given the refusal as its own justification.
+    var reject = function (reason) { out.rejected.push({ from: row.from, to: row.to, reason: reason }); };
+
+    if (!from.valid || !from.id) { reject('`from` is not a well-formed `kind:id` surface ref'); continue; }
+    if (!to.valid || !to.id) { reject('`to` is not a well-formed `kind:id` surface ref'); continue; }
+    if (from.kind !== to.kind) {
+      reject('changes the kind (`' + from.kind + '` to `' + to.kind + '`) — a rename may change'
+        + ' the NAME of a surface and never what kind of surface it is');
+      continue;
+    }
+    if (RENAMEABLE_REF_KINDS.indexOf(from.kind) === -1) {
+      reject('targets `' + from.kind + '`, which this channel may not rename — only '
+        + RENAMEABLE_REF_KINDS.join(', ') + ' are free-named surfaces');
+      continue;
+    }
+    if (from.id.trim().toLowerCase() === to.id.trim().toLowerCase()) {
+      reject('renames a surface to itself'); continue;
+    }
+    if (currency && from.id.trim().toLowerCase() === currency) {
+      reject('names the currency, which is woven verbatim through the printed page and the'
+        + ' currency floors — the currency is not renameable on this channel');
+      continue;
+    }
+    if (!why) {
+      reject('states no reason — a rename is earned by the developed world or it is not made');
+      continue;
+    }
+    var key = from.kind + ':' + to.id.trim().toLowerCase();
+    if (seenTargets[key]) { reject('collides with an earlier rename onto the same name'); continue; }
+    seenTargets[key] = true;
+    legal.push({ kind: from.kind, from: from.id.trim(), to: to.id.trim(), why: why });
+  }
+
+  if (!legal.length) return out;
+
+  var next = JSON.parse(JSON.stringify(rulebook));
+
+  // ── HALF ONE: the structured refs ────────────────────────────────────────
+  var rewriteRef = function (raw) {
+    var parsed = parseSurfaceRef(raw);
+    if (!parsed.valid || !parsed.id) return raw;
+    for (var r = 0; r < legal.length; r++) {
+      var ren = legal[r];
+      if (parsed.kind !== ren.kind) continue;
+      if (parsed.id.trim().toLowerCase() !== ren.from.toLowerCase()) continue;
+      return ren.kind + ':' + ren.to;
+    }
+    return raw;
+  };
+
+  RULEBOOK_REF_FIELDS.forEach(function (field) {
+    var parts = field.path;
+    var at = parts.indexOf('[]');
+    if (at !== -1) {
+      var arr = readPath(next, parts.slice(0, at));
+      if (!Array.isArray(arr)) return;
+      var tailKey = parts.slice(at + 1);
+      arr.forEach(function (item) {
+        if (!item || typeof item !== 'object') return;
+        var holder = readPath(item, tailKey.slice(0, -1));
+        var last = tailKey[tailKey.length - 1];
+        if (holder && typeof holder === 'object' && typeof holder[last] === 'string') {
+          holder[last] = rewriteRef(holder[last]);
+        }
+      });
+      return;
+    }
+    var parent = readPath(next, parts.slice(0, -1));
+    var leaf = parts[parts.length - 1];
+    if (!parent || typeof parent !== 'object') return;
+    if (field.list) {
+      if (!Array.isArray(parent[leaf])) return;
+      parent[leaf] = parent[leaf].map(function (v) {
+        return typeof v === 'string' ? rewriteRef(v) : v;
+      });
+    } else if (typeof parent[leaf] === 'string') {
+      parent[leaf] = rewriteRef(parent[leaf]);
+    }
+  });
+
+  // ── HALF TWO: the prose ──────────────────────────────────────────────────
+  // CONSERVATIVE BY CONSTRUCTION: exact, case-sensitive, word-boundary matches
+  // of the authored display name only. A lowercase or possessive-plural mention
+  // is deliberately left alone — an over-eager rewrite of prose is worse than a
+  // surviving one, because the ref half already carries the machine-readable
+  // truth and a mangled sentence is what the reader sees.
+  var proseRewrites = legal.map(function (ren) {
+    return { re: new RegExp('\\b' + escapeForRegExp(ren.from) + '\\b', 'g'), to: ren.to };
+  });
+  RULEBOOK_PROSE_FIELDS.forEach(function (parts) {
+    var parent = readPath(next, parts.slice(0, -1));
+    var leaf = parts[parts.length - 1];
+    if (!parent || typeof parent !== 'object' || typeof parent[leaf] !== 'string') return;
+    var text = parent[leaf];
+    proseRewrites.forEach(function (rw) { text = text.replace(rw.re, rw.to); });
+    parent[leaf] = text;
+  });
+
+  out.rulebook = next;
+  out.applied = legal;
+  return out;
+}
+
 /**
  * resolveShellFamily(rawShellFamily, artifactClass, themeArchetype) -> family
  *

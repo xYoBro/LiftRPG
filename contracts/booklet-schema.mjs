@@ -912,6 +912,53 @@ var gameRulebook = {
   }
 };
 
+// ── rulebookAmendments (the flavour-amendment channel, 2026-08-20) ──────────
+// THE RECORD OF WHAT THE DEVELOPED WORLD RENAMED. `gameRulebook` runs FIRST on
+// both pipelines and must coin the names of the surfaces the game is played on
+// from the brief alone, before any world exists. `shellIdentity` is the first
+// seat where that world DOES exist, and it may propose flavour-level renames of
+// the rulebook's free-named surfaces (`clock`, `map`, `companion` — the fences
+// and their reasons live at RENAMEABLE_REF_KINDS in contract-constants.mjs).
+//
+// WHAT THIS FIELD IS. Not an instruction and not a proposal: by the time a
+// booklet carries it, the renames it lists are the ones that were APPLIED. The
+// pipeline rewrites this field to the applied set after
+// `applyRulebookAmendments` runs, so a rename that was refused on a fence never
+// appears here claiming to have happened. `meta.gameRulebook` above is already
+// the amended document — this is the provenance beside it, and `why` is the
+// sentence that says the world earned the name.
+//
+// RENDERER-INERT AND ADDITIVE-OPTIONAL, the processParticulars precedent
+// exactly (D103): no corpus fixture carries one, the sealed-corpus rule forbids
+// editing them back green, and a book generated before this existed is
+// byte-identical to one generated after when nothing is proposed.
+//
+// NOTHING BLOCKS ON IT, at any seat. Amendments are an enhancement; a malformed
+// one is dropped with a warning and the run proceeds on the original names. That
+// is why this surface owes no blocking floor and therefore no
+// floor-teaching-registry row — the two-halves law binds BLOCKING demands.
+var rulebookAmendments = {
+  type: 'object',
+  required: [],
+  additionalProperties: false,
+  properties: {
+    renames: {
+      type: 'array',
+      items: {
+        type: 'object',
+        // All three required when a row is present — the manifestPointer idiom.
+        // A rename with no `why` is a preference; the whole licence for this
+        // channel is that the developed world EARNED the name, and the sentence
+        // saying so is the evidence.
+        required: ['from', 'to', 'why'],
+        additionalProperties: false,
+        properties: { from: nonEmptyString, to: nonEmptyString, why: nonEmptyString, _x: xt }
+      }
+    },
+    _x: xt
+  }
+};
+
 // ── playSpine (Layer 3 play contract, PLAY.md §3 / VISION §4.4) ─────────────
 // The Ludic Spine: composition with consequence, declared before content
 // exists. Play is global — the fourth constitution — and the whole reason this
@@ -1399,6 +1446,7 @@ export var BOOKLET_SCHEMA = {
         // this object's projection (VISION §4.0 / PLAY.md §3.2), and a reader
         // who meets the projection first learns the wrong causal order.
         gameRulebook: gameRulebook,
+        rulebookAmendments: rulebookAmendments,
         playSpine: playSpine,
         economy: economy,
         weeklyComponentType: nonEmptyString,

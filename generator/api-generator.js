@@ -61,6 +61,7 @@ import {
   // D144: the shell and the board become bounded choices on the transport, the
   // same way the dialect already was. See STRUCTURED_SCHEMA_SHELL below.
   VALID_SHELL_FAMILIES,
+  VALID_ATTACHMENT_STRATEGIES,
   VALID_BOARD_STATE_MODES,
   OUTPUT_BUDGETS,
   // D128 → W4a: pipeline debris lives under `_x`, the only home the schema
@@ -78,7 +79,10 @@ import {
   identityAxesForStage,
   // The arsenal's week schedule (D170) — one derivation, two readers per
   // pipeline: the week prompt's GIVEN and the week gate's floor.
-  deriveLudicWeekAssignments
+  deriveLudicWeekAssignments,
+  // The flavour-amendment channel's applier (2026-08-20). Pure; the junction
+  // that calls it is at 3a½ below.
+  applyRulebookAmendments
 } from './modules/constants.js';
 
 import {
@@ -679,7 +683,14 @@ var STRUCTURED_SCHEMA_SHELL = {
             revealShape: { type: 'string' },
             unlockLogic: { type: 'string' },
             shellFamily: { type: 'string', enum: VALID_SHELL_FAMILIES },
-            attachmentStrategy: { type: 'string' },
+            // ── THE THIRD FENCE (run 4b, 2026-08-20) ──────────────────────
+            // REQUIRED below and closed to three values by the schema, but
+            // typed as a bare string here — so the transport enforced nothing
+            // on the one required artifactIdentity field whose two enum-fenced
+            // siblings sit either side of it. A live run spent three attempts
+            // writing a prose description into it. IMPORTED, not quoted: this
+            // file is an ES module and the constant is the menu.
+            attachmentStrategy: { type: 'string', enum: VALID_ATTACHMENT_STRATEGIES },
             // Teeth Round F2, mirroring STRUCTURED_SCHEMA_SKELETON's
             // artifactIdentity: the multi-stage shell is the other place a book
             // declares its identity, and a floor enforced on one pipeline only
@@ -856,7 +867,31 @@ var STRUCTURED_SCHEMA_SHELL = {
         },
         weeklyComponentType: { type: 'string' },
         passwordEncryptedEnding: { type: 'string' },
-        liftoScript: { type: 'string' }
+        liftoScript: { type: 'string' },
+        // ── THE FLAVOUR-AMENDMENT CHANNEL (2026-08-20) ────────────────────
+        // OPTIONAL, and deliberately absent from `required` below. Silence is
+        // a legal answer here — a developed world that earns no rename is the
+        // common case, and a required field would make the model invent one,
+        // which is the silent-substitution failure this project names as its
+        // founding law. The fences live at RENAMEABLE_REF_KINDS in
+        // contract-constants.mjs; nothing blocks on this surface at any seat.
+        rulebookAmendments: {
+          type: 'object',
+          properties: {
+            renames: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  from: { type: 'string' },
+                  to: { type: 'string' },
+                  why: { type: 'string' }
+                },
+                required: ['from', 'to', 'why']
+              }
+            }
+          }
+        }
       },
       required: ['schemaVersion', 'blockTitle', 'worldContract', 'narrativeVoice',
         'literaryRegister', 'structuralShape', 'artifactIdentity', 'artifactIntent',
@@ -1067,7 +1102,12 @@ function withPlaySpine(schema) {
 var SHELL_META_BY_SUB_STAGE = {
   shellIdentity: ['schemaVersion', 'generatedAt', 'blockTitle', 'blockSubtitle', 'worldContract',
     'narrativeVoice', 'literaryRegister', 'structuralShape', 'artifactIdentity', 'artifactIntent',
-    'economy', 'weeklyComponentType', 'passwordEncryptedEnding', 'liftoScript'],
+    'economy', 'weeklyComponentType', 'passwordEncryptedEnding', 'liftoScript',
+    // The flavour-amendment channel (2026-08-20). Claimed by THIS seat and no
+    // other: it is the first stage where the developed world exists and the
+    // last one before `shellRules` teaches the rules and `shellSpine` projects
+    // them, which is the entire reason the channel sits here.
+    'rulebookAmendments'],
   shellRules: [],
   shellTheme: ['designLanguage'],
   shellSpine: []
@@ -5145,6 +5185,90 @@ async function runApiPipeline(options) {
     }
   });
 
+  // ── 3a½. THE FLAVOUR-AMENDMENT CHANNEL (2026-08-20) ───────────────────
+  //
+  // THE ONE JUNCTION. `gameRulebook` is a single local binding, and every
+  // downstream reader of the rulebook reaches it through a CLOSURE that is
+  // evaluated when its prompt or its gate is built — `shellBuilderOptions`
+  // and `shellSubStageExpectations` for 3b/3c/3d, and the week, fragment and
+  // ending seats further down. Reassigning it HERE, after the identity stage
+  // has banked and before the rules are taught or the spine is projected, is
+  // therefore the whole of the plumbing: there is no second copy to keep in
+  // step, and a rename that reached some readers and not others — two names
+  // for one surface — is structurally unavailable.
+  //
+  // THE BANK IS NEVER MUTATED (the split's pristine-bank law).
+  // `applyRulebookAmendments` is pure and returns a fresh document; the banked
+  // `gameRulebook` and `shellIdentity` payloads are untouched, which is what
+  // makes the resume path free: the amended rulebook is a deterministic
+  // function of two stages that are already banked, so it re-derives itself on
+  // replay with no checkpoint key of its own (D98/D149).
+  //
+  // VALIDATION BY REJECTION, NEVER BY BLOCKING. The amended document is re-put
+  // to the rulebook's OWN stage gate — the same function that judged the
+  // original — and if any error appears that the original did not have, EVERY
+  // amendment is dropped and the run proceeds on the original names. A prose
+  // rewrite can cost an answer a word and drop it under its band floor; that
+  // must cost a rename, never a book. Nothing here can fail a run, which is
+  // why this channel carries no blocking floor and owes no teaching registry
+  // row.
+  //
+  // The rules→graph parity floor is NOT re-run here, and its absence is a
+  // structural fact rather than an omission: at this seat no spine exists yet.
+  // `shellSpine` is prompted with the AMENDED rulebook three calls from now and
+  // its own parity floor checks the graph it writes against exactly this
+  // document, so the two cannot disagree by construction.
+  var rulebookAmendment = { applied: [], rejected: [] };
+  if (gameRulebook) {
+    var proposed = ((shellIdentityStage || {}).meta || {}).rulebookAmendments;
+    var amendResult = applyRulebookAmendments(gameRulebook, proposed);
+    amendResult.rejected.forEach(function (row) {
+      console.warn('[LiftRPG] Rulebook amendment refused: "' + row.from + '" → "'
+        + row.to + '" — ' + row.reason);
+    });
+    if (amendResult.applied.length) {
+      var before = validateGameRulebookStage({ gameRulebook: gameRulebook }, { collect: true });
+      var after = validateGameRulebookStage({ gameRulebook: amendResult.rulebook }, { collect: true });
+      // COMPARED ON THE FLOOR'S IDENTITY, NOT ITS MESSAGE. The band floors
+      // quote the MEASURED number into their text ("is 9 words against a floor
+      // of 120"), and a rename legitimately moves that number — "Pressure" is
+      // one word and "Tide Ledger" is two. A raw string diff therefore reports
+      // a pre-existing failure as newly caused by the amendment, and this guard
+      // drops every rename on any book whose rulebook already fails a floor.
+      // Digits are normalised away so the key is WHICH floor failed on WHICH
+      // field; a floor that newly starts failing still changes the key, because
+      // crossing a threshold changes an error's PRESENCE and not only its
+      // count. Found by check-generation-floors' AMEND-4 rows, which is the
+      // only reason it is not shipping.
+      var floorKey = function (e) { return String(e).replace(/\d+/g, '#'); };
+      var beforeSet = {};
+      before.forEach(function (e) { beforeSet[floorKey(e)] = true; });
+      var worsened = after.filter(function (e) { return !beforeSet[floorKey(e)]; });
+      if (worsened.length) {
+        // CONSOLE ONLY, DELIBERATELY. The obvious move is an `emitPipelineEvent`
+        // warn notice, and the stale-week sweep below does exactly that — but it
+        // emits `phase: 'start'` for a stage it is genuinely RE-ENTERING. Here
+        // the identity stage has already closed its card and nothing is being
+        // re-entered, so a `start` would reopen a COMPLETE rail card for a
+        // notice, which is D110's UI lie in miniature and D243's contract says
+        // the rail closes a card by inferring "finished" from "a different stage
+        // started". Nothing paid is lost when amendments drop and the run
+        // continues on the original names, so the operator's log is the right
+        // audience and the rail is left alone.
+        console.warn('[LiftRPG] Rulebook amendments DROPPED — applying '
+          + amendResult.applied.length + ' rename(s) would have broken the rulebook\'s own gate: '
+          + worsened.slice(0, 2).join('; ') + '. The book keeps its original surface names.');
+      } else {
+        gameRulebook = amendResult.rulebook;
+        rulebookAmendment = amendResult;
+        console.log('[LiftRPG] Rulebook amended by the developed world: '
+          + amendResult.applied.map(function (r) {
+            return r.kind + ' "' + r.from + '" → "' + r.to + '"';
+          }).join(', '));
+      }
+    }
+  }
+
   // ── 3b. COVER + RULES SPREAD ──────────────────────────────────────────
   shellRulesStage = await runShellSubStage({
     stageKey: 'shellRules',
@@ -5265,7 +5389,33 @@ async function runApiPipeline(options) {
   // `booklet.meta`, exactly the way the knowing is applied below. Outside the
   // `else` on purpose: a RESUMED shell must carry it too, or a resumed book
   // ships with no record of the game it was designed to be.
-  applyGameRulebook(shell, rulebookState.rulebook);
+  //
+  // THE AMENDED DOCUMENT, NOT THE BANKED ONE. `gameRulebook` is the local
+  // binding the amendment channel above reassigned; `rulebookState.rulebook` is
+  // the pristine bank and must stay that way. Stamping the bank here would have
+  // shipped a book whose prompts served the renamed surfaces and whose printed
+  // record named the originals — two names for one surface, arriving through
+  // the one reader that does not go through a closure. With no amendment the
+  // two are the same object and this line is byte-identical to what it replaced.
+  applyGameRulebook(shell, { gameRulebook: gameRulebook });
+
+  // THE PROVENANCE, REWRITTEN TO WHAT ACTUALLY HAPPENED. The identity stage
+  // PROPOSED renames; `applyRulebookAmendments` and the gate above decided
+  // which were made. Carrying the model's proposal into the artifact would
+  // publish a record of renames that may have been refused on a fence or
+  // dropped wholesale. `shell.meta` is `mergeShellParts`' own fresh object, so
+  // this writes nothing back into the bank.
+  if (shell && shell.meta) {
+    if (rulebookAmendment.applied.length) {
+      shell.meta.rulebookAmendments = {
+        renames: rulebookAmendment.applied.map(function (r) {
+          return { from: r.kind + ':' + r.from, to: r.kind + ':' + r.to, why: r.why };
+        })
+      };
+    } else {
+      delete shell.meta.rulebookAmendments;
+    }
+  }
 
   var identityContract = buildIdentityContract(shell, campaignPlan);
 
