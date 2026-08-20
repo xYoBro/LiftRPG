@@ -886,6 +886,33 @@
       color: var(--muted);
     }
 
+    /* ── The chosen backend's caveats (2026-08-19) ─────────────────────────
+       NO NEW VISUAL LANGUAGE. This is the run panel's own `.api-run-notice
+       .is-warn` bar, reused at the two seats a reader passes before
+       committing: under the chip that selects the backend, and directly above
+       the Build button. Everything here is spacing and one type-size override
+       — no colour, no border, no second warn idiom to keep in step.
+
+       The size override is D99's floor, not taste: `.api-run-notice-text` is
+       --fs-micro (TRUE fine print — captions and legends), and this text is
+       informational and decision-bearing, read immediately before a button
+       that spends an afternoon. Same reasoning, same number, as .book-estimate. */
+    .backend-caveat {
+      margin-top: 10px;
+    }
+
+    .backend-caveat .api-run-notice-text {
+      font-size: var(--fs-meta);
+    }
+
+    .backend-caveat-line {
+      display: block;
+    }
+
+    .backend-caveat-line + .backend-caveat-line {
+      margin-top: 6px;
+    }
+
     /* ── The pre-run estimate ─────────────────────────────────────────────
        Informational, decision-bearing, and read immediately before a button
        that spends money or an afternoon: --fs-meta floor throughout (D99). */
@@ -924,6 +951,27 @@
     .api-bridge-command {
       font-family: var(--ui-mono);
       font-size: var(--fs-meta);
+    }
+
+    .api-bridge-get {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    /* .api-inline-btn is authored for <button>; an <a> needs the box and the
+       underline reset to match it exactly. */
+    .api-bridge-get-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+    }
+
+    .api-bridge-get .api-field-help {
+      flex: 1 1 220px;
+      margin: 0;
     }
 
     .api-bridge-ready {
@@ -2338,6 +2386,32 @@
       color: var(--muted);
     }
 
+    /* The progression readout's own two lines. Everything above them is the
+       API panel's metrics grammar reused verbatim; only the caption pair is
+       new, and it is sized on the same --fs floor as every other informational
+       line in this door. */
+    .wizard-progress-metrics {
+      margin-top: 8px;
+    }
+
+    .wizard-progress-caption {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 10px;
+      align-items: baseline;
+      margin-top: 8px;
+      font-size: 6.5pt;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+    .wizard-progress-tally {
+      font-family: var(--ui-mono);
+      font-size: 6pt;
+      letter-spacing: .04em;
+      color: var(--muted);
+    }
+
     .wizard-current-kicker {
       font-size: 6pt;
       letter-spacing: .22em;
@@ -2673,6 +2747,40 @@
       text-transform: uppercase;
       color: var(--ink);
       font-weight: 400;
+    }
+
+    /* The quality phase's block inside its host card (D110's second form).
+       Indented off a rule so it reads as work happening UNDER this card rather
+       than as another card — the referee family has no fixed shape and must
+       not be drawn as if it did. */
+    .wizard-stage-phase {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding-left: 10px;
+      border-left: 2px solid var(--rule-soft);
+      min-width: 0;
+    }
+
+    .wizard-stage-phase-tag {
+      font-family: var(--mono);
+      font-size: var(--fs-micro);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .wizard-stage-phase-line {
+      font-family: var(--body);
+      font-size: var(--fs-micro);
+      line-height: 1.7;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .wizard-stage-phase-line.is-live {
+      color: var(--ink);
     }
 
     .wizard-stage-stats {
@@ -3470,14 +3578,37 @@
               <span class="api-station-index">Step 1</span>
               <span class="api-station-title">Start the bridge on your machine</span>
             </div>
-            <div class="api-station-copy">This door uses the Claude Code you already have installed, on your own Claude subscription, instead of a metered API key. A small program on your machine — the bridge — hands LiftRPG's requests to Claude Code and hands the answers back. It never sees your login, and nothing is sent anywhere except by Claude Code itself.</div>
+            <!-- Written by applyDoorSurface() from BRIDGE_BACKEND_UI, like
+                 every other sentence on this door that names the agent. It sat
+                 here as static "Claude Code" text through the whole
+                 multi-backend landing: a reader on the Codex chip was told, in
+                 Step 1, that this door runs Claude Code on a Claude
+                 subscription. The markup keeps the Claude Code wording as the
+                 no-JS floor only. -->
+            <div class="api-station-copy" id="api-bridge-station-copy">This door uses the coding agent you already have installed, on your own subscription, instead of a metered API key. A small program on your machine — the bridge — hands LiftRPG's requests to that agent and hands the answers back. It never sees your login, and nothing is sent anywhere except by the agent itself.</div>
+            <!-- THE DOWNLOAD AFFORDANCE (2026-08-19). The bridge has shipped
+                 from this site since D138 — public/scripts/liftrpg-bridge.mjs
+                 is served at exactly the relative path BRIDGE_SCRIPT_PATH
+                 quotes — but the door never handed it over: it printed a
+                 command naming a file the reader had no way to obtain. A door
+                 that names a file it will not give you is not a door. The href
+                 is the SAME path the command below is built from, so the link
+                 and the command cannot drift onto different files. -->
             <div class="api-field">
-              <label class="field-label" for="api-bridge-command">Run this in the LiftRPG folder</label>
+              <div class="field-label">Get the bridge</div>
+              <div class="api-bridge-get">
+                <a class="api-inline-btn api-bridge-get-btn" id="api-bridge-download" href="scripts/liftrpg-bridge.mjs" download="liftrpg-bridge.mjs">Download The Bridge</a>
+                <span class="api-field-help">One file, <code>liftrpg-bridge.mjs</code>. You need Node installed and a logged-in Claude Code; if either is missing, the bridge&rsquo;s first line names the exact fix.</span>
+              </div>
+            </div>
+            <div class="api-field">
+              <label class="field-label" for="api-bridge-command">Then start it</label>
               <div class="api-key-row">
                 <input class="api-input api-bridge-command" id="api-bridge-command" type="text" spellcheck="false" readonly>
                 <button class="api-key-toggle" id="api-bridge-copy" type="button">Copy</button>
               </div>
             </div>
+            <div class="api-field-help">This command is written for the LiftRPG folder&rsquo;s own copy. If you downloaded the single file above, run it from wherever you saved it — <code>node liftrpg-bridge.mjs</code>, with the same flags.</div>
             <div class="api-field-help" id="api-bridge-origin-help"></div>
             <div class="api-bridge-ready">
               <span class="api-bridge-ready-label">You are ready when its first line reads</span>
@@ -3520,9 +3651,42 @@
             <div class="api-field-help" id="api-station-provider-help">Running a model locally? Ollama and LM Studio both serve an OpenAI-compatible endpoint on your machine, and most local servers need no key at all.</div>
           </section>
 
-          <section class="api-station" id="api-station-model">
+          <!-- KEY BEFORE MODEL (2026-08-19). Ordering rationale, since the
+               ruling left the order to the builder: the key is a HARD
+               PRECONDITION of the model station's own control —
+               describeModelDiscoveryBlocker() refuses Refresh Models with
+               "Enter an API key to load the current model list" — so asking
+               for the model first stranded the reader at a button that sent
+               them to a later step. Key, then model, is the order the machine
+               already enforces; the page now says so.
+               Base URL deliberately STAYS with Provider rather than riding
+               into this pair: applyProviderPreset() writes it FROM the chosen
+               preset, so it is a property of the destination, not of the
+               credentials — and on the bridge door the provider field hides
+               while Base URL remains as "where the bridge is listening".
+               The key station is hidden entirely on the bridge door, and
+               renumberApiStations() rewrites the badges from what is on
+               screen, so this move needs no numbering logic of its own. -->
+          <section class="api-station" id="api-station-key">
             <div class="api-station-head">
               <span class="api-station-index">Step 2</span>
+              <span class="api-station-title">Your key</span>
+            </div>
+            <div class="api-station-copy">Held in this tab for this session only. It goes straight from your browser to the provider you chose — LiftRPG has no server in the middle and never stores it. It is also what lets the next step ask your provider which models it offers.</div>
+            <div class="api-config-grid api-config-grid--single">
+              <div class="api-field">
+                <label class="field-label" for="api-key">API Key</label>
+                <div class="api-key-row">
+                  <input class="api-input" id="api-key" type="password" placeholder="Paste your key for this session" autocomplete="off" spellcheck="false">
+                  <button class="api-key-toggle" id="api-key-toggle" type="button" aria-pressed="false" aria-label="Show the API key">Show</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="api-station" id="api-station-model">
+            <div class="api-station-head">
+              <span class="api-station-index">Step 3</span>
               <span class="api-station-title">Which model writes the booklet?</span>
             </div>
             <div class="api-station-copy">Refresh Models asks your provider what it currently offers. If your model is not on the list — or the provider does not publish one — choose <em>Custom model</em> and type the id yourself.</div>
@@ -3537,23 +3701,6 @@
                   <button class="api-inline-btn" id="api-model-refresh" type="button">Refresh Models</button>
                 </div>
                 <div class="api-model-status" id="api-model-status">LiftRPG can load the current model list from supported providers so you do not have to keep updating this field by hand.</div>
-              </div>
-            </div>
-          </section>
-
-          <section class="api-station" id="api-station-key">
-            <div class="api-station-head">
-              <span class="api-station-index">Step 3</span>
-              <span class="api-station-title">Your key</span>
-            </div>
-            <div class="api-station-copy">Held in this tab for this session only. It goes straight from your browser to the provider you chose — LiftRPG has no server in the middle and never stores it.</div>
-            <div class="api-config-grid api-config-grid--single">
-              <div class="api-field">
-                <label class="field-label" for="api-key">API Key</label>
-                <div class="api-key-row">
-                  <input class="api-input" id="api-key" type="password" placeholder="Paste your key for this session" autocomplete="off" spellcheck="false">
-                  <button class="api-key-toggle" id="api-key-toggle" type="button" aria-pressed="false" aria-label="Show the API key">Show</button>
-                </div>
               </div>
             </div>
           </section>
@@ -3619,6 +3766,12 @@
           </div>
           <div class="api-note" id="api-prefs-note">Provider, model, base URL, build method, and any pricing you enter are saved on this device for next time. Your key never is.</div>
           <div class="book-estimate" id="api-estimate" hidden></div>
+          <!-- What the chosen coding-agent backend costs you to pick, stated
+               where the choice is actually committed. Written by
+               applyDoorSurface() from BRIDGE_BACKEND_UI, so this seat and the
+               legend's chip row cannot say different things; empty (and zero
+               height) on every door and backend that declares nothing. -->
+          <div id="api-backend-caveat"></div>
           <div class="generator-flow-actions">
           <button class="generator-flow-back" id="api-config-back" type="button">Back To Brief</button>
           <button class="gen-submit" id="api-submit" type="button" style="margin-top:0; flex:1">Build Booklet With My API &rarr;</button>
@@ -3759,6 +3912,38 @@
           <div class="wizard-current-kicker" id="wiz-current-kicker">Current Step</div>
           <div class="wizard-current-title" id="wiz-current-title">Foundation</div>
           <div class="wizard-current-help" id="wiz-current-help">Two moves only: copy the prompt into your AI, then paste the AI reply back here.</div>
+          <!-- ── THE PROGRESSION READOUT (the flow half of the author's kanban
+               ask, 2026-08-18) ─────────────────────────────────────────────
+               getPipelineSummary() has computed every number on this row since
+               the board landed and NOTHING called it — a progression summary
+               with no reader, which is the same shape as a rule nothing reads.
+               This is its reader.
+
+               It deliberately introduces NO new visual vocabulary: the
+               three-tile metrics row is the API run panel's own
+               (.api-run-metrics / .wizard-state-label / .api-run-metric-value),
+               so both doors answer "where am I" in one grammar. And there is
+               no progress BAR here on purpose — the rail directly above IS the
+               bar, drawing complete / current / upcoming per step already, and
+               a second one would be a second answer to the same question. -->
+          <div class="api-run-metrics wizard-progress-metrics">
+            <div class="api-run-metric">
+              <div class="wizard-state-label">Where You Are</div>
+              <div class="api-run-metric-value" id="wiz-progress-position">Step 1 of 6</div>
+            </div>
+            <div class="api-run-metric">
+              <div class="wizard-state-label">Steps Checked</div>
+              <div class="api-run-metric-value" id="wiz-progress-count">0 / 6 ready</div>
+            </div>
+            <div class="api-run-metric">
+              <div class="wizard-state-label">What Happens Now</div>
+              <div class="api-run-metric-value api-run-metric-value--compact" id="wiz-progress-next">Foundation</div>
+            </div>
+          </div>
+          <div class="wizard-progress-caption">
+            <span id="wiz-progress-detail"></span>
+            <span class="wizard-progress-tally" id="wiz-progress-tally"></span>
+          </div>
         </div>
 
         <div class="wizard-pane is-visible" id="wiz-pane-1">
@@ -4051,6 +4236,7 @@
       var apiConfigTitle = document.getElementById('api-config-title');
       var apiConfigCopy = document.getElementById('api-config-copy');
       var apiStationBridge = document.getElementById('api-station-bridge');
+      var apiBridgeStationCopy = document.getElementById('api-bridge-station-copy');
       var apiStationProvider = document.getElementById('api-station-provider');
       var apiStationProviderTitle = document.getElementById('api-station-provider-title');
       var apiStationProviderCopy = document.getElementById('api-station-provider-copy');
@@ -4066,6 +4252,7 @@
       var apiBridgeStatusEl = document.getElementById('api-bridge-status');
       var genEstimateEl = document.getElementById('gen-estimate');
       var apiEstimateEl = document.getElementById('api-estimate');
+      var apiBackendCaveatEl = document.getElementById('api-backend-caveat');
       var apiPanel = document.getElementById('api-panel');
       var apiConfigBackBtn = document.getElementById('api-config-back');
       var apiStatusBackBtn = document.getElementById('api-status-back');
@@ -4097,6 +4284,11 @@
       var apiPipelineRail = document.getElementById('api-pipeline-rail');
       var apiStageLedger = document.getElementById('api-stage-ledger');
       var apiRunLog = document.getElementById('api-run-log');
+      // What is currently painted into the run log. renderApiRunState is the
+      // only writer (the placeholder in the markup is the only other author,
+      // and the first render replaces it), so a string compare is a sound
+      // answer to "does this need rewriting at all?".
+      var lastApiRunLogHtml = null;
       var apiRunActions = document.getElementById('api-run-actions');
       // The delivery block (W2). Its own container, its own heading, never
       // painted into a slot the checkpoint/recovery UI already owns.
@@ -4165,6 +4357,11 @@
       var wizBackToBriefBtn = document.getElementById('wiz-back-to-brief');
       var wizPipelineRail = document.getElementById('wiz-pipeline-rail');
       var wizStageLedger = document.getElementById('wiz-stage-ledger');
+      var wizProgressPosition = document.getElementById('wiz-progress-position');
+      var wizProgressCount = document.getElementById('wiz-progress-count');
+      var wizProgressNext = document.getElementById('wiz-progress-next');
+      var wizProgressDetail = document.getElementById('wiz-progress-detail');
+      var wizProgressTally = document.getElementById('wiz-progress-tally');
       var wizStageHealth = document.getElementById('wiz-stage-health');
       var wizBuildMeta = document.getElementById('wiz-build-meta');
       var wizDraftStatus = document.getElementById('wiz-draft-status');
@@ -4283,11 +4480,138 @@
           // The door is the preset, and nothing else. The id stays 'bridge'
           // (machine contract, test-pinned) while the label generalizes
           // (display copy, plain language — D99). Which AGENT the bridge
-          // spawns is the sub-choice rendered in the legend; Claude Code is
-          // the one wired today.
+          // spawns is the sub-choice rendered in the legend; this row is that
+          // sub-choice's DEFAULT, not its only value — see doorProviderId().
           providerId: 'bridge'
         }
       ];
+
+      // ── THE CODING-AGENT SUB-CHOICE ───────────────────────────────────────
+      // The bridge is ONE door in front of SEVERAL backends: one process, one
+      // port, path-prefix routing, one PROVIDERS row each. The chip row is how
+      // a reader picks between them, and it is built from those rows.
+      //
+      // MEMBERSHIP IS DERIVED; PRESENTATION IS DECLARED. The chips come from
+      // the `bridge*` ids in PROVIDERS, never from a hand-written list — a
+      // hand-written list is precisely how this row rotted: the codex backend
+      // went live and the chip beside it still read "Codex — Soon", disabled
+      // and wired to nothing, because the UI copy and the provider table had
+      // no relation a machine could check. A backend that gains a PROVIDERS
+      // row now gains a chip whether or not anyone remembers this file.
+      //
+      // What CANNOT be derived is READINESS: nothing in a preset row says
+      // whether the CLI behind it can answer. That is declared here — and a
+      // bridge provider with no row here renders DISABLED and says so, using
+      // the preset's own label. The failure mode of a forgotten entry must be
+      // "visibly not ready yet", never "silently absent" and never "falsely
+      // ready" (D96/D99: a control may not promise a state it cannot enter).
+      var BRIDGE_PROVIDER_PREFIX = 'bridge';
+      //
+      // READINESS IS NOT THE ONLY THING A READER IS OWED. `blocked` answers
+      // "can this backend answer at all"; `caveats` answers "what does picking
+      // it cost me that the panel would otherwise never say". A backend can be
+      // fully live — clickable, wired, proven to return real answers — and
+      // still carry risks a reader must weigh BEFORE spending an afternoon on
+      // a run. Those go here, in the reader's words, and render at both seats
+      // the reader passes on the way to Build.
+      //
+      // The FACTS OF RECORD for these lines live in generator/modules/
+      // constants.js, in the BACKEND TABLE header above `bridgeCodex`. When
+      // that CLI grows an output ceiling or a truncation signal, the comment
+      // there and these lines move together — this is copy, that is the
+      // finding it reports.
+      // `subscription` is WHOSE ACCOUNT PAYS, which is not the same question as
+      // which CLI runs — and answering it with the CLI's name was factually
+      // wrong the moment a second backend landed. Codex spends a ChatGPT
+      // subscription; there is no such thing as a "Codex subscription". Kept
+      // beside chipLabel rather than derived from it for exactly that reason:
+      // the two answers coincide for Claude Code and for nothing else.
+      var BRIDGE_BACKEND_UI = {
+        bridge: { chipLabel: 'Claude Code', subscription: 'Claude' },
+        bridgeCodex: {
+          chipLabel: 'Codex',
+          subscription: 'ChatGPT',
+          caveats: [
+            'No output ceiling: the Codex CLI has no maximum-output setting, so LiftRPG’s per-stage token budget is written into the prompt and enforced by nothing. It also reports every answer as finished, so a stage that was cut off arrives looking complete.',
+            'Fixed overhead on every call: Codex wraps each request in its own agent framing, measured at about 17,300 input tokens on a call whose prompt was six words, and it is charged again at every stage of the build. This door is not billed per token, so the run log shows exact token counts and no dollar figure — the framing is why those counts run well above the text LiftRPG actually sent.',
+            'Landed, not proven: real calls through the real CLI return real answers, and no full book has been built through this backend end to end.'
+          ]
+        },
+        // Not a "soon". The bridge routes this prefix and answers every
+        // request under it with a self-describing refusal, because that CLI
+        // has no auth configured here. The chip states the blocker the reader
+        // can actually act on, not a date nobody promised.
+        bridgeGemini: {
+          chipLabel: 'Gemini',
+          subscription: 'Google',
+          blocked: 'needs your Gemini CLI login first'
+        }
+      };
+      var BRIDGE_BACKEND_UNDECLARED_BLOCK = 'not wired up yet';
+
+      function isBridgeProviderId(providerId) {
+        return String(providerId || '').indexOf(BRIDGE_PROVIDER_PREFIX) === 0;
+      }
+
+      function bridgeBackendIds() {
+        var presets = api() && api().PROVIDERS ? api().PROVIDERS : null;
+        var ids = presets ? Object.keys(presets).filter(isBridgeProviderId) : [];
+        // The legend renders once before api-generator.js has landed (see the
+        // boot note above setGenerationMode). An empty derivation there would
+        // paint the door with no chips at all, so the declaration is the floor
+        // and the derived table is the authority the moment it exists.
+        return ids.length ? ids : Object.keys(BRIDGE_BACKEND_UI);
+      }
+
+      // The reason a chip is unclickable, or '' when it is live. One reader
+      // for the rendered chip and one for the honesty gate.
+      function bridgeBackendBlockReason(providerId) {
+        var ui = BRIDGE_BACKEND_UI[providerId];
+        if (!ui) return BRIDGE_BACKEND_UNDECLARED_BLOCK;
+        return ui.blocked || '';
+      }
+
+      function bridgeBackendLabel(providerId) {
+        var ui = BRIDGE_BACKEND_UI[providerId];
+        if (ui && ui.chipLabel) return ui.chipLabel;
+        var preset = getProviderPreset(providerId);
+        return (preset && preset.label) || providerId;
+      }
+
+      // The noun phrase for whose account a bridge run spends. ONE reader per
+      // sentence that makes the claim, so the door, the station copy and the
+      // book estimate cannot end up naming three different subscriptions —
+      // which is how "your Claude subscription window" survived on the Codex
+      // door and told the reader something that is simply not true. A backend
+      // that declares none gets the honest generic: it still is not the
+      // reader's wallet, and that is the whole point of the sentence.
+      function bridgeBackendSubscriptionLabel(providerId) {
+        var ui = BRIDGE_BACKEND_UI[providerId];
+        return (ui && ui.subscription) ? ui.subscription + ' subscription' : 'own account';
+      }
+
+      // ONE HOME, TWO SEATS. The caveat block is built once and rendered at
+      // both places a reader can commit from: the legend under the chip row
+      // (where the backend is chosen) and the config panel above the Build
+      // button (where the run actually starts). A reader who restores a saved
+      // bridge preference lands on the second surface without passing the
+      // first, so a warning at only one of them is a warning that can be
+      // skipped by the ordinary path. '' when the backend declares nothing —
+      // the container collapses and the door is byte-identical to before.
+      function bridgeBackendCaveatHtml(providerId) {
+        var ui = BRIDGE_BACKEND_UI[providerId];
+        var lines = (ui && ui.caveats) || [];
+        if (!lines.length) return '';
+        return '<div class="api-run-notice is-warn backend-caveat">' +
+          '<span class="api-run-notice-tag">' +
+          escapeForHtml(bridgeBackendLabel(providerId)) +
+          '</span><span class="api-run-notice-text" data-backend-caveat="' +
+          escapeForHtml(providerId) + '">' +
+          lines.map(function (line) {
+            return '<span class="backend-caveat-line">' + escapeForHtml(line) + '</span>';
+          }).join('') +
+          '</span></div>';
+      }
 
       function getDoor(modeId) {
         for (var d = 0; d < GENERATION_DOORS.length; d++) {
@@ -4303,12 +4627,28 @@
       }
 
       function doorForProvider(providerId) {
+        // The coding-agent door owns EVERY bridge backend, not only the one it
+        // is currently pointed at. Matching the door's single `providerId`
+        // would leave 'bridgeCodex' looking like a provider no door owns — so
+        // applyProviderPreset would file it as `lastApiDoorProvider`, and the
+        // API door would later reopen holding a coding-agent backend the
+        // reader never chose for it. That is the exact defect the
+        // apiDoorProvider split exists to prevent, one backend down.
+        if (isBridgeProviderId(providerId)) return 'bridge';
         for (var d = 0; d < GENERATION_DOORS.length; d++) {
           if (GENERATION_DOORS[d].providerId && GENERATION_DOORS[d].providerId === providerId) {
             return GENERATION_DOORS[d].id;
           }
         }
         return '';
+      }
+
+      // Which provider a door is pointed at right now. Constant for every door
+      // but the bridge, whose backend is the reader's chip choice.
+      function doorProviderId(door) {
+        if (!door) return '';
+        if (door.id === 'bridge') return currentBridgeProvider;
+        return door.providerId || '';
       }
 
       function doorOwnsProvider(providerId) {
@@ -4370,6 +4710,38 @@
         return /^week_\d+$/i.test(value) ? 'weeks' : value;
       }
 
+      // ── IS THIS KEY A CARD ON THE BOARD? (D110's second form) ──────────────
+      //
+      // THE DEFECT THIS PREDICATE EXISTS TO KILL (author, watching proving-run
+      // 3 finish, 2026-08-18): all ten cards read COMPLETE while the pipeline
+      // was still buying calls. The pipeline does not stop at the last rail
+      // card. After it, `runCriticLoop` runs the conductor's pass and then up
+      // to CRITIC_MAX_ROUNDS graded reads, each with up to
+      // CRITIC_MAX_REVISIONS_PER_ROUND unit revisions — real minutes, real
+      // spend, and revisions that REWRITE PRINTED PROSE. Those stages emit on
+      // the same channel under keys the rail has never heard of ('conductor',
+      // 'critic', 'critic-revise').
+      //
+      // markApiStageInProgress read "the pipeline moved to a different
+      // stageKey" as "the previous card finished". For every on-rail
+      // transition that inference is true. For an off-rail one it is a lie,
+      // and it is the lie the author read: the conductor's first heartbeat
+      // retired the Quality Check card, which flipped the board to 10/10 and
+      // the headline to "10 / 10 stages" while the critic was still writing.
+      //
+      // The rule the whole fix rests on: AN OFF-RAIL STAGE IS NOT EVIDENCE
+      // ABOUT A RAIL CARD. A card is retired by its OWN completion event and
+      // by nothing else. Derived from API_STAGE_ORDER — the one home for what
+      // the board draws — so a pipeline change that adds or removes a card
+      // moves this predicate with it and no second list can drift.
+      function isRailStageKey(stageKey) {
+        if (!stageKey) return false;
+        for (var i = 0; i < API_STAGE_ORDER.length; i++) {
+          if (API_STAGE_ORDER[i].key === stageKey) return true;
+        }
+        return false;
+      }
+
       var wizStep = 0;
       var wizData = {};
       var wizState = {};
@@ -4383,6 +4755,12 @@
       // reader's own choice (anthropic, a local endpoint, whatever they picked)
       // was silently replaced by 'openai' when they came back.
       var lastApiDoorProvider = 'openai';
+      // Which backend the coding-agent door is pointed at. The door owns a
+      // FAMILY of providers (one per CLI behind the bridge), so "which door"
+      // and "which backend" are two questions and get two answers — the same
+      // split, one level down, that `door` and `provider` needed. Restored
+      // from the saved provider in initializeApiSettings.
+      var currentBridgeProvider = 'bridge';
       var currentGeneratorSurface = 'intake';
       var activeApiRunId = 0;
       // THE RUN'S CANCELLATION (DR-23). `activeApiRunId` answers "should I
@@ -4547,7 +4925,22 @@
         return pricing.sourceLabel;
       }
 
+      // THREE WAYS TO NOT KNOW A PRICE, AND THEY ARE NOT THE SAME SENTENCE.
+      // The two branches below sit ahead of the rate-table wording because a
+      // rate table is not what produced either number. See provider.js's
+      // TRANSPORT_BILLING_MODES header for why the middle case is its own state:
+      // telling someone on a ChatGPT subscription that their run is "unpriced —
+      // no pricing is mapped for this model" reports a gap in OUR table for a
+      // number that does not exist in the world and never will.
       function buildPricingCostCaption(pricing, modelLabel, fallbackReason) {
+        if (pricing && pricing.sourceKind === 'measured') {
+          return 'Measured, not estimated: this figure is what ' + pricing.sourceLabel +
+            ' reported for the calls in this run. It comes from the tool that did the work, so no rate table is involved.';
+        }
+        if (pricing && pricing.sourceKind === 'notMetered') {
+          return 'Not billed per-token — ' + pricing.sourceLabel +
+            '. Token counts stay exact, but there is no per-token price to report for this door, and no pricing table could supply one.';
+        }
         if (!pricing || !pricing.sourceLabel) {
           return 'LiftRPG starts with the local pricing table, then refreshes live pricing in the background when the provider allows browser access.';
         }
@@ -4558,14 +4951,18 @@
           caption += ' at ' + formatPricingTimestamp(pricing.fetchedAt);
         }
         caption += ' for ' + (modelLabel || 'the selected model') + '.';
-        if (pricing.live && pricing.sourceKind === 'thirdParty' && fallbackReason) {
-          caption += ' Official provider pricing could not be fetched directly, so LiftRPG used the configured third-party pricing feed.';
-          return caption;
-        }
         if (!pricing.live && fallbackReason) {
           caption += ' Staying on the local pricing table because live pricing could not be refreshed from this browser.';
         }
         return caption;
+      }
+
+      // A MEASURED FIGURE MUST NOT WEAR THE WORD "EST". Under-claiming is a
+      // smaller sin than fabricating, but the run log is the surface the author
+      // reads to judge a run, and calling the CLI's own accounting an estimate
+      // hides the one number on the panel that is not a guess.
+      function costQualifier(pricing) {
+        return (pricing && pricing.sourceKind === 'measured') ? ' measured' : ' est';
       }
 
       function createApiUsageTotals() {
@@ -4688,6 +5085,21 @@
           // (the headline caption and the stage card), so the two cannot
           // disagree about whether the build is waiting or working.
           throttleWait: null,
+          // ── THE REFEREE FAMILY'S PRESENCE ON THE BOARD (D110's second form) ──
+          // The paid work that runs AFTER the last rail card: the conductor's
+          // pass, the critic's graded rounds, and the unit revisions those
+          // rounds buy. It has no card of its own because its shape is not
+          // known until it runs (rounds are bounded, not fixed; a round revises
+          // as many units as the verdict names), and inventing a fixed card
+          // count for it would be the same lie in the other direction.
+          //
+          // So it is rendered as a PHASE under the rail card that is still in
+          // progress while it runs — indeterminate but honest, which is the
+          // whole point: accuracy over precision. Null whenever no off-rail
+          // stage is live. Shape:
+          //   { hostKey, stageKey, stageName, startedAt, finishedCalls,
+          //     stream, waiting }
+          qualityPhase: null,
           ledger: ledger,
           booklet: null,
           error: '',
@@ -4763,6 +5175,178 @@
       function getActiveStreamFor(stageKey) {
         if (!apiRunState || !apiRunState.stream || !stageKey) return null;
         return apiRunState.stream.stageKey === stageKey ? apiRunState.stream : null;
+      }
+
+      // ── THE QUALITY PHASE (D110's second form) ────────────────────────────
+      //
+      // Every event whose stageKey is not a card on the board lands here, and
+      // NOTHING else in this file may act on one. That containment is the fix:
+      // the rail's ledger, its current card, its counter and the pipeline's
+      // totalStages are all unreachable from an off-rail event by
+      // construction, so no future referee stage can retire a card the way the
+      // conductor's first heartbeat used to.
+      //
+      // What the reader is told comes from the event itself — `stageName` is
+      // the pipeline's own sentence for what is running ("Composition Critic —
+      // round 2 of up to 3"). There is deliberately NO table of referee stages
+      // here: a hand-written roster beside the pipeline's own keys is the D93
+      // defect, and it would drift silently, because an unknown key looks
+      // exactly like the off-rail keys the roster would exist to name.
+      // WHICH CARD HOSTS THIS OFF-RAIL STAGE — and '' is a legitimate answer.
+      //
+      // ONLY a card that is actually in progress can host off-rail work, and
+      // there is deliberately no "nearest card" fallback. `canonicalize` — the
+      // Liftosaur program read (D107/D133) — is off-rail too, and it runs
+      // BEFORE the first card on the live multi-stage path. Hosting it under
+      // the last card would print a review line on Quality Check before a word
+      // had been written, which is this same defect inverted: a card claiming
+      // activity it does not have. Unhosted off-rail work still logs and still
+      // reports its spend; it just draws nothing on the board.
+      function qualityPhaseHostKey() {
+        if (apiRunState
+          && isRailStageKey(apiRunState.currentStageKey)
+          && apiRunState.ledger[apiRunState.currentStageKey] === 'in progress') {
+          return apiRunState.currentStageKey;
+        }
+        return '';
+      }
+
+      // What the hosted block calls itself. Derived from the host card rather
+      // than from a roster of referee stage keys — a roster beside the
+      // pipeline's own keys is the D93 defect, and it would mislabel the first
+      // off-rail stage anybody adds under a different card.
+      function qualityPhaseTag(hostKey) {
+        return hostKey === 'quality' ? 'Quality review' : 'Still running';
+      }
+
+      function applyQualityPhaseEvent(stageKey, phase, message, meta) {
+        if (!apiRunState || !stageKey) return;
+        meta = meta || {};
+        var stageName = String(meta.stageName || '') || stageKey;
+        var hostKey = qualityPhaseHostKey();
+        // The phase belongs to ONE host card. A run whose off-rail work happens
+        // under two different cards (canonicalize under none, then the referee
+        // family under Quality Check) starts a fresh count at each — carrying
+        // the earlier one over would put "2 review calls finished" on a card
+        // whose review had not started.
+        var previous = (apiRunState.qualityPhase && apiRunState.qualityPhase.hostKey === hostKey)
+          ? apiRunState.qualityPhase
+          : null;
+        var finishedCalls = previous ? Number(previous.finishedCalls || 0) : 0;
+        var tag = qualityPhaseTag(hostKey);
+
+        // Telemetry FIRST and unconditionally: the referee's rounds are paid
+        // calls, and their tokens and cost have always aggregated into the run
+        // meter through this function. Containing the rail damage must not
+        // also contain the spend — a phase that costs money and reports none
+        // is the same class of lie as a card that reads Complete while it runs.
+        if (meta.telemetry) applyApiStageTelemetry(stageKey, meta.telemetry, message, meta);
+
+        if (phase === 'complete' || phase === 'failed') {
+          apiRunState.qualityPhase = {
+            hostKey: hostKey,
+            stageKey: '',
+            stageName: '',
+            startedAt: 0,
+            finishedCalls: finishedCalls + 1,
+            stream: null,
+            waiting: ''
+          };
+          pushApiLog((hostKey ? tag + ' · ' : '') + stageName
+            + (phase === 'failed' ? ' failed' : ' complete')
+            + ' · ' + (meta.telemetry ? formatTokenSummary(meta.telemetry.usage) : 'No token data'));
+          return;
+        }
+
+        var startedAt = (previous && previous.stageName === stageName && previous.startedAt)
+          ? previous.startedAt
+          : Date.now();
+        var live = {
+          hostKey: hostKey,
+          stageKey: stageKey,
+          stageName: stageName,
+          startedAt: startedAt,
+          finishedCalls: finishedCalls,
+          stream: null,
+          waiting: ''
+        };
+        if (phase === 'streaming') {
+          live.stream = {
+            stageKey: stageKey,
+            received: !!meta.received,
+            chars: Number(meta.chars || 0),
+            approxTokens: Number(meta.approxTokens || 0),
+            elapsedMs: Number(meta.elapsedMs || 0),
+            budgetMs: Number(meta.budgetMs || 0),
+            attempt: Number(meta.attempt || 0),
+            attemptCount: Number(meta.attemptCount || 0),
+            final: !!meta.final
+          };
+        } else if (phase === 'throttle_wait') {
+          live.waiting = 'the provider’s rate limit is holding this call';
+        } else if (phase === 'retrying' || phase === 'delta_repair') {
+          applyApiNotice(phase === 'retrying' ? 'warn' : 'info', message, meta);
+        }
+        // A referee stage the reader has not been told about yet gets one log
+        // line, once. Heartbeats arrive twice a second and must never push one
+        // (the same rule the on-rail heartbeat follows).
+        if (!previous || previous.stageName !== stageName) {
+          pushApiLog((hostKey ? tag + ' · ' : '') + stageName + ' started.');
+        }
+        apiRunState.qualityPhase = live;
+      }
+
+      // The sentence the phase puts on screen. Empty unless a referee stage is
+      // actually live — a finished phase leaves its call count behind but says
+      // nothing, so a delivered run can never carry a "still reviewing" line.
+      function describeQualityPhase(hostKey) {
+        if (!apiRunState || apiRunState.status !== 'running') return '';
+        var phase = apiRunState.qualityPhase;
+        if (!phase || !phase.stageKey || !phase.hostKey) return '';
+        if (hostKey && phase.hostKey !== hostKey) return '';
+        // DERIVED, never a second flag: a phase is live only while the card it
+        // runs under is. The pipeline always finishes its referee stages before
+        // the host card's own completion event, so this is belt to that
+        // ordering's braces — and it means a stale "still reviewing" line
+        // cannot outlive the card, which would be this defect inverted.
+        if (apiRunState.ledger[phase.hostKey] !== 'in progress') return '';
+        var parts = [phase.stageName];
+        if (phase.waiting) {
+          parts.push(phase.waiting);
+        } else {
+          var beat = formatStreamHeartbeat(phase.stream);
+          if (beat) parts.push(beat.replace(/\.$/, ''));
+        }
+        if (phase.startedAt) parts.push(formatApiElapsed(Date.now() - phase.startedAt) + ' elapsed');
+        return parts.join(' · ');
+      }
+
+      // The block the reader can see. Rendered inside the rail card the phase
+      // is hosted by, so the referee family is on the board rather than only in
+      // the notes log — which is the half of the author's fix that a guard
+      // alone does not buy.
+      function renderQualityPhaseHtml(hostKey) {
+        if (!apiRunState || !apiRunState.qualityPhase) return '';
+        var phase = apiRunState.qualityPhase;
+        // Unhosted off-rail work (`canonicalize`, which runs before the first
+        // card) draws nothing: `hostKey` is '' and matches no card.
+        if (!phase.hostKey || phase.hostKey !== hostKey) return '';
+        var live = describeQualityPhase(hostKey);
+        var done = Number(phase.finishedCalls || 0);
+        if (!live && !done) return '';
+        var rows = [];
+        if (live) {
+          rows.push('<span class="wizard-stage-phase-line is-live">' + escapeForHtml(live) + '</span>');
+        }
+        if (done) {
+          var noun = hostKey === 'quality' ? 'review call' : 'extra call';
+          rows.push('<span class="wizard-stage-phase-line">' + escapeForHtml(done + ' ' + noun
+            + (done === 1 ? '' : 's') + ' finished') + '</span>');
+        }
+        return '<div class="wizard-stage-phase">' +
+          '<span class="wizard-stage-phase-tag">' + escapeForHtml(qualityPhaseTag(hostKey)) + '</span>' +
+          rows.join('') +
+          '</div>';
       }
 
       function formatApiElapsed(ms) {
@@ -5294,8 +5878,14 @@
             rows.push('<div class="book-estimate-caption">' +
               escapeForHtml('Roughly ' + formatApproxTokens(estimate.tokens) + ' tokens, scaled from one measured ' +
                 estimate.anchorWeeks + '-week run. Your model, and any stage that has to be retried, will move that. ' +
+                // WHOSE window, not always Claude's (2026-08-19). This line was
+                // hardcoded to "your Claude subscription window" and stayed
+                // there on the Codex chip, where it is not merely stale but
+                // false: Codex spends a ChatGPT subscription. One accessor, so
+                // the estimate and the door's own copy cannot disagree.
                 (currentGenerationMode === 'bridge'
-                  ? 'On this door those tokens come out of your Claude subscription window, not your wallet.'
+                  ? 'On this door those tokens come out of your ' +
+                    bridgeBackendSubscriptionLabel(currentBridgeProvider) + ' window, not your wallet.'
                   : 'LiftRPG shows the real total as the run goes.')) +
               '</div>');
           }
@@ -5325,6 +5915,14 @@
         } else if (!doorOwnsProvider(providerId)) {
           lastApiDoorProvider = providerId;
         }
+        // WHICH backend the coding-agent door was pointed at is part of that
+        // door's restored state, and it rides the saved provider — no new pref
+        // key. A backend that has since been blocked (or removed) falls back to
+        // the door's default rather than restoring a chip nobody can click.
+        if (isBridgeProviderId(providerId) && getProviderPreset(providerId) &&
+            !bridgeBackendBlockReason(providerId)) {
+          currentBridgeProvider = providerId;
+        }
         if (apiProviderEl) apiProviderEl.value = providerId;
         if (apiMethodEl) apiMethodEl.value = resolveApiPipelineMethod(prefs.method);
         applyPipelineStageOrder(apiMethodEl ? apiMethodEl.value : API_PIPELINE_DEFAULT);
@@ -5348,7 +5946,9 @@
       function updatePrimaryContinueLabel() {
         if (!submitBtn) return;
         if (currentGenerationMode === 'api') submitBtn.textContent = 'Continue To API Setup →';
-        else if (currentGenerationMode === 'bridge') submitBtn.textContent = 'Continue To Claude Code Setup →';
+        else if (currentGenerationMode === 'bridge') {
+          submitBtn.textContent = 'Continue To ' + bridgeBackendLabel(currentBridgeProvider) + ' Setup →';
+        }
         else submitBtn.textContent = 'Start Guided Build →';
       }
 
@@ -5362,21 +5962,43 @@
         modeCopyEl.innerHTML = GENERATION_DOORS.filter(function (door) {
           return door.id === currentGenerationMode;
         }).map(function (door) {
-          // The coding-agent sub-choice (author, 2026-08-13). Static trusted
-          // markup — no reader data rides in it. Codex ships disabled until
-          // its bridge adapter lands (honest-state, D99); "Something Else"
-          // is a REAL button today because local and other models already
-          // run through the API door via any OpenAI-compatible endpoint.
+          // The coding-agent sub-choice (author, 2026-08-13; derived from the
+          // provider table 2026-08-19). Backend chips are BUILT from the
+          // `bridge*` PROVIDERS rows, so a live backend cannot sit behind a
+          // stale label again; readiness comes from BRIDGE_BACKEND_UI and an
+          // undeclared backend renders disabled rather than absent. Ids are
+          // escaped on the way into the markup even though they come from our
+          // own table — the sink decides the escaping, never the source.
+          // "Something Else" is a REAL button today because local and other
+          // models already run through the API door via any OpenAI-compatible
+          // endpoint.
           var extra = '';
           if (door.id === 'bridge') {
+            var chips = bridgeBackendIds().map(function (backendId) {
+              var blocked = bridgeBackendBlockReason(backendId);
+              var label = bridgeBackendLabel(backendId);
+              var isActive = !blocked && backendId === currentBridgeProvider;
+              return '<button type="button" class="agent-chip' +
+                (isActive ? ' is-active' : '') + '"' +
+                (blocked ? ' disabled title="' + escapeForHtml(blocked) + '"' : '') +
+                ' data-agent-chip="backend" data-agent-provider="' +
+                escapeForHtml(backendId) + '">' +
+                escapeForHtml(blocked ? label + ' — ' + blocked : label) +
+                '</button>';
+            });
+            chips.push('<button type="button" class="agent-chip" data-agent-chip="other">Something Else</button>');
             extra = '<div class="agent-chip-row" role="group" aria-label="Which coding agent?">' +
-              '<button type="button" class="agent-chip is-active" data-agent-chip="claude-code">Claude Code</button>' +
-              '<button type="button" class="agent-chip" disabled title="Queued — not wired yet">Codex — Soon</button>' +
-              '<button type="button" class="agent-chip" data-agent-chip="other">Something Else</button>' +
+              chips.join('') +
               '</div>' +
-              '<div class="agent-chip-caption">Claude Code works today; Codex is queued. Anything else — ' +
-              'local models included — runs through the API door: LiftRPG speaks to any OpenAI-compatible ' +
-              'endpoint, including Ollama on this machine. Something Else takes you there.</div>';
+              '<div class="agent-chip-caption">Claude Code and Codex both run here today, on the ' +
+              'subscription you already pay for. A chip that names a blocker is telling you the truth ' +
+              'about that agent on this machine — the bridge will refuse it until the blocker is gone. ' +
+              'Anything else — local models included — runs through the API door: LiftRPG speaks to any ' +
+              'OpenAI-compatible endpoint, including Ollama on this machine. Something Else takes you there.</div>' +
+              // The caveats belong to the SELECTED backend, and the chip
+              // handler re-renders the legend, so picking Codex surfaces them
+              // in the same click that chooses it.
+              bridgeBackendCaveatHtml(currentBridgeProvider);
           }
           return '<div class="generator-mode-legend-row' +
             (door.id === currentGenerationMode ? ' is-active' : '') + '">' +
@@ -5393,7 +6015,31 @@
       if (modeCopyEl) modeCopyEl.addEventListener('click', function (ev) {
         var chip = ev.target && ev.target.closest ? ev.target.closest('[data-agent-chip]') : null;
         if (!chip || chip.disabled) return;
-        if (chip.getAttribute('data-agent-chip') === 'other') setGenerationMode('api');
+        var chipKind = chip.getAttribute('data-agent-chip');
+        if (chipKind === 'other') { setGenerationMode('api'); return; }
+        if (chipKind !== 'backend') return;
+
+        var backendId = chip.getAttribute('data-agent-provider') || '';
+        // Belt to the disabled attribute's braces: a backend that is blocked,
+        // unknown to the provider table, or already selected changes nothing.
+        if (bridgeBackendBlockReason(backendId)) return;
+        if (!getProviderPreset(backendId)) return;
+        if (backendId === currentBridgeProvider) return;
+
+        // The chip IS the door's provider selection, and it lands through the
+        // same applyProviderPreset the door itself uses — so the base URL, the
+        // key exemption, the model list and the run log's provider label all
+        // resolve through the one preset, with no second code path that could
+        // send the run somewhere the chip does not claim.
+        currentBridgeProvider = backendId;
+        if (apiProviderEl) {
+          apiProviderEl.value = backendId;
+          applyProviderPreset(backendId, {});
+        }
+        renderDoorLegend();
+        applyDoorSurface();
+        updatePrimaryContinueLabel();
+        scheduleApiModelDiscovery({ immediate: true });
       });
 
       // The station numbers are rewritten from what is actually on screen. A
@@ -5416,19 +6062,48 @@
       // nothing else on the page works until the bridge is running.
       function applyDoorSurface() {
         var isBridge = currentGenerationMode === 'bridge';
+        // The door names the agent it is actually pointed at. These lines said
+        // "Claude Code" unconditionally, which was true while one backend was
+        // wired and becomes a lie the moment a reader picks another — a panel
+        // describing a run it is not about to make (D99).
+        var agentName = bridgeBackendLabel(currentBridgeProvider);
         if (apiStationBridge) apiStationBridge.hidden = !isBridge;
+        // Step 1's own copy names the agent and the subscription it spends.
+        // Only rewritten on the bridge door — on any other door this section is
+        // hidden, and a sentence about a coding agent nobody selected is the
+        // same class of lie as a stale chip label.
+        if (apiBridgeStationCopy && isBridge) {
+          apiBridgeStationCopy.textContent = 'This door uses the ' + agentName +
+            ' you already have installed, on your own ' +
+            bridgeBackendSubscriptionLabel(currentBridgeProvider) +
+            ', instead of a metered API key. A small program on your machine — the bridge — hands ' +
+            'LiftRPG’s requests to ' + agentName + ' and hands the answers back. It never sees ' +
+            'your login, and nothing is sent anywhere except by ' + agentName + ' itself.';
+        }
+        // The backend's caveats, restated on the surface that holds the Build
+        // button. Cleared on every other door — a caveat about a coding agent
+        // sitting over an API-key run would be a warning about a run nobody is
+        // making, which is the same class of lie as a stale chip label.
+        if (apiBackendCaveatEl) {
+          apiBackendCaveatEl.innerHTML = isBridge
+            ? bridgeBackendCaveatHtml(currentBridgeProvider)
+            : '';
+        }
         if (apiStationKey) apiStationKey.hidden = isBridge;
         if (apiProviderField) apiProviderField.hidden = isBridge;
         if (apiProviderGrid) apiProviderGrid.classList.toggle('api-config-grid--single', isBridge);
-        if (apiConfigKicker) apiConfigKicker.textContent = isBridge ? 'Use Claude Code' : 'Use Your API';
+        if (apiConfigKicker) apiConfigKicker.textContent = isBridge ? 'Use ' + agentName : 'Use Your API';
         if (apiConfigTitle) {
           apiConfigTitle.textContent = isBridge
-            ? 'Point LiftRPG at the Claude Code on your machine'
+            ? 'Point LiftRPG at the ' + agentName + ' on your machine'
             : 'Connect your API and start the build';
         }
         if (apiConfigCopy) {
           apiConfigCopy.textContent = isBridge
-            ? 'Your workout and booklet direction are locked in. Start the bridge, check that LiftRPG can reach it, then build. This spends your Claude subscription rather than money.'
+            // Through the same accessor as Step 1 and the book estimate: the
+            // CLI's name is not the account's name, and "your Codex
+            // subscription" names a product that does not exist.
+            ? 'Your workout and booklet direction are locked in. Start the bridge, check that LiftRPG can reach it, then build. This spends your ' + bridgeBackendSubscriptionLabel(currentBridgeProvider) + ' rather than money.'
             : 'Your workout and booklet direction are locked in. Add your API settings, then LiftRPG will run the full build here in the browser.';
         }
         if (apiStationProviderTitle) {
@@ -5443,15 +6118,20 @@
         }
         if (apiStationProviderHelp) {
           apiStationProviderHelp.textContent = isBridge
-            ? 'No key is needed or wanted here. The bridge runs on your machine, spawns your own Claude Code, and never sees your login.'
+            ? 'No key is needed or wanted here. The bridge runs on your machine, spawns your own ' + agentName + ', and never sees your login.'
             : 'Running a model locally? Ollama and LM Studio both serve an OpenAI-compatible endpoint on your machine, and most local servers need no key at all.';
         }
         if (apiSubmitBtn && !apiSubmitBtn.classList.contains('is-busy')) {
           API_SUBMIT_IDLE_LABEL = isBridge
-            ? 'Build Booklet With Claude Code →'
+            ? 'Build Booklet With ' + agentName + ' →'
             : 'Build Booklet With My API →';
           apiSubmitBtn.textContent = API_SUBMIT_IDLE_LABEL;
         }
+        // The estimate's last line names the subscription this door spends, so
+        // it is part of the door's surface and repaints with it. Without this,
+        // switching the backend chip repainted every sentence except the one
+        // making a claim about the reader's money.
+        renderBookEstimate();
         renumberApiStations();
       }
 
@@ -5471,11 +6151,12 @@
         // the model list, the run log's provider label — resolves through the
         // one preset with no second code path.
         var door = getDoor(currentGenerationMode);
+        var doorProvider = doorProviderId(door);
         if (apiProviderEl) {
-          if (door.providerId && getProviderPreset(door.providerId)) {
-            if (apiProviderEl.value !== door.providerId) {
-              apiProviderEl.value = door.providerId;
-              applyProviderPreset(door.providerId, {});
+          if (doorProvider && getProviderPreset(doorProvider)) {
+            if (apiProviderEl.value !== doorProvider) {
+              apiProviderEl.value = doorProvider;
+              applyProviderPreset(doorProvider, {});
             }
           } else if (doorOwnsProvider(apiProviderEl.value)) {
             // Leaving a door must leave its provider behind. Saved prefs
@@ -5733,6 +6414,16 @@
 
       function markApiStageInProgress(stageKey) {
         if (!apiRunState || !stageKey) return;
+        // ── A CARD IS RETIRED BY ITS OWN COMPLETION, NEVER BY SOMEBODY ELSE'S
+        // START (D110's second form). The line below infers "the previous card
+        // finished" from "a different stage is now running". True for every
+        // on-rail transition; false for an off-rail one, and that false
+        // inference is exactly what flipped the board to 10/10 while the critic
+        // was still rewriting weeks. Off-rail events never reach this function
+        // (the handler routes them to applyQualityPhaseEvent), and this guard
+        // is the second lock: a caller added later cannot reintroduce the
+        // defect by calling straight in.
+        if (!isRailStageKey(stageKey)) return;
         if (apiRunState.currentStageKey && apiRunState.currentStageKey !== stageKey && apiRunState.ledger[apiRunState.currentStageKey] === 'in progress') {
           apiRunState.ledger[apiRunState.currentStageKey] = 'valid';
         }
@@ -5995,7 +6686,7 @@
           stats.push('<span class="wizard-stage-stat">' + escapeForHtml(formatCompactTokens(usage.outputTokens)) + ' out</span>');
         }
         if (Number(metrics.estimatedCostUsd || 0) > 0) {
-          stats.push('<span class="wizard-stage-stat">' + escapeForHtml(formatUsd(metrics.estimatedCostUsd)) + ' est</span>');
+          stats.push('<span class="wizard-stage-stat">' + escapeForHtml(formatUsd(metrics.estimatedCostUsd) + costQualifier(metrics.pricing)) + '</span>');
         }
         if (Number(metrics.retries || 0) > 0) {
           stats.push('<span class="wizard-stage-stat">' + escapeForHtml(String(metrics.retries)) + ' retries</span>');
@@ -6050,8 +6741,14 @@
           // was refused. Say what is actually happening instead.
           var throttleDetail = describeThrottleWait(stageKey);
           if (throttleDetail) return 'Paused — ' + throttleDetail;
+          // "Locally on this device" is true of assembly and false of the
+          // referee family, which makes paid remote calls (D110's second form).
+          // While a quality-phase stage is live the card must not claim the
+          // opposite of what the block underneath it is reporting.
           var baseDetail = stageKey === 'quality'
-            ? 'Assembling and checking the booklet locally on this device.'
+            ? (describeQualityPhase(stageKey)
+                ? 'Assembled. The editorial review is still reading and revising the booklet.'
+                : 'Assembling and checking the booklet locally on this device.')
             : (apiRunState.targetCaption || 'Working…');
           var parts = [baseDetail.replace(/\.$/, '')];
           // The heartbeat sits between what the stage is doing and how long it
@@ -6140,6 +6837,30 @@
         return position + ' / ' + total + ' stages';
       }
 
+      // ── TWO COUNTERS, AND EACH ONE SAYS WHAT IT COUNTS (D110's second form) ──
+      //
+      // THE DEFECT (author, watching proving-run 3 finish): the headline read
+      // "10 / 10 stages" while the notes log read "17/17", and nothing on
+      // screen said why two numbers about the same run disagreed. Neither was
+      // wrong. They count different things: the rail counts CARDS (weeks
+      // collapse onto one), the pipeline counts its own work items (one per
+      // week, one per fragment batch) — and the pipeline's total EXCLUDES the
+      // referee family entirely, by its own comment at the totalStages
+      // recompute, so the two can never agree even in principle.
+      //
+      // Two bare fractions in the same panel read as one fact stated twice.
+      // The rail's stays a fraction because it is the reader's; this one is
+      // labelled with the noun it counts and written out, so it can no longer
+      // be mistaken for a second opinion about the board. "Step" is
+      // deliberately not the word — the rail's cards are already numbered
+      // "Step 1…Step 10".
+      function formatPipelineWorkItem(stageIndex, totalStages) {
+        var total = Number(totalStages) || 0;
+        var index = Number(stageIndex) || 0;
+        if (!total) return '';
+        return 'Work item ' + index + ' of ' + total + ' · ';
+      }
+
       function buildApiStageItems() {
         return API_STAGE_ORDER.map(function (stage) {
           var metrics = apiRunState.stageMetrics[stage.key] || createApiStageMetrics();
@@ -6163,8 +6884,17 @@
         }
         var currentClass = apiRunState.currentStageKey === item.key ? ' is-current' : '';
         var detail = formatApiStageDetail(item.key, item.status, item.metrics);
+        // A button, for the same reason the guided board's cards are: this is
+        // the card the reader is looking at when they want to know what a
+        // stage is, what it has cost and how long it took, and it was the one
+        // surface on this panel that could not be asked. The rail node above
+        // it already opened that answer; the card is the bigger target and the
+        // one carrying the numbers. Everything inside stays non-interactive
+        // (spans and <strong> only), so nothing nests a control in a control.
         return '' +
-          '<div class="wizard-stage-item ' + tone + currentClass + '">' +
+          '<button type="button" class="wizard-stage-item is-clickable ' + tone + currentClass + '"' +
+            ' data-stage-key="' + escapeForHtml(String(item.key || '')) + '"' +
+            ' aria-label="' + escapeForHtml(item.label + ' — ' + formatApiStageStatusLabel(item.status, item.metrics) + '. Open step detail.') + '">' +
             '<div class="wizard-stage-head">' +
               '<div class="wizard-stage-head-main">' +
                 '<div class="wizard-stage-step">Step ' + escapeForHtml(String(stageIndex + 1)) + '</div>' +
@@ -6173,9 +6903,14 @@
               '<div class="wizard-status-chip ' + tone + '">' + escapeForHtml(formatApiStageStatusLabel(item.status, item.metrics)) + '</div>' +
             '</div>' +
             '<div class="wizard-stage-detail">' + escapeForHtml(detail) + '</div>' +
+            // The referee family's rail presence (D110's second form). Nested
+            // inside the card it runs under rather than given cards of its own,
+            // because its shape is not known until it runs — see the
+            // qualityPhase note in createApiRunState.
+            renderQualityPhaseHtml(item.key) +
             renderApiStageStatsHtml(item.metrics) +
             '<div class="wizard-stage-meta">' + formatApiStageMeta(item.status, item.metrics, providerDisplay, modelDisplay) + '</div>' +
-          '</div>';
+          '</button>';
       }
 
       function renderApiActions() {
@@ -6356,7 +7091,16 @@
             // replaces it; when it does not, the honest fallback stands.
             var headlineStream = getActiveStreamFor(apiRunState.currentStageKey);
             var headlineBeat = formatStreamHeartbeat(headlineStream);
-            if (headlineBeat) {
+            // The referee family outranks both (D110's second form). While the
+            // quality phase is live, the card's own heartbeat is null and its
+            // elapsed clock is the only thing left — which is how a paid,
+            // multi-minute critic loop read as a stalled local step. The phase
+            // says what is actually running and how long it has been running.
+            var headlinePhase = describeQualityPhase(apiRunState.currentStageKey);
+            if (headlinePhase) {
+              apiRunState.progressCaption += ' ' + qualityPhaseTag(apiRunState.currentStageKey)
+                + ': ' + headlinePhase + '.';
+            } else if (headlineBeat) {
               apiRunState.progressCaption += ' ' + headlineBeat;
             } else if ((Date.now() - apiRunState.currentStageStartedAt) >= 90000) {
               apiRunState.progressCaption += ' Still waiting on provider response.';
@@ -6409,9 +7153,22 @@
           var stageIndex = API_STAGE_ORDER.findIndex(function (stage) { return stage.key === item.key; });
           return renderApiStageCard(item, stageIndex, providerDisplay, modelDisplay);
         });
-        apiRunLog.innerHTML = apiRunState.log.map(function (line) {
+        // THE RUN LOG IS NOT A GROWING APPEND-ONLY LIST, and the obvious
+        // "append only the new lines" fix would be a defect here. pushApiLog()
+        // does `unshift` then `slice(0, 8)`: newest FIRST, hard-capped at
+        // eight. An insertAdjacentHTML('beforeend', …) would print the newest
+        // line at the bottom of a newest-first list and would never prune past
+        // eight. Eight short lines are cheap to build — what is expensive is
+        // writing them into the DOM once a second when they have not changed,
+        // which is every tick between log pushes. So build, compare, and write
+        // only on a difference.
+        var apiRunLogHtml = apiRunState.log.map(function (line) {
           return escapeForHtml(line);
         }).join('<br>');
+        if (apiRunLogHtml !== lastApiRunLogHtml) {
+          apiRunLog.innerHTML = apiRunLogHtml;
+          lastApiRunLogHtml = apiRunLogHtml;
+        }
         if (apiStopBtn) {
           apiStopBtn.hidden = apiRunState.status !== 'running';
         }
@@ -6958,6 +7715,101 @@
         return 'is-upcoming';
       }
 
+      // ── Keyed reconciliation ────────────────────────────────────────────
+      //
+      // THE DEFECT THIS EXISTS TO KILL. While a run is live, syncApiRunTicker
+      // fires renderApiRunState once a second, and every rail and board below
+      // rebuilt its whole subtree with `innerHTML =` on each of those ticks.
+      // Measured on a parked stub run (the run-panel.spec armPanel recipe):
+      // 171 elements torn down and 171 rebuilt PER SECOND across the rail, the
+      // board and the log — for the entire length of a build. Nothing about
+      // that churn is information: between stage transitions the only string
+      // on the whole panel that actually changes is the in-progress card's
+      // "N s elapsed", one card out of seventeen.
+      //
+      // So: build the same HTML as before, per keyed child, and write only the
+      // children whose HTML actually differs from what is already on screen.
+      // The markup is byte-identical to what the old builders emitted, which
+      // is the property that keeps the DR-38b drill-down working — those
+      // handlers are delegated onto the containers and read `data-stage-key` /
+      // `data-stage-index` off the node, so an untouched node stays clickable
+      // for exactly the same reason a rebuilt one does.
+      //
+      // The cache is keyed by CONTAINER (WeakMap) and every hit is re-checked
+      // against `parentNode`, so anything that clears a container behind this
+      // function's back costs a full rebuild rather than a silent no-op.
+      var keyedChildCache = new WeakMap();
+      var keyedChildScratch = null;
+
+      function buildKeyedNode(html) {
+        if (!keyedChildScratch) keyedChildScratch = document.createElement('div');
+        keyedChildScratch.innerHTML = html;
+        var node = keyedChildScratch.firstElementChild;
+        if (node) keyedChildScratch.removeChild(node);
+        keyedChildScratch.innerHTML = '';
+        return node;
+      }
+
+      function reconcileKeyedChildren(containerEl, entries) {
+        if (!containerEl) return;
+        entries = Array.isArray(entries) ? entries : [];
+        var cache = keyedChildCache.get(containerEl);
+        if (!cache) { cache = {}; keyedChildCache.set(containerEl, cache); }
+
+        // Focus survival. The old full rebuild destroyed keyboard focus on
+        // this panel once a second; keeping an untouched node keeps its focus
+        // for free, and the one node that does get replaced gets its focus put
+        // back by key. preventScroll matters — re-focusing a node the reader
+        // has scrolled away from would be a scroll jump of our own making.
+        var focused = document.activeElement;
+        var focusKey = '';
+        if (focused && containerEl.contains(focused)) {
+          Object.keys(cache).forEach(function (key) {
+            var entry = cache[key];
+            if (!focusKey && entry && entry.node && entry.node.contains(focused)) focusKey = key;
+          });
+        }
+
+        var desired = [];
+        var seen = {};
+        entries.forEach(function (entry) {
+          var key = String(entry.key);
+          seen[key] = true;
+          var prev = cache[key];
+          if (prev && prev.html === entry.html && prev.node && prev.node.parentNode === containerEl) {
+            desired.push(prev.node);
+            return;
+          }
+          var node = buildKeyedNode(entry.html);
+          if (!node) return;
+          cache[key] = { node: node, html: entry.html };
+          desired.push(node);
+        });
+        Object.keys(cache).forEach(function (key) {
+          if (!seen[key]) delete cache[key];
+        });
+
+        // Place in order. insertBefore moves a node that is already present,
+        // so after step i the first i+1 children are exactly desired[0..i];
+        // anything left under the cursor at the end no longer belongs.
+        var cursor = containerEl.firstChild;
+        desired.forEach(function (node) {
+          if (cursor === node) { cursor = node.nextSibling; return; }
+          containerEl.insertBefore(node, cursor);
+        });
+        while (cursor) {
+          var next = cursor.nextSibling;
+          containerEl.removeChild(cursor);
+          cursor = next;
+        }
+
+        if (focusKey && cache[focusKey] && cache[focusKey].node
+          && !cache[focusKey].node.contains(document.activeElement)
+          && typeof cache[focusKey].node.focus === 'function') {
+          try { cache[focusKey].node.focus({ preventScroll: true }); } catch (error) { /* focus is best-effort */ }
+        }
+      }
+
       function renderPipelineRail(targetEl, items, options) {
         if (!targetEl) return;
         items = Array.isArray(items) ? items : [];
@@ -6969,7 +7821,10 @@
         // NOT do for it. The rail markup is otherwise unchanged, so the class
         // names every reader and gate keys off stay put.
         var selectable = !!options.selectable;
-        targetEl.innerHTML = items.map(function (item, index) {
+        // Keyed by stage AND position: a rail never reorders, so the position
+        // is part of a node's identity, and a pipeline switch that changes the
+        // stage count correctly rebuilds rather than half-matching.
+        reconcileKeyedChildren(targetEl, items.map(function (item, index) {
           var isCurrent = item.key === currentKey;
           var nodeState = getPipelineNodeState(item.status, isCurrent);
           var statusText = isCurrent
@@ -6986,16 +7841,19 @@
                 ' data-stage-index="' + index + '"' +
                 ' aria-label="' + escapeForHtml(item.label + ' — ' + statusText + '. Open step detail.') + '">'
             : '<div class="pipeline-stage-node ' + nodeState + '">';
-          return '' +
-            openTag +
-              '<div class="pipeline-stage-node-top">' +
-                '<div class="pipeline-stage-node-dot">' + escapeForHtml(String(index + 1)) + '</div>' +
-                '<div class="pipeline-stage-node-status">' + escapeForHtml(statusText) + '</div>' +
-              '</div>' +
-              '<div class="pipeline-stage-node-title">' + escapeForHtml(item.label) + '</div>' +
-              '<div class="pipeline-stage-node-meta">' + escapeForHtml(meta) + '</div>' +
-            (selectable ? '</button>' : '</div>');
-        }).join('');
+          return {
+            key: String(item.key || '') + '#' + index,
+            html: '' +
+              openTag +
+                '<div class="pipeline-stage-node-top">' +
+                  '<div class="pipeline-stage-node-dot">' + escapeForHtml(String(index + 1)) + '</div>' +
+                  '<div class="pipeline-stage-node-status">' + escapeForHtml(statusText) + '</div>' +
+                '</div>' +
+                '<div class="pipeline-stage-node-title">' + escapeForHtml(item.label) + '</div>' +
+                '<div class="pipeline-stage-node-meta">' + escapeForHtml(meta) + '</div>' +
+              (selectable ? '</button>' : '</div>')
+          };
+        }));
       }
 
       function buildStageGroups(items, resolveGroupKey) {
@@ -7027,20 +7885,42 @@
         var definitions = getStageGroupDefinitions().filter(function (group) {
           return group.key === 'complete' || (grouped[group.key] && grouped[group.key].length > 0);
         });
-        targetEl.innerHTML = definitions.map(function (group) {
+        // The section SHELL carries only its title, so a card moving between
+        // columns costs those cards' own nodes and two text writes — never a
+        // rebuild of both columns. The count and the empty-copy line are text,
+        // written only when the text actually differs.
+        reconcileKeyedChildren(targetEl, definitions.map(function (group) {
+          return {
+            key: group.key,
+            html: '' +
+              '<section class="pipeline-stage-group">' +
+                '<div class="pipeline-stage-group-head">' +
+                  '<div class="pipeline-stage-group-title">' + escapeForHtml(group.title) + '</div>' +
+                  '<div class="pipeline-stage-group-meta"></div>' +
+                '</div>' +
+                '<div class="pipeline-stage-group-copy"></div>' +
+                '<div class="pipeline-stage-group-list"></div>' +
+              '</section>'
+          };
+        }));
+        var sections = targetEl.children;
+        definitions.forEach(function (group, index) {
+          var section = sections[index];
+          if (!section) return;
           var items = grouped[group.key] || [];
-          return '' +
-            '<section class="pipeline-stage-group">' +
-              '<div class="pipeline-stage-group-head">' +
-                '<div class="pipeline-stage-group-title">' + escapeForHtml(group.title) + '</div>' +
-                '<div class="pipeline-stage-group-meta">' + escapeForHtml(String(items.length)) + '</div>' +
-              '</div>' +
-              '<div class="pipeline-stage-group-copy">' + escapeForHtml(items.length ? '' : group.emptyCopy) + '</div>' +
-              '<div class="pipeline-stage-group-list">' +
-                (items.length ? items.map(renderCard).join('') : '') +
-              '</div>' +
-            '</section>';
-        }).join('');
+          var metaEl = section.querySelector('.pipeline-stage-group-meta');
+          var copyEl = section.querySelector('.pipeline-stage-group-copy');
+          var countText = String(items.length);
+          var copyText = items.length ? '' : group.emptyCopy;
+          if (metaEl && metaEl.textContent !== countText) metaEl.textContent = countText;
+          if (copyEl && copyEl.textContent !== copyText) copyEl.textContent = copyText;
+          reconcileKeyedChildren(section.querySelector('.pipeline-stage-group-list'), items.map(function (item, itemIndex) {
+            // Keyed by STAGE, not position: a card that only changes column
+            // keeps its identity, and the card the reader is looking at is the
+            // one card on the board whose HTML moves between ticks.
+            return { key: String(item.key || itemIndex), html: renderCard(item, itemIndex, items) };
+          }));
+        });
       }
 
       function renderStageLedger(items, nextAction) {
@@ -7072,9 +7952,18 @@
           var tone = guidedCardTone(item.cardState);
           var stageIndex = WIZARD_STAGE_KEYS.indexOf(item.key);
           var currentClass = stageIndex === wizStep ? ' is-current' : '';
-          var canJump = stageIndex >= 0 ? canNavigateToStep(stageIndex) : false;
+          // EVERY CARD OPENS, INCLUDING THE ONES YOU CANNOT GO TO YET (the
+          // author's ask, 2026-08-18). These cards used to be jump buttons and
+          // nothing else, `disabled` whenever the step was not reachable — so
+          // the card that most owes an explanation ("what IS step 5, and why
+          // can't I touch it?") was the one card in the door that answered
+          // nothing at all. A card is now a control that opens the step's
+          // detail, which is what the rail node and the numbered strip already
+          // do; navigation moved one level in, to the modal's own primary
+          // button, which states the locked case in words instead of by being
+          // dead. Three affordances, one behaviour, one place the gap is said.
           return '' +
-            '<button type="button" class="wizard-stage-item ' + tone + currentClass + (canJump ? ' is-clickable' : '') + '" data-stage-index="' + stageIndex + '" data-card-state="' + escapeForHtml(item.cardState || '') + '"' + (canJump ? '' : ' disabled') + (item.key === activeKey ? ' aria-current="step"' : '') + '>' +
+            '<button type="button" class="wizard-stage-item is-clickable ' + tone + currentClass + '" data-stage-index="' + stageIndex + '" data-card-state="' + escapeForHtml(item.cardState || '') + '" aria-label="' + escapeForHtml(item.label + ' — ' + formatGuidedCardState(item.cardState) + '. Open step detail.') + '"' + (item.key === activeKey ? ' aria-current="step"' : '') + '>' +
               '<div class="wizard-stage-head">' +
                 '<div class="wizard-stage-head-main">' +
                   '<div class="wizard-stage-step">Step ' + (stageIndex + 1) + '</div>' +
@@ -7086,11 +7975,30 @@
               '<div class="wizard-stage-meta">' + escapeForHtml(getStageMeta(item)) + '</div>' +
             '</button>';
         });
-        Array.prototype.forEach.call(wizStageLedger.querySelectorAll('[data-stage-index]'), function (button) {
-          button.addEventListener('click', function () {
-            jumpToStep(Number(button.getAttribute('data-stage-index')));
-          });
-        });
+        // No per-card listener is bound here. The board reconciles its cards on
+        // every state change — a card is replaced whenever its own HTML moves
+        // and left alone when it does not — so a listener bound at render time
+        // would be bound to a node that may be swapped out from under it, and
+        // re-bound on every keystroke of a pasted reply besides. The click is
+        // delegated once onto the container, the same way both rails are.
+      }
+
+      // The three numbers the door already knew and never showed. Every value
+      // comes from getPipelineSummary()/getNextAction() — nothing is counted a
+      // second time here, because a second count is a second answer.
+      function renderGuidedProgress(items, nextAction) {
+        var summary = getPipelineSummary(items);
+        // The kicker carries the STATE, mirroring #api-state-summary on the
+        // API panel. It used to be the constant string "Current Step", which
+        // is a label, not information.
+        if (wizCurrentKicker) wizCurrentKicker.textContent = summary.stateTitle;
+        if (wizProgressPosition) {
+          wizProgressPosition.textContent = 'Step ' + (wizStep + 1) + ' of ' + items.length;
+        }
+        if (wizProgressCount) wizProgressCount.textContent = summary.progressTitle;
+        if (wizProgressNext) wizProgressNext.textContent = nextAction.title || nextAction.stageLabel || '';
+        if (wizProgressDetail) wizProgressDetail.textContent = nextAction.detail || '';
+        if (wizProgressTally) wizProgressTally.textContent = summary.progressCaption;
       }
 
       function updateStageHealth() {
@@ -7105,6 +8013,7 @@
             : 'No step issues right now.';
         }
         renderStageLedger(items, nextAction);
+        renderGuidedProgress(items, nextAction);
         wizNums.forEach(function (num, index) {
           var item = items[index];
           if (!item) return;
@@ -7729,7 +8638,9 @@
 
       function updateWizardOverview(idx) {
         var entry = stepText[idx] || stepText[0];
-        if (wizCurrentKicker) wizCurrentKicker.textContent = 'Current Step';
+        // The kicker is renderGuidedProgress()'s to write (it carries the run
+        // state now, not a fixed label), and updateStageHealth() below always
+        // runs after this — so writing it here would only ever be overwritten.
         if (wizCurrentTitle) wizCurrentTitle.textContent = entry.title;
         if (wizCurrentHelp) wizCurrentHelp.textContent = entry.help;
         updateBuildMeta();
@@ -8077,7 +8988,14 @@
         // overlay's own display (D99). Both move together, always.
         wizardStageModal.hidden = false;
         wizardStageModal.classList.add('is-open');
-        if (wizardStageModalClose) wizardStageModalClose.focus();
+        // Navigation lives one level in now, so the card's primary action gets
+        // the focus when it has one: Enter on a board card then Enter again is
+        // the jump the card itself used to be, and a reader who only wanted to
+        // read still lands somewhere sane. Falls back to Close, which is the
+        // right target on a card that offers no action (the API door's).
+        var preferred = spec.focusId ? document.getElementById(spec.focusId) : null;
+        if (preferred && !preferred.disabled) preferred.focus();
+        else if (wizardStageModalClose) wizardStageModalClose.focus();
       }
 
       // The API rail's own drill-down (DR-38b). Same component, different door:
@@ -8098,7 +9016,10 @@
         var parts = [];
         if (Number(usage.inputTokens || 0) > 0) parts.push(formatCompactTokens(usage.inputTokens) + ' tokens in');
         if (Number(usage.outputTokens || 0) > 0) parts.push(formatCompactTokens(usage.outputTokens) + ' tokens out');
-        if (Number(metrics.estimatedCostUsd || 0) > 0) parts.push(formatUsd(metrics.estimatedCostUsd) + ' estimated');
+        if (Number(metrics.estimatedCostUsd || 0) > 0) {
+          parts.push(formatUsd(metrics.estimatedCostUsd) +
+            ((metrics.pricing && metrics.pricing.sourceKind === 'measured') ? ' measured' : ' estimated'));
+        }
         if (Number(metrics.retries || 0) > 0) {
           parts.push(metrics.retries + ' rewrite' + (metrics.retries === 1 ? '' : 's') + ' after a failed check');
         } else if (Number(metrics.attempts || 0) > 1) {
@@ -8177,6 +9098,7 @@
           ],
           noteLabel: 'What this door does not do:',
           note: explainer.gap,
+          focusId: 'wizard-stage-modal-goto',
           actionHtml: '<div class="result-actions" style="margin-top:16px">' +
             '<button type="button" class="result-btn-primary" id="wizard-stage-modal-goto"' + (canJump ? '' : ' disabled') + '>' +
               (canJump ? 'Go To This Step' : 'Locked Until Earlier Steps Are Checked') +
@@ -8232,10 +9154,12 @@
         });
       });
 
-      // The rails redraw their whole innerHTML on every state change, so the
-      // handler lives on the container and is registered exactly once. Both
-      // rails are the same component; each hands its own door's modal the key
-      // the node was drawn from.
+      // The rails reconcile their nodes on every state change — a node is
+      // replaced when its own HTML moves and left in place when it does not —
+      // so the handler lives on the CONTAINER and is registered exactly once.
+      // That is what makes an untouched node as clickable as a rebuilt one.
+      // Both rails are the same component; each hands its own door's modal the
+      // key the node was drawn from.
       function wireRailDrillDown(railEl, open) {
         if (!railEl) return;
         railEl.addEventListener('click', function (e) {
@@ -8250,6 +9174,28 @@
       });
       wireRailDrillDown(wizPipelineRail, function (node) {
         openWizardStageModal(Number(node.getAttribute('data-stage-index')));
+      });
+
+      // THE KANBAN BOARDS, same delegation, same modal (the author's ask,
+      // 2026-08-18: "click any stage card"). The boards re-render far more
+      // often than the rails do — the guided one on every keystroke of a
+      // pasted reply — and a card also MOVES between columns as its state
+      // changes, so a per-card listener is the one shape this must not take.
+      // One handler per board, registered once.
+      function wireBoardDrillDown(boardEl, open) {
+        if (!boardEl) return;
+        boardEl.addEventListener('click', function (e) {
+          var card = e.target && e.target.closest ? e.target.closest('.wizard-stage-item') : null;
+          if (!card || !boardEl.contains(card)) return;
+          open(card);
+        });
+      }
+
+      wireBoardDrillDown(apiStageLedger, function (card) {
+        openApiStageModal(card.getAttribute('data-stage-key') || '');
+      });
+      wireBoardDrillDown(wizStageLedger, function (card) {
+        openWizardStageModal(Number(card.getAttribute('data-stage-index')));
       });
 
       function copyText(text, button, defaultLabel) {
@@ -9808,6 +10754,25 @@
             var stageKey = normalizeApiStageKey(meta.stageKey || inferApiStageKey(message));
             var phase = meta.phase || 'start';
 
+            // ── THE REFEREE FAMILY, CLAIMED (D110's second form) ─────────────
+            // Handled here, ahead of every branch below, because those branches
+            // all speak about RAIL CARDS: they retire the current card, move
+            // the reader's counter, overwrite the pipeline's stage total, and
+            // rewrite the headline target. An event from a stage the board does
+            // not draw has no business doing any of that, and when it did, ten
+            // cards read COMPLETE for the whole length of a critic loop that
+            // was still spending and still rewriting prose.
+            //
+            // Everything the phase owes the reader — its spend, its log lines,
+            // its live sentence on the Quality Check card — is done inside
+            // applyQualityPhaseEvent. `stageKey` is empty on notices only, and
+            // those returned above.
+            if (stageKey && !isRailStageKey(stageKey)) {
+              applyQualityPhaseEvent(stageKey, phase, message, meta);
+              renderApiRunState();
+              return;
+            }
+
             // HEARTBEAT. Handled before the run-wide fields below because a
             // tick is not a stage transition: it must not rewrite the headline
             // target, bump the stage counter, or push a log line (they arrive
@@ -9978,7 +10943,7 @@
               // line below keeps the pipeline's own pair — a transcript can
               // say "week 5 of 12" where the rail has one Weeks card.
               apiRunState.progress = formatApiStageProgress();
-              pushApiLog(stageIndex + '/' + totalStages + ' ' + message);
+              pushApiLog(formatPipelineWorkItem(stageIndex, totalStages) + message);
             } else if (phase === 'complete') {
               // ── HOW LONG THIS ONE TOOK, AND HOW LONG THE RUN HAS TAKEN ────
               // Read BEFORE markApiStageComplete, which clears the stage clock.
@@ -10008,7 +10973,7 @@
               } else if (runElapsedMs > 0) {
                 completionTiming = ' · run ' + formatApiElapsed(runElapsedMs);
               }
-              pushApiLog(getApiCompletionLabel(stageKey, meta) + ' complete · ' + (meta.telemetry ? formatTokenSummary(meta.telemetry.usage) : 'No token data') + (meta.telemetry && meta.telemetry.estimatedCostUsd ? ' · ' + formatUsd(meta.telemetry.estimatedCostUsd) + ' est' : '') + completionTiming);
+              pushApiLog(getApiCompletionLabel(stageKey, meta) + ' complete · ' + (meta.telemetry ? formatTokenSummary(meta.telemetry.usage) : 'No token data') + (meta.telemetry && meta.telemetry.estimatedCostUsd ? ' · ' + formatUsd(meta.telemetry.estimatedCostUsd) + costQualifier(meta.telemetry.pricing) : '') + completionTiming);
             } else if (phase === 'failed') {
               if (meta.telemetry) {
                 applyApiStageTelemetry(stageKey, meta.telemetry, meta.error || message, meta);
