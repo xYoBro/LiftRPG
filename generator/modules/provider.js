@@ -16,7 +16,7 @@
 //               buildUsageSnapshot, blankUsageTotals, addUsageTotals,
 //               humanizeModelLabel, buildOpenAIModelDocsUrl,
 //               refreshPricing, MODEL_PRICING_RULES, PRICING_SOURCES,
-//               THIRD_PARTY_PRICING_FEED, DEFAULT_PRICING_REFRESH_TIMEOUT_MS
+//               TRANSPORT_BILLING_MODES, DEFAULT_PRICING_REFRESH_TIMEOUT_MS
 //   Discovery:  listProviderModels, fetchJsonWithTimeout
 //   Settings:   resolveStructuredPipelineSettings, allowsEmptyApiKey
 
@@ -93,7 +93,15 @@ export function normalizeFinishReason(raw) {
 // ── Pricing constants ─────────────────────────────────────────────────────────
 
 export var DEFAULT_PRICING_REFRESH_TIMEOUT_MS = 20000;
-var PRICING_VERIFIED_AT = '2026-03-23';
+// ONE GLOBAL STAMP, AND IT IS A CEILING ON TRUST, NOT A CLAIM ABOUT EVERY ROW.
+// Re-verified 2026-08-19 against the Anthropic pricing table. Only the
+// `anthropic` rows were checked on that date; the openai / groq / gemini rows
+// below were left exactly as they were because this pass had no authoritative
+// source for them, and re-stamping a number nobody re-read is how a staleness
+// marker becomes a lie. Those rows carry their own `verifiedAt` override — see
+// the note above the openai block.
+var PRICING_VERIFIED_AT = '2026-08-19';
+var UNVERIFIED_THIS_PASS_AT = '2026-03-23';
 
 export var PRICING_SOURCES = {
   anthropic: {
@@ -118,14 +126,48 @@ export var PRICING_SOURCES = {
   }
 };
 
-// Centralized third-party pricing fallback configuration.
-// If this ecosystem shifts again, update this single object first.
-export var THIRD_PARTY_PRICING_FEED = {
-  id: 'pricetoken',
-  enabled: true,
-  label: 'PriceToken pricing API',
-  siteUrl: 'https://pricetoken.ai/',
-  modelEndpointBase: 'https://pricetoken.ai/api/v1/text/'
+// ── THE MEASURED-COST CHANNEL (2026-08-19) ───────────────────────────────────
+//
+// WHAT THIS REPLACED. A third-party pricing feed (pricetoken.ai) used to be
+// probed whenever MODEL_PRICING_RULES had no row. It was removed, not disabled,
+// for three independent reasons and any one of them was sufficient:
+//
+//   1. It did not answer. The author observed it failing for every model.
+//   2. It could never have helped the door that needed it most. The feed was
+//      only consulted when no local rule matched — which on the bridge doors is
+//      ALWAYS — and its own parser then rejected the answer, because it refused
+//      any payload whose `provider` disagreed with the detected provider id.
+//      `'bridge' !== 'anthropic'` is not a flaky network; it is a guard that
+//      returns null on every possible response. Every bridge run paid one
+//      round-trip to a site that was structurally incapable of pricing it.
+//   3. It was this repo's only non-LLM-provider runtime call (AUDIT.md #84).
+//
+// WHAT REPLACED IT is not another guess — it is a MEASUREMENT. A transport that
+// KNOWS what a call cost may say so on the wire, and a known number outranks
+// every estimate this file can compute. The channel is deliberately
+// provider-blind (D94/D95's law): provider.js reads two fields off the usage
+// object and never asks which door produced them. The local bridge is today's
+// only speaker, but any OpenAI-compatible endpoint that reports its own cost —
+// a gateway, a proxy, a metering layer — is understood for free.
+//
+// D96 IS PRESERVED EXACTLY, and this widens it rather than relaxing it. Token
+// counts stay exact; dollars stay best-effort; nothing is ever fabricated. What
+// changes is that "we do not know" is no longer one state but three, because
+// they are three different facts about the world:
+//
+//   measured    — a real figure was reported by the thing that did the work.
+//   notMetered  — there IS no per-token price. A subscription CLI is not an
+//                 unpriced metered model; no future pricing table can ever fill
+//                 this in, and saying "unpriced" implies a gap that will close.
+//   (absent)    — genuinely unknown. Renders '—' as it always did.
+//
+// Collapsing the middle case into the third is what made the run panel say a
+// ChatGPT-subscription run was "unpriced — no pricing is mapped for this
+// model", which reads as a defect in our table rather than the truth about how
+// that door is billed.
+export var TRANSPORT_BILLING_MODES = {
+  MEASURED: 'measured',
+  NOT_METERED: 'not_metered'
 };
 
 export var MODEL_PRICING_RULES = [
@@ -193,12 +235,43 @@ export var MODEL_PRICING_RULES = [
     source: PRICING_SOURCES.anthropic
   },
   {
+    // THE ONE ROW THIS TABLE WAS ACTUALLY MISSING (added 2026-08-19). Every
+    // other Anthropic row above was re-read against the pricing table on that
+    // date and was already correct; Fable 5 simply had no row, so a run on the
+    // top tier reported as unpriced rather than as the most expensive model on
+    // the menu. Cache rates are the family's published multipliers (write =
+    // 1.25x input, read = 0.1x input), which is how every other row here is
+    // derived and reproduces each of their published figures exactly.
+    // Claude Mythos 5 is documented at these same rates but is invitation-only
+    // (Project Glasswing); it is deliberately NOT matched here — a door nobody
+    // on this project can open should report honestly rather than carry a rate
+    // nothing has exercised.
+    provider: 'anthropic',
+    match: /^claude-(?:fable-5|5-fable)(?:$|[-_.])/i,
+    label: 'Claude Fable 5',
+    inputPerMillion: 10,
+    outputPerMillion: 50,
+    cacheWritePerMillion: 12.50,
+    cacheReadPerMillion: 1.00,
+    source: PRICING_SOURCES.anthropic
+  },
+  // ── NOT RE-VERIFIED ON 2026-08-19 ───────────────────────────────────────────
+  // Everything from here down keeps `verifiedAt: UNVERIFIED_THIS_PASS_AT`. The
+  // 2026-08-19 pass had an authoritative source for the Anthropic rates and for
+  // nothing else, so these rows were read and left untouched rather than
+  // refreshed from memory. An invented rate is worse than a stale one: a stale
+  // rate at least dates itself in the UI caption ("verified 2026-03-23"), while
+  // a confabulated one reports today's date and is believed. Refreshing these
+  // means opening the three PRICING_SOURCES pages above and moving the stamp
+  // per row — not a bulk re-date.
+  {
     provider: 'openai',
     match: /^gpt-4o(?:$|[-_])/i,
     label: 'GPT-4o',
     inputPerMillion: 2.5,
     cachedInputPerMillion: 1.25,
     outputPerMillion: 10,
+    verifiedAt: UNVERIFIED_THIS_PASS_AT,
     source: PRICING_SOURCES.openai
   },
   {
@@ -208,6 +281,7 @@ export var MODEL_PRICING_RULES = [
     inputPerMillion: 2,
     cachedInputPerMillion: 0.50,
     outputPerMillion: 8,
+    verifiedAt: UNVERIFIED_THIS_PASS_AT,
     source: PRICING_SOURCES.openai
   },
   {
@@ -217,6 +291,7 @@ export var MODEL_PRICING_RULES = [
     inputPerMillion: 0.40,
     cachedInputPerMillion: 0.10,
     outputPerMillion: 1.60,
+    verifiedAt: UNVERIFIED_THIS_PASS_AT,
     source: PRICING_SOURCES.openai
   },
   {
@@ -226,6 +301,7 @@ export var MODEL_PRICING_RULES = [
     inputPerMillion: 0.10,
     cachedInputPerMillion: 0.025,
     outputPerMillion: 0.40,
+    verifiedAt: UNVERIFIED_THIS_PASS_AT,
     source: PRICING_SOURCES.openai
   },
   {
@@ -235,6 +311,7 @@ export var MODEL_PRICING_RULES = [
     inputPerMillion: 1.25,
     cachedInputPerMillion: 0.125,
     outputPerMillion: 10,
+    verifiedAt: UNVERIFIED_THIS_PASS_AT,
     source: PRICING_SOURCES.openai
   },
   {
@@ -244,6 +321,7 @@ export var MODEL_PRICING_RULES = [
     inputPerMillion: 0.25,
     cachedInputPerMillion: 0.025,
     outputPerMillion: 2,
+    verifiedAt: UNVERIFIED_THIS_PASS_AT,
     source: PRICING_SOURCES.openai
   },
   {
@@ -253,6 +331,7 @@ export var MODEL_PRICING_RULES = [
     inputPerMillion: 0.05,
     cachedInputPerMillion: 0.005,
     outputPerMillion: 0.40,
+    verifiedAt: UNVERIFIED_THIS_PASS_AT,
     source: PRICING_SOURCES.openai
   },
   {
@@ -261,6 +340,7 @@ export var MODEL_PRICING_RULES = [
     label: 'GPT-5 pro',
     inputPerMillion: 15,
     outputPerMillion: 120,
+    verifiedAt: UNVERIFIED_THIS_PASS_AT,
     source: PRICING_SOURCES.openai
   },
   {
@@ -269,6 +349,7 @@ export var MODEL_PRICING_RULES = [
     label: 'Llama 3.3 70B Versatile',
     inputPerMillion: 0.59,
     outputPerMillion: 0.79,
+    verifiedAt: UNVERIFIED_THIS_PASS_AT,
     source: PRICING_SOURCES.groq
   },
   {
@@ -280,6 +361,7 @@ export var MODEL_PRICING_RULES = [
     longContextThresholdTokens: 200000,
     longContextInputPerMillion: 2.50,
     longContextOutputPerMillion: 15,
+    verifiedAt: UNVERIFIED_THIS_PASS_AT,
     source: PRICING_SOURCES.gemini
   },
   {
@@ -288,6 +370,7 @@ export var MODEL_PRICING_RULES = [
     label: 'Gemini 2.5 Flash',
     inputPerMillion: 0.30,
     outputPerMillion: 2.50,
+    verifiedAt: UNVERIFIED_THIS_PASS_AT,
     source: PRICING_SOURCES.gemini
   },
   {
@@ -296,6 +379,7 @@ export var MODEL_PRICING_RULES = [
     label: 'Gemini 2.5 Flash-Lite',
     inputPerMillion: 0.10,
     outputPerMillion: 0.40,
+    verifiedAt: UNVERIFIED_THIS_PASS_AT,
     source: PRICING_SOURCES.gemini
   }
 ];
@@ -644,8 +728,95 @@ export function estimateUsageCostUsd(usage, pricing) {
   return total > 0 ? total : 0;
 }
 
+// THE WIRE HALF OF THE MEASURED-COST CHANNEL. Read off the RAW usage object,
+// before normalizeUsageMetrics() drops everything it does not recognise.
+//
+// Two fields, both optional, both provider-blind:
+//   usage.billing_mode — 'measured' | 'not_metered'
+//   usage.cost_usd     — the measured figure, required by 'measured' only
+//
+// `usage` is the carrier for the same reason the bridge already maps CLI
+// thinking tokens into `completion_tokens_details.reasoning_tokens`: this is
+// accounting, it travels with the accounting object the stream and the one-shot
+// body both already deliver, and it survives every path without a second
+// plumbing route. A mode we do not recognise returns null rather than throwing —
+// an unknown billing vocabulary means "no claim", which lands on the honest
+// unpriced state instead of inventing a fourth one.
+function readTransportBilling(rawUsage, modelId) {
+  if (!rawUsage || typeof rawUsage !== 'object') return null;
+  var mode = String(rawUsage.billing_mode || '').trim().toLowerCase();
+  var label = humanizeModelLabel(modelId);
+
+  if (mode === TRANSPORT_BILLING_MODES.NOT_METERED) {
+    return {
+      costUsd: null,
+      pricing: {
+        label: label,
+        // A caption is owed even though there are no rates, because "no rates
+        // exist" is the whole finding. An empty sourceLabel would fall through
+        // to the unpriced branch and erase the distinction this state exists
+        // to draw.
+        sourceLabel: String(rawUsage.billing_source || 'the transport that ran this call'),
+        sourceUrl: '',
+        verifiedAt: '',
+        fetchedAt: '',
+        live: false,
+        sourceKind: 'notMetered',
+        fallbackReason: '',
+        longContextApplied: false
+      }
+    };
+  }
+
+  if (mode !== TRANSPORT_BILLING_MODES.MEASURED) return null;
+
+  // A measured mode with no usable number is NOT a measurement. Falling back to
+  // the estimate is the correct outcome, not an error: the transport claimed a
+  // capability and then declined to exercise it on this call, which is exactly
+  // what the Claude CLI does on its schema-forced path (no `total_cost_usd` in
+  // the result frame). Returning null here is what keeps that honest.
+  var cost = Number(rawUsage.cost_usd);
+  if (!Number.isFinite(cost) || cost < 0) return null;
+
+  return {
+    costUsd: cost,
+    pricing: {
+      label: label,
+      sourceLabel: String(rawUsage.billing_source || 'the transport that ran this call'),
+      sourceUrl: '',
+      verifiedAt: '',
+      fetchedAt: '',
+      live: false,
+      sourceKind: 'measured',
+      fallbackReason: '',
+      // No per-million rates are published deliberately. The transport reported
+      // a TOTAL, not a rate card; deriving rates by dividing by the token counts
+      // would manufacture a pricing table out of one sample and is the exact
+      // shape of fabrication D96 forbids.
+      longContextApplied: false
+    }
+  };
+}
+
 export function buildUsageSnapshot(providerId, modelId, usage, pricingRule) {
   var normalizedUsage = normalizeUsageMetrics(providerId, usage);
+
+  // MEASURED OUTRANKS ESTIMATED, INCLUDING AN OPERATOR OVERRIDE. `pricingRule`
+  // is the operator stating rates for a model we have no row for — a considered
+  // guess, and better than nothing. A figure the thing that did the work
+  // computed for that call is not a guess at all, so it wins. The override
+  // still governs every call where no measurement arrives.
+  var billing = readTransportBilling(usage, modelId);
+  if (billing) {
+    return {
+      provider: providerId,
+      model: String(modelId || '').trim(),
+      usage: normalizedUsage,
+      pricing: billing.pricing,
+      estimatedCostUsd: billing.costUsd
+    };
+  }
+
   var pricing = resolveModelPricing(providerId, modelId, normalizedUsage, pricingRule);
   return {
     provider: providerId,
@@ -800,30 +971,6 @@ function buildLivePricingRule(providerId, modelId, fields) {
   };
 }
 
-function buildThirdPartyPricingUrl(modelId) {
-  return THIRD_PARTY_PRICING_FEED.modelEndpointBase + encodeURIComponent(normalizeModelFamilyId(modelId) || normalizeModelId(modelId));
-}
-
-function parseThirdPartyPricingRule(body, providerId, modelId) {
-  var payload = body && body.data ? body.data : body;
-  if (!payload || (!payload.modelId && !payload.displayName)) return null;
-  var payloadProvider = normalizeModelId(payload.provider || providerId);
-  if (providerId && payloadProvider && providerId !== payloadProvider && providerId !== 'custom' && providerId !== 'ollama') {
-    return null;
-  }
-  return buildLivePricingRule(payloadProvider || providerId || 'openai', modelId, {
-    label: payload.displayName || humanizeModelLabel(payload.modelId || modelId),
-    inputPerMillion: parseMoneyValue(payload.inputPerMTok),
-    outputPerMillion: parseMoneyValue(payload.outputPerMTok),
-    source: {
-      label: THIRD_PARTY_PRICING_FEED.label,
-      url: THIRD_PARTY_PRICING_FEED.siteUrl
-    },
-    sourceKind: 'thirdParty',
-    fetchedAt: payload.lastUpdated || (body && body.meta && body.meta.timestamp) || new Date().toISOString()
-  });
-}
-
 function parseAnthropicPricingRule(pageText, modelId, fetchedAt) {
   var labels = buildAnthropicPricingLabels(modelId);
   for (var i = 0; i < labels.length; i++) {
@@ -959,19 +1106,6 @@ async function fetchLivePricingRule(providerId, modelId, timeoutMs) {
   return null;
 }
 
-async function fetchThirdPartyPricingRule(providerId, modelId, timeoutMs) {
-  if (!THIRD_PARTY_PRICING_FEED.enabled || !modelId) return null;
-  var body = await fetchJsonWithTimeout(buildThirdPartyPricingUrl(modelId), {
-    method: 'GET',
-    cache: 'no-store',
-    credentials: 'omit',
-    headers: {
-      'accept': 'application/json'
-    }
-  }, timeoutMs);
-  return parseThirdPartyPricingRule(body, providerId, modelId);
-}
-
 function shouldSkipOfficialPricingFetch(providerId) {
   if (typeof window === 'undefined') return false;
   var source = providerId && PRICING_SOURCES[providerId] ? PRICING_SOURCES[providerId] : null;
@@ -985,7 +1119,6 @@ export async function refreshPricing(settings, options) {
   var timeoutMs = (options && options.timeoutMs) || Math.min(resolved.requestTimeoutMs || DEFAULT_TIMEOUT_MS, DEFAULT_PRICING_REFRESH_TIMEOUT_MS);
   var fallbackRule = findMatchingPricingRule(MODEL_PRICING_RULES, providerId, modelId);
   var liveRule = null;
-  var thirdPartyRule = null;
   var officialRefreshError = '';
   var refreshError = '';
 
@@ -1002,27 +1135,16 @@ export async function refreshPricing(settings, options) {
     }
   }
 
-  if (!liveRule && THIRD_PARTY_PRICING_FEED.enabled && !fallbackRule) {
-    try {
-      thirdPartyRule = await fetchThirdPartyPricingRule(providerId, modelId, timeoutMs);
-      if (thirdPartyRule && officialRefreshError) {
-        thirdPartyRule.fallbackReason = officialRefreshError;
-      }
-    } catch (error) {
-      refreshError = describePricingFetchError(error, 'The configured third-party pricing feed could not be reached.');
-    }
-  }
-
+  // NO THIRD-PARTY FALLBACK. When the official page cannot be read, the answer
+  // is the local table or an honest '—'; there is no fourth place to look. See
+  // the TRANSPORT_BILLING_MODES header for why the one that used to be here was
+  // removed rather than repaired.
   var effectiveRule = null;
   var live = false;
   if (liveRule) {
     effectiveRule = mergePricingRule(fallbackRule, liveRule);
     live = true;
     refreshError = '';
-  } else if (thirdPartyRule) {
-    effectiveRule = mergePricingRule(fallbackRule, thirdPartyRule);
-    live = true;
-    refreshError = officialRefreshError;
   } else if (fallbackRule) {
     effectiveRule = clonePricingRule(fallbackRule);
     refreshError = officialRefreshError || refreshError;
@@ -1042,14 +1164,11 @@ export async function refreshPricing(settings, options) {
     matched: !!pricing,
     live: live,
     pricing: pricing,
-    sourcePath: liveRule ? 'official' : thirdPartyRule ? 'third-party' : 'local',
+    sourcePath: liveRule ? 'official' : 'local',
     error: refreshError
   };
   if (result.pricing && !live && refreshError) {
     result.pricing.fallbackReason = refreshError;
-  }
-  if (result.pricing && thirdPartyRule && officialRefreshError) {
-    result.pricing.fallbackReason = officialRefreshError;
   }
   if (typeof window !== 'undefined' && window.LiftRPGAPI) {
     window.LiftRPGAPI.lastPricing = result;

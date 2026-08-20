@@ -169,6 +169,129 @@ const CLI_DEFAULT_SENTINELS = ['', 'default'];
 // takes these verbatim (`claude --model haiku`).
 const CLI_MODEL_ALIASES = ['default', 'fable', 'opus', 'sonnet', 'haiku'];
 
+// ── THE BACKEND TABLE (2026-08-19) — TWO OF THREE ARE SCAFFOLDING ────────────
+// ONE HOME for "which backends does this bridge route, and what is true of
+// each". Routing, /healthz, the startup banner and --self-test all WALK this
+// table; a second list is the D93 defect and is how a server ends up
+// advertising a state it does not implement.
+//
+// `claude` is the bridge as it has always been: the bare `/v1/*` surface, an
+// empty prefix, and NOT ONE BYTE of its path changed when this table arrived
+// (--self-test asserts the claude routes still answer exactly as before).
+//
+// `codex` and `gemini` are ROUTED AND REFUSED. There is no spawn, no argv, no
+// parser for either, on purpose. The wave that tried to build them hit a real
+// wall: the Codex CLI reports itself logged in while its refresh token is dead
+// (401 on every real call), and no Gemini CLI auth is configured on this
+// machine at all. A parser written against zero observed success transcripts is
+// exactly how a silently-wrong transport ships — the D102 lesson at the top of
+// this file, one layer out. So this wave routes the paths, says plainly that
+// nothing stands behind them, and stops.
+//
+// ── WHAT A FOLLOW-UP WAVE OWES (start HERE; do not re-derive these) ──────────
+// 1. FIX AUTH FIRST, then capture a REAL transcript. `codex login`; for Gemini,
+//    configure that CLI's own auth. No frame parser may be written from a
+//    guess about what the binary emits.
+// 2. The flag shapes below were read off `--help` on the INSTALLED binaries
+//    (codex 0.145.0, gemini CLI 0.55.1) on 2026-08-19. They are notes for
+//    whoever implements, never a contract — re-check them against the version
+//    actually installed then:
+//    · codex: `codex exec --json` (JSONL events) · `--output-schema <FILE>`
+//      (a PATH, not inline JSON) · `-o/--output-last-message <FILE>` ·
+//      `-m/--model` · `-s/--sandbox read-only|workspace-write|…` ·
+//      `--skip-git-repo-check` (MANDATORY — the CLI refuses to run outside a
+//      git repo, and this bridge spawns its children in os.tmpdir()) ·
+//      `--ignore-user-config`.
+//    · gemini: `-p/--prompt` (headless) · `-m/--model` ·
+//      `-o/--output-format text|json|stream-json` · `--approval-mode
+//      default|auto_edit|yolo|plan` · `--skip-trust` (headless needs it, or an
+//      untrusted CWD silently downgrades the approval mode). No
+//      `--output-schema` equivalent exists: structured output on that backend
+//      would be prompt-instructed, never wire-enforced, and a stage that
+//      believes it was forced when it was only asked is a defect.
+//    THE COLLISION, in writing: `-o` is an output FILE on codex and an output
+//    FORMAT on gemini. A shared arg-builder that assumes one meaning is a bug.
+// 3. OPEN DESIGN QUESTION, unresolved and load-bearing — someone must RULE on
+//    it before either backend goes live. Neither CLI exposes a max-output-token
+//    lever, and codex exposes no system-prompt flag at all. The claude backend
+//    honors the STAGE_BUDGETS ceiling through CLAUDE_CODE_MAX_OUTPUT_TOKENS
+//    (see childEnv, and the note above it explaining what a dropped ceiling
+//    costs). On a codex backend that ladder has NO WIRE PATH: D97's escalation
+//    would be inert, and a truncation retry would escalate to the same ceiling
+//    that just truncated — the precise defect childEnv exists to have fixed.
+//    Fold the system prompt into the user prompt and accept an unenforced
+//    ceiling, or find another lever; either way it is an author ruling, not an
+//    implementer's judgement call.
+const BACKENDS = {
+  claude: {
+    prefix: '',                 // the historical surface: bare /v1/*
+    state: 'live',
+    label: 'Claude Code CLI',
+    defaultModelLabel: 'claude-code-default',
+    streamsTextDeltas: true,    // real message_delta frames; unchanged since W1
+    // ── HOW THIS BACKEND IS BILLED (2026-08-19) ──────────────────────────────
+    // A capability column, exactly like `streamsTextDeltas` above: one row per
+    // backend, read by handleChatCompletions, nothing downstream (D237's law).
+    //
+    // 'measured': the CLI computes the dollar figure for the call itself and
+    // reports it as `total_cost_usd` on the result frame. That number is
+    // subscription-window accounting done by the thing that did the work — it
+    // is not an estimate, and it outranks any rate-card arithmetic the client
+    // could do. It was already being parsed here and then dropped on the floor;
+    // nothing downstream had ever seen it.
+    billing: 'measured',
+    billingSource: 'the Claude Code CLI\'s own accounting'
+  },
+  codex: {
+    prefix: '/codex',
+    state: 'live',
+    label: 'Codex CLI',
+    defaultModelLabel: 'codex-cli-default',
+    // 'not_metered' is a DIFFERENT FACT from "we have no price", and the client
+    // renders them differently on purpose. ChatGPT-subscription access has no
+    // per-token billing concept at all: there is no rate to look up, no table
+    // that could ever be extended to cover it, and no figure the CLI withholds.
+    // Reporting it as "unpriced" blames our pricing table for a number that
+    // does not exist. `costUsd: 0` in generateCodex() is the same statement in
+    // the runner's vocabulary — and 0 must never reach the client as a DOLLAR
+    // amount, which is why the mode travels and the zero does not.
+    billing: 'not_metered',
+    billingSource: 'ChatGPT subscription access',
+    // Codex emits NO incremental text: the whole answer arrives in one
+    // `item.completed` frame (observed, both plain and schema-forced). The
+    // streaming path reads this and relays the accumulated text as a single
+    // chunk instead of assuming deltas that never come — a streaming client
+    // that got an empty stream would be the D102 failure exactly.
+    streamsTextDeltas: false
+  },
+  gemini: {
+    prefix: '/gemini',
+    state: 'scaffolded',
+    label: 'Gemini CLI',
+    // NO `billing` COLUMN ON PURPOSE. This backend refuses every request before
+    // a generation runs, so it never builds a usage object and has nothing to
+    // declare. Guessing a billing mode for a door that has never answered would
+    // be inventing a fact about a transport nobody has authenticated.
+    blocker: 'no Gemini CLI auth is configured on this machine. Fix: authenticate the '
+      + 'gemini CLI, then re-run this bridge'
+  }
+};
+
+// Which backend a request names, and the route with that backend's prefix
+// removed. The claude branch returns the route UNCHANGED, so every claude route
+// below is matched by the same literal string it always was — the routing table
+// did not learn a new shape, it grew a lookup in front of it.
+function resolveBackendRoute(route) {
+  for (const name of Object.keys(BACKENDS)) {
+    const backend = BACKENDS[name];
+    if (!backend.prefix) continue;
+    if (route === backend.prefix || route.startsWith(backend.prefix + '/')) {
+      return { name, backend, rest: route.slice(backend.prefix.length) || '/' };
+    }
+  }
+  return { name: 'claude', backend: BACKENDS.claude, rest: route };
+}
+
 // The CLI's own agent system prompt frames the model as a coding agent with
 // tools. A generation stage is a self-contained "return this JSON" instruction,
 // so the bridge replaces that framing with the smallest honest one. A `system`
@@ -318,11 +441,11 @@ function killAllChildren(signal) {
   }
 }
 
-function runCli(args, { input = '', timeoutMs = 30000 } = {}) {
+function runCli(args, { input = '', timeoutMs = 30000, bin = null } = {}) {
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawn(claudeBin(), args, { env: childEnv(), cwd: os.tmpdir() });
+      child = spawn(bin || claudeBin(), args, { env: childEnv(), cwd: os.tmpdir() });
     } catch (err) {
       return resolve({ code: -1, stdout: '', stderr: String(err && err.message || err), spawnError: err });
     }
@@ -376,6 +499,36 @@ async function preflight(port) {
       + ' · plan ' + (status.subscriptionType || 'unknown')
       + (strippedKey ? ' · ANTHROPIC_API_KEY present in env and withheld from the CLI (subscription billing preserved)' : '')
   };
+}
+
+// The codex backend's own status line. NEVER blocking and never the first line
+// printed: the claude preflight owns that (the door quotes it verbatim), and a
+// second backend being unavailable must not stop the bridge serving the first.
+// Both probes are local reads — `--version` and `login status` make no model
+// call and spend nothing.
+async function codexPreflight() {
+  const version = await runCli(['--version'], { timeoutMs: 15000, bin: codexBin() });
+  if (version.spawnError && version.spawnError.code === 'ENOENT') {
+    return 'codex backend: CLI not found (' + codexBin() + '). Fix: install the Codex CLI, or ignore this door.';
+  }
+  if (version.code !== 0) {
+    return 'codex backend: the CLI failed to run — '
+      + (version.stderr || version.stdout || 'exit ' + version.code).trim().split('\n')[0];
+  }
+  const auth = await runCli(['login', 'status'], { timeoutMs: 20000, bin: codexBin() });
+  const said = (auth.stdout + ' ' + auth.stderr).trim().split('\n')[0];
+  if (auth.code !== 0 || /not logged in/i.test(said)) {
+    return 'codex backend: not logged in. Fix: codex login';
+  }
+  // Deliberately NOT called "ready". `codex login status` reports that
+  // credentials exist on disk; it does not prove the token refreshes or that
+  // this account may use a model — both of which were false on this machine
+  // while that command said everything was fine. The only proof is a real call,
+  // and a preflight that spends quota to prove a door is worse than one that
+  // states what it actually checked.
+  return 'codex backend: ' + version.stdout.trim().split('\n')[0] + ' · ' + said
+    + ' · not verified by a call (this bridge always sends --ignore-user-config; '
+    + 'a config-pinned model is the known way this door 400s)';
 }
 
 // ── Request translation ──────────────────────────────────────────────────────
@@ -518,6 +671,31 @@ function toOpenAIUsage(usage) {
     prompt_tokens_details: { cached_tokens: cacheRead },
     completion_tokens_details: { reasoning_tokens: thinking }
   };
+}
+
+// ── THE BILLING FACT, ON THE WIRE ────────────────────────────────────────────
+// Rides `usage` for the same reason thinking tokens ride
+// `completion_tokens_details` above: it is accounting, the usage object is the
+// accounting carrier, and both the one-shot body and the streaming usage frame
+// already deliver it — so one attachment point covers every path without a
+// second plumbing route. The client reads these two keys provider-blind and
+// never asks which door produced them.
+//
+// `cost_usd` is emitted ONLY when a real figure exists. The Claude CLI reports
+// `total_cost_usd` on its plain result frames but NOT on the schema-forced
+// path, so the field is genuinely absent on schema calls — and absent is the
+// correct wire shape for "not measured this time". Emitting 0 there would be
+// indistinguishable from a free call, which is the exact lie the client's
+// unpriced state exists to avoid.
+function withBillingFacts(usage, backend, costUsd) {
+  const out = Object.assign({}, usage || {});
+  if (!backend || !backend.billing) return out;
+  out.billing_mode = backend.billing;
+  if (backend.billingSource) out.billing_source = backend.billingSource;
+  if (backend.billing === 'measured' && Number(costUsd) > 0) {
+    out.cost_usd = Number(costUsd);
+  }
+  return out;
 }
 
 // ── Spawning one generation ──────────────────────────────────────────────────
@@ -733,6 +911,318 @@ function generate({ prompt, system, schema, model, maxTokens, onDelta, onActivit
   });
 }
 
+// ── The codex backend (2026-08-19) ───────────────────────────────────────────
+// EVERY LINE BELOW IS GROUNDED IN AN OBSERVED TRANSCRIPT, captured on this
+// machine against codex-cli 0.145.0 on 2026-08-19. Nothing here is inferred
+// from `--help`; the flag notes on the BACKENDS table were the starting point,
+// and the parser was written from what the binary actually emitted:
+//
+//   $ echo "say the word PROBE and nothing else" | codex exec --json \
+//       --skip-git-repo-check --ignore-user-config -s read-only -o LAST.txt
+//   {"type":"thread.started","thread_id":"01a01845-…"}
+//   {"type":"turn.started"}
+//   {"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"PROBE"}}
+//   {"type":"turn.completed","usage":{"input_tokens":17269,"cached_input_tokens":11008,
+//     "cache_write_input_tokens":0,"output_tokens":6,"reasoning_output_tokens":0}}
+//
+// and, schema-forced with `--output-schema FILE` (a PATH, never inline JSON):
+//   {"type":"item.completed","item":{"id":"item_0","type":"agent_message",
+//     "text":"{\"title\":\"Midnight Iron\",\"weeks\":6}"}}
+// — the raw JSON arrives as the agent message's TEXT, so the schema path needs
+// no separate extraction. The `-o` file received the identical string.
+//
+// A failed turn, from the probe that found the model wall:
+//   {"type":"item.completed","item":{"id":"item_0","type":"error","message":
+//     "Model metadata for `gpt-5.4` not found. Defaulting to fallback metadata…"}}
+//   {"type":"error","message":"{\"type\":\"error\",\"status\":400,…}"}
+//   {"type":"turn.failed","error":{"message":"…"}}
+//
+// ── THREE THINGS THAT WILL BITE WHOEVER TOUCHES THIS NEXT ────────────────────
+// 1. THE EXIT CODE IS NOT A SUCCESS SIGNAL. That failed turn exited **0**.
+//    (And a run whose prompt is passed as a positional argument exits 1 while
+//    printing "Reading additional input from stdin" — the prompt goes on
+//    STDIN.) So this parser decides on the EVENTS and treats the exit code as
+//    nothing but a reason to stop reading. A wrapper that trusted `code === 0`
+//    would report a 400 from the API as a successful empty generation.
+// 2. `--ignore-user-config` IS LOAD-BEARING, not hygiene. The user's
+//    ~/.codex/config.toml pins `model = "gpt-5.4"`, which this account cannot
+//    use, and EVERY call failed 400 until the flag was added. It is also the
+//    codex analogue of the claude path's --safe-mode: personality, projects,
+//    notify hooks and MCP config must not leak into a generation prompt.
+// 3. `item.completed` carries BOTH the answer and non-fatal warnings — the
+//    same frame type, told apart only by `item.type`. An `item.type:'error'`
+//    is a WARNING (the metadata line above rode one and the turn still ran);
+//    only a top-level `type:'error'` or `turn.failed` is fatal.
+//
+// ── WHAT THIS DOOR CANNOT DO, STATED RATHER THAN PAPERED OVER ────────────────
+// · NO OUTPUT CEILING. The CLI exposes no max-tokens flag and no environment
+//   equivalent (the claude path has CLAUDE_CODE_MAX_OUTPUT_TOKENS; see
+//   childEnv). So `max_tokens` — the load-bearing half of every STAGE_BUDGETS
+//   row (D97) — is ADVISORY here: it is stated to the model in words and
+//   enforced by nothing. A truncation retry on this door escalates a ceiling
+//   the wire never carried. That is a known hole, not an oversight, and it is
+//   the open ruling named on the BACKENDS table.
+// · NO SYSTEM-PROMPT CHANNEL. There is no --system-prompt flag, so the system
+//   message is folded into the prompt under a labelled delimiter below.
+// · NO MODEL MENU. Every concrete id tried (gpt-5, gpt-5-codex, gpt-5.1-codex,
+//   gpt-5.4) was refused by the account with "not supported when using Codex
+//   with a ChatGPT account". The ONLY selection proven to work is the CLI's own
+//   default, so that is the only id /codex/v1/models advertises. A requested id
+//   still reaches the binary verbatim (the claude path's law: a bridge that
+//   silently ignores the model it was asked for is spending the wrong one) —
+//   it will simply fail loudly at the API.
+function codexBin() { return process.env.LIFTRPG_BRIDGE_CODEX_BIN || 'codex'; }
+
+const CODEX_BASE_ARGS = [
+  'exec',
+  '--json',                 // NDJSON events on stdout — what makes this parseable
+  '--skip-git-repo-check',  // MANDATORY: children spawn in os.tmpdir(), not a repo
+  '--ignore-user-config',   // see note 2 above — without it every call 400s here
+  '-s', 'read-only'         // a generation stage writes nothing to the machine
+];
+
+// The only model id this door advertises. Everything else is a request that
+// reaches the binary and is answered by the API, not silently swapped.
+const CODEX_MODEL_ALIASES = ['default'];
+
+// Folded, not dropped. The delimiter is plain words rather than a fake role
+// header: the model is being told where the instructions end, and an invented
+// protocol marker would be one more thing to get subtly wrong.
+function foldCodexPrompt(system, prompt, maxTokens) {
+  const head = system || DEFAULT_SYSTEM_PROMPT;
+  const ceiling = maxTokens
+    ? '\n\nKeep the response under roughly ' + maxTokens + ' output tokens.'
+    : '';
+  return 'INSTRUCTIONS (follow exactly):\n' + head + ceiling
+    + '\n\n--- END INSTRUCTIONS ---\n\nREQUEST:\n' + prompt;
+}
+
+// Codex's usage block, in OpenAI's shape.
+//
+// `input_tokens` is TREATED AS INCLUSIVE of `cached_input_tokens`, on the
+// evidence rather than a guess: two near-identical probes reported 17269 (with
+// 11008 cached) and 17311 (with 0 cached). If cached were additive the first
+// prompt would have been ~28k for the same handful of words. So cached rides
+// the DETAIL field only — adding it to the prompt total, the way toOpenAIUsage
+// does for Anthropic's genuinely-separate counters, would inflate every number
+// the run panel shows. Re-measure before changing this.
+function codexUsageToOpenAI(usage) {
+  const u = usage || {};
+  const prompt = Number(u.input_tokens) || 0;
+  const output = Number(u.output_tokens) || 0;
+  return {
+    prompt_tokens: prompt,
+    completion_tokens: output,
+    total_tokens: prompt + output,
+    prompt_tokens_details: { cached_tokens: Number(u.cached_input_tokens) || 0 },
+    completion_tokens_details: { reasoning_tokens: Number(u.reasoning_output_tokens) || 0 }
+  };
+}
+
+// Same contract as generate(): resolves { text, usage, finishReason, model,
+// costUsd }, rejects with an Error carrying `status` and optionally
+// `rateLimited` / `stalled`. Same watchdog, same tracking, same kill-first
+// discipline — a second process family spending a user's quota with nobody
+// reading its output is the failure `track()` exists to prevent.
+function generateCodex({ prompt, system, schema, model, maxTokens, onActivity, onModel, onSpawn }) {
+  return new Promise((resolve, reject) => {
+    const args = CODEX_BASE_ARGS.slice();
+    const requested = String(model == null ? '' : model);
+    if (CLI_DEFAULT_SENTINELS.indexOf(requested) === -1) args.push('-m', requested);
+
+    // The schema is a FILE on this CLI. Written per call and removed when the
+    // call settles, whichever way it settles.
+    let schemaPath = '';
+    if (schema) {
+      try {
+        schemaPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'liftrpg-codex-schema-')), 'schema.json');
+        fs.writeFileSync(schemaPath, JSON.stringify(schema));
+        args.push('--output-schema', schemaPath);
+      } catch (err) {
+        return reject(Object.assign(
+          new Error('Bridge: could not stage the codex output schema: ' + (err && err.message)),
+          { status: 500 }));
+      }
+    }
+    function cleanupSchema() {
+      if (!schemaPath) return;
+      try { fs.rmSync(path.dirname(schemaPath), { recursive: true, force: true }); } catch (_e) { /* gone */ }
+      schemaPath = '';
+    }
+
+    let child;
+    try {
+      // childEnv() with no argument: the API-key strip applies here too (an
+      // OPENAI_API_KEY in the environment would bill the API account instead of
+      // the subscription — the same premise-evaporation the claude path guards,
+      // and codex reads that variable), and NO ceiling is sent because this CLI
+      // has nowhere to put one.
+      child = spawn(codexBin(), args, { env: childEnv(), cwd: os.tmpdir() });
+    } catch (err) {
+      return reject(Object.assign(
+        new Error('Bridge could not spawn the Codex CLI: ' + (err && err.message)), { status: 503 }));
+    }
+    track(child);
+    if (onSpawn) onSpawn(child);
+
+    let stdoutBuf = '';
+    let stderr = '';
+    let text = '';
+    let usage = null;
+    let fatal = '';
+    let fatalStatus = 0;
+    let settled = false;
+    let sawTurn = false;
+
+    const idleMs = idleWatchdogMs();
+    let idleTimer = null;
+    function clearWatchdog() {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = null;
+    }
+    function armWatchdog() {
+      if (settled || !idleMs) return;
+      clearWatchdog();
+      idleTimer = setTimeout(onSilence, idleMs);
+    }
+    function finishError(message, extra) {
+      if (settled) return;
+      settled = true;
+      clearWatchdog();
+      cleanupSchema();
+      reject(Object.assign(new Error(message), extra || {}));
+    }
+    function onSilence() {
+      idleTimer = null;
+      if (settled) return;
+      const windowLabel = idleMs >= 1000 ? Math.round(idleMs / 1000) + 's' : idleMs + 'ms';
+      log('no output from the Codex CLI for ' + windowLabel + ' — stopping it');
+      try { child.kill('SIGTERM'); } catch (_e) { /* gone */ }
+      const hard = setTimeout(() => {
+        try { if (child.exitCode === null) child.kill('SIGKILL'); } catch (_e) { /* gone */ }
+      }, KILL_GRACE_MS);
+      if (hard.unref) hard.unref();
+      // 502 + 'stalled', for the reason the header gives: a hang must consume a
+      // retry attempt and escalate, never be waited out as a throttle. NOTE the
+      // codex-specific risk: this CLI emits FAR fewer frames than the claude
+      // one — on the probes, four events for a whole call — so a long quiet
+      // generation has less to re-arm this window with. If a real stage is ever
+      // killed here while healthy, raise LIFTRPG_BRIDGE_IDLE_MS rather than
+      // removing the watchdog.
+      finishError(
+        'Bridge: the Codex CLI produced no output for ' + windowLabel + ' and was stopped '
+        + '(the run stalled). Raise LIFTRPG_BRIDGE_IDLE_MS if this machine legitimately '
+        + 'needs longer.',
+        { status: 502, stalled: true });
+    }
+
+    function handleFrame(frame) {
+      const type = String(frame && frame.type || '');
+      if (type === 'turn.started') { sawTurn = true; return; }
+      if (type === 'item.completed') {
+        const item = frame.item || {};
+        if (item.type === 'agent_message' && typeof item.text === 'string') {
+          text += item.text;
+          // NO onDelta HERE, deliberately. This backend declares
+          // streamsTextDeltas:false, which makes the caller emit the
+          // accumulated text as one chunk at the end. Emitting it here TOO
+          // sends the whole answer twice — caught by the self-test's
+          // no-duplication row, which exists because a doubled payload is the
+          // kind of defect a client happily accepts and a reader never sees.
+          return;
+        }
+        // An item-level error is a WARNING (see note 3 in the header): the
+        // metadata notice rode one and the turn completed normally. Logged so
+        // it is never invisible, never fatal.
+        if (item.type === 'error') log('codex notice: ' + String(item.message || '').slice(0, 200));
+        return;
+      }
+      if (type === 'turn.completed') { usage = frame.usage || null; return; }
+      if (type === 'error' || type === 'turn.failed') {
+        const raw = String((frame.error && frame.error.message) || frame.message || 'unknown codex failure');
+        // The API's own error arrives as a JSON STRING inside that message.
+        // Unwrapped when it parses, so the operator reads a sentence instead of
+        // an escaped blob; left alone when it does not.
+        let shown = raw;
+        try {
+          const inner = JSON.parse(raw);
+          if (inner && inner.error && inner.error.message) shown = String(inner.error.message);
+          // The API's OWN status rides that envelope (the observed failure
+          // carried "status":400). Propagated rather than flattened to 502,
+          // because the difference is the whole retry decision: a 400 the
+          // account can never satisfy must not be retried three times with an
+          // escalating budget, and a 429 must be waited out rather than burning
+          // an attempt. Only a plausible HTTP status is trusted.
+          const innerStatus = Number(inner && inner.status);
+          if (Number.isFinite(innerStatus) && innerStatus >= 400 && innerStatus < 600) {
+            fatalStatus = innerStatus;
+          }
+        } catch (_e) { /* not JSON — the raw line is the message */ }
+        if (!fatal) fatal = shown;
+        return;
+      }
+    }
+
+    child.stdout.on('data', (chunk) => {
+      armWatchdog();
+      if (onActivity) onActivity();
+      stdoutBuf += chunk;
+      let nl;
+      while ((nl = stdoutBuf.indexOf('\n')) !== -1) {
+        const line = stdoutBuf.slice(0, nl).trim();
+        stdoutBuf = stdoutBuf.slice(nl + 1);
+        if (!line) continue;
+        try { handleFrame(JSON.parse(line)); } catch (_e) { debug('codex: unparsed line', line.slice(0, 160)); }
+      }
+    });
+    child.stderr.on('data', (d) => { armWatchdog(); if (onActivity) onActivity(); stderr += d; });
+
+    child.on('error', (err) => finishError(
+      'Bridge could not run the Codex CLI: ' + (err && err.message),
+      { status: err && err.code === 'ENOENT' ? 400 : 503 }));
+
+    child.on('close', () => {
+      if (settled) return;
+      settled = true;
+      clearWatchdog();
+      cleanupSchema();
+      if (fatal) {
+        // A quota wall on this backend is expected, not exceptional, and is
+        // mapped onto the wire format's structural throttle shape exactly as
+        // the claude path maps a spent usage window.
+        const throttled = EXHAUSTION_TEXT.test(fatal) || fatalStatus === 429;
+        return reject(Object.assign(
+          new Error('Codex CLI: ' + fatal),
+          { status: throttled ? 429 : (fatalStatus || 502), rateLimited: throttled }));
+      }
+      if (!text) {
+        return reject(Object.assign(
+          new Error('Bridge: the Codex CLI returned no assistant message'
+            + (sawTurn ? '' : ' and never started a turn')
+            + (stderr.trim() ? ' (' + stderr.trim().split('\n')[0].slice(0, 200) + ')' : '')
+            + '. The exit code is not a success signal on this CLI, so this is decided on the events.'),
+          { status: 502 }));
+      }
+      if (onModel) onModel(BACKENDS.codex.defaultModelLabel);
+      resolve({
+        text,
+        usage: codexUsageToOpenAI(usage),
+        // This CLI reports no stop reason at all, so nothing here can tell a
+        // clean stop from a truncation. Reported as 'stop' because that is what
+        // is known — inventing 'length' from a text-length guess would be worse
+        // than the silence.
+        finishReason: 'stop',
+        model: BACKENDS.codex.defaultModelLabel,
+        costUsd: 0
+      });
+    });
+
+    armWatchdog();
+    child.stdin.on('error', () => { /* the child died first; `close` reports it */ });
+    child.stdin.end(foldCodexPrompt(system, prompt, maxTokens));
+  });
+}
+
 // ── HTTP surface ─────────────────────────────────────────────────────────────
 
 // DEFAULT-DENY. A request with no Origin (Node, curl, the bench's own fetch)
@@ -798,6 +1288,30 @@ function errorBody(message, type) {
   return { error: { message, type: type || 'bridge_error', code: type === 'rate_limit_error' ? 'rate_limit_exceeded' : undefined } };
 }
 
+// A scaffolded backend's answer, and the ONLY thing behind those routes.
+//
+// HTTP 400, deliberately NOT 501. The client marks `status === 429 || >= 500`
+// retryable (provider.js, both the streaming and the structured paths), so a
+// semantically-correct 501 would make every stage retry a backend that can
+// never answer — three escalating attempts and a whole wall-clock ladder spent
+// on a permanent condition. A scaffolded backend is a FATAL config error,
+// exactly like a model id the CLI cannot resolve, and it is shaped like one.
+//
+// The wording is chosen as carefully as resolveModelArgs' is: it avoids the
+// refusal words error-classify.js scans for beside a forcing subject
+// ('unsupported', 'not supported', 'does not support', …), so a structured
+// stage does not read this as a schema-forcing capability miss and silently
+// degrade to an unforced call; and it avoids every throttle phrase
+// (isLikelyThrottleError), so nobody waits it out. --self-test pins both.
+function backendNotImplemented(req, res, name, backend) {
+  return sendJson(req, res, 400, errorBody(
+    'Bridge: the ' + name + ' backend is scaffolding only. This bridge routes '
+    + backend.prefix + '/v1/* and spawns nothing behind it — there is no request path yet. '
+    + 'Blocked on: ' + backend.blocker
+    + '. See the BACKENDS table in liftrpg-bridge.mjs for what a follow-up wave owes.',
+    'backend_not_implemented'));
+}
+
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let raw = '';
@@ -809,7 +1323,23 @@ function readBody(req) {
 
 const SSE_KEEPALIVE_MS = 10000;   // client idle window is 120s (constants.js)
 
-async function handleChatCompletions(req, res) {
+// THE DISPATCH POINT (2026-08-19). One handler, one runner per backend. The
+// claude branch is reached by exactly the same values it always was — the
+// backend defaults to claude and every claude-specific string below is now read
+// off the BACKENDS row that holds it, so the live surface is unmoved.
+//
+// A follow-up wave adding gemini adds a runner and a row. It does NOT add a
+// branch here, and it does not start until it has a REAL transcript in hand:
+// the codex parser above exists because two probes were run and read, and the
+// three traps recorded in its header (exit 0 on failure, the config-pinned
+// model, warnings sharing the answer's frame type) were all found that way, not
+// reasoned out. See the BACKENDS table for what is known about the gemini flags
+// and for the OPEN RULING on the unenforceable output ceiling.
+const BACKEND_RUNNERS = { claude: generate, codex: generateCodex };
+
+async function handleChatCompletions(req, res, backendName) {
+  const backend = BACKENDS[backendName] || BACKENDS.claude;
+  const runGeneration = BACKEND_RUNNERS[backendName] || BACKEND_RUNNERS.claude;
   let body;
   try {
     body = JSON.parse(await readBody(req) || '{}');
@@ -824,7 +1354,7 @@ async function handleChatCompletions(req, res) {
   if (hasImageParts(messages)) {
     // Honest refusal beats a silent text-only call. The CLI takes a prompt on
     // stdin; images would need a different transport shape entirely.
-    return sendJson(req, res, 400, errorBody('Bridge: image parts are not carried to the Claude Code CLI.'));
+    return sendJson(req, res, 400, errorBody('Bridge: image parts are not carried to the ' + backend.label + '.'));
   }
 
   const system = messages.filter((m) => m && m.role === 'system').map((m) => partsToText(m.content)).join('\n\n');
@@ -840,6 +1370,10 @@ async function handleChatCompletions(req, res) {
   // client makes carries the STAGE_BUDGETS row's maxTokens here; before this it
   // was read by nothing, so the D97 ladder did not exist on this door.
   const maxTokens = Number(body.max_tokens) > 0 ? Number(body.max_tokens) : 0;
+  // Which streaming shape this backend needs at the end of the call. For
+  // claude this evaluates to `!!schema` — byte-identical to the condition that
+  // stood here before the second backend existed.
+  const needsWholeText = backend.streamsTextDeltas ? !!schema : true;
   const id = 'bridge-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
   const created = Math.floor(Date.now() / 1000);
   let child = null;
@@ -848,19 +1382,19 @@ async function handleChatCompletions(req, res) {
   // A client that hangs up must not leave a paid generation running.
   res.on('close', () => { if (child && child.exitCode === null) { try { child.kill('SIGTERM'); } catch (_e) { /* gone */ } } });
 
-  log((wantsStream ? 'stream' : 'one-shot') + (schema ? '+schema' : '') + ' · model=' + (body.model || 'default')
-    + ' · prompt=' + prompt.length + ' chars');
+  log(backendName + ' · ' + (wantsStream ? 'stream' : 'one-shot') + (schema ? '+schema' : '')
+    + ' · model=' + (body.model || 'default') + ' · prompt=' + prompt.length + ' chars');
 
   if (!wantsStream) {
     try {
-      const out = await generate({ prompt, system, schema, model: body.model, maxTokens, onSpawn });
+      const out = await runGeneration({ prompt, system, schema, model: body.model, maxTokens, onSpawn });
       return sendJson(req, res, 200, {
         id,
         object: 'chat.completion',
         created,
         model: out.model,
         choices: [{ index: 0, message: { role: 'assistant', content: out.text }, finish_reason: out.finishReason }],
-        usage: out.usage
+        usage: withBillingFacts(out.usage, backend, out.costUsd)
       });
     } catch (err) {
       const status = err.status || 502;
@@ -897,10 +1431,10 @@ async function handleChatCompletions(req, res) {
     try { res.end(); } catch (_e) { /* closed */ }
   }
 
-  let model = body.model || 'claude-code-default';
+  let model = body.model || backend.defaultModelLabel;
   try {
     openStream();
-    const out = await generate({
+    const out = await runGeneration({
       prompt, system, schema, model: body.model, maxTokens, onSpawn,
       onActivity: touch,
       onModel: (resolved) => { model = resolved; },
@@ -910,11 +1444,13 @@ async function handleChatCompletions(req, res) {
       })
     });
     model = out.model || model;
-    // The schema path produces no text deltas (the JSON rides a tool_use
-    // block), so the accumulated text arrives here as one chunk. Emitting it
-    // unconditionally would double the payload; emitting it never would hand a
-    // schema-mode streaming client an empty stream — the exact D102 failure.
-    if (schema && out.text) {
+    // On claude, the schema path produces no text deltas (the JSON rides a
+    // tool_use block), so the accumulated text arrives here as one chunk.
+    // Emitting it unconditionally would double the payload; emitting it never
+    // would hand a schema-mode streaming client an empty stream — the exact
+    // D102 failure. A backend that streams NO deltas at all (codex) is that
+    // same case on every request, which is what `streamsTextDeltas` says.
+    if (needsWholeText && out.text) {
       frame({
         id, object: 'chat.completion.chunk', created, model,
         choices: [{ index: 0, delta: { role: 'assistant', content: out.text }, finish_reason: null }]
@@ -926,7 +1462,7 @@ async function handleChatCompletions(req, res) {
     });
     // Usage rides its own choices-empty chunk — the shape
     // stream_options.include_usage produces, which is what the client reads.
-    frame({ id, object: 'chat.completion.chunk', created, model, choices: [], usage: out.usage });
+    frame({ id, object: 'chat.completion.chunk', created, model, choices: [], usage: withBillingFacts(out.usage, backend, out.costUsd) });
     res.write('data: [DONE]\n\n');
     closeStream();
   } catch (err) {
@@ -951,20 +1487,49 @@ function createServer() {
       res.writeHead(204, corsHeaders(req));
       return res.end();
     }
-    if (req.method === 'GET' && (route === '/healthz' || route === '/')) {
-      return sendJson(req, res, 200, { ok: true, service: 'liftrpg-bridge', format: 'openai-compatible' });
+    // THE BACKEND LOOKUP (2026-08-19). `rest` is the route the claude branches
+    // below have always matched — for the claude backend it IS `route`, so
+    // nothing about the live surface moved. A prefixed backend is answered by
+    // exactly one thing, on every method and every path under it: the refusal.
+    const { name: backendName, backend, rest } = resolveBackendRoute(route);
+    if (backend.state !== 'live') {
+      // Including /healthz and /models. A scaffolded backend answering a health
+      // probe with 200 would tell eval-bench's bridgeIsUp() (which reads
+      // res.ok) that a backend spawning nothing is up, and model discovery
+      // answering 200 would let the door look configured. The reason arrives at
+      // the earliest possible touch instead.
+      return backendNotImplemented(req, res, backendName, backend);
+    }
+
+    if (req.method === 'GET' && (rest === '/healthz' || rest === '/')) {
+      return sendJson(req, res, 200, {
+        ok: true,
+        service: 'liftrpg-bridge',
+        format: 'openai-compatible',
+        // Additive, and the one place all three states are visible at once.
+        // Derived from the table, never restated: a backend that grows a real
+        // implementation reports it here by changing one field.
+        backends: Object.keys(BACKENDS).map((name) => ({
+          name,
+          state: BACKENDS[name].state,
+          baseUrl: 'http://' + HOST + ':' + (req.socket.localPort || DEFAULT_PORT) + BACKENDS[name].prefix + '/v1',
+          blocker: BACKENDS[name].blocker || null
+        }))
+      });
     }
     // Model discovery: `modelDiscovery:'openai'` fetches <baseUrl>/models. The
     // ids are the CLI's own aliases — the bridge names no concrete model.
-    if (req.method === 'GET' && route === '/v1/models') {
+    if (req.method === 'GET' && rest === '/v1/models') {
+      const aliases = backendName === 'codex' ? CODEX_MODEL_ALIASES : CLI_MODEL_ALIASES;
+      const owner = backendName === 'codex' ? 'codex-cli' : 'claude-code-cli';
       return sendJson(req, res, 200, {
         object: 'list',
-        data: CLI_MODEL_ALIASES.map((id) => ({ id, object: 'model', owned_by: 'claude-code-cli' }))
+        data: aliases.map((id) => ({ id, object: 'model', owned_by: owner }))
       });
     }
-    if (req.method === 'POST' && route === '/v1/chat/completions') {
+    if (req.method === 'POST' && rest === '/v1/chat/completions') {
       try {
-        return await handleChatCompletions(req, res);
+        return await handleChatCompletions(req, res, backendName);
       } catch (err) {
         log('unhandled request failure:', err && err.message);
         if (!res.headersSent) return sendJson(req, res, 500, errorBody('Bridge failure: ' + (err && err.message)));
@@ -1000,6 +1565,23 @@ async function serve(port) {
     // the program that knows it (found on the first real deployed-site run).
     log('base URL for the LiftRPG page: http://' + HOST + ':' + port + '/v1');
     log('bench: EVAL_PROVIDER=bridge node scripts/eval-bench.mjs');
+    log('POST http://' + HOST + ':' + port + '/codex/v1/chat/completions  (Codex CLI backend)');
+    // Best-effort and after the server is already listening, so a slow or
+    // missing codex binary delays nothing that matters.
+    codexPreflight().then((line) => log(line)).catch(() => { /* never fatal */ });
+    // The scaffolded backends announce themselves as scaffolded. The FIRST
+    // printed line is still the preflight's (ready, or the exact fix) — that
+    // line is the door's quoted contract and is untouched. These sit below it
+    // so an operator reading the banner cannot mistake a routed path for a
+    // working one. Derived from BACKENDS, so a backend that goes live drops out
+    // of this list by changing its `state` and nothing else.
+    for (const name of Object.keys(BACKENDS)) {
+      const backend = BACKENDS[name];
+      if (backend.state === 'live') continue;
+      log(name + ' backend: SCAFFOLDED, NOT IMPLEMENTED — http://' + HOST + ':' + port
+        + backend.prefix + '/v1/* answers with the reason and spawns nothing. Blocked on: '
+        + backend.blocker);
+    }
   });
   for (const sig of ['SIGINT', 'SIGTERM']) {
     process.on(sig, () => {
@@ -1017,6 +1599,68 @@ async function serve(port) {
 // proves is the part that cannot be proven by reading — that an exhausted usage
 // window arrives at error-classify.js as a RETRYABLE stage error through
 // structural markers alone, with no new vocabulary anywhere downstream.
+
+// The fake CODEX cli. Every frame it writes is COPIED FROM A REAL TRANSCRIPT
+// captured on 2026-08-19 (the full transcripts are quoted in generateCodex's
+// header) — the token counts, the frame order, the item shapes and the
+// exits-0-on-failure behaviour are all reproductions, not inventions. That is
+// the difference between a fixture and a guess: this replays what the binary
+// did, so a parser that passes here parsed the real thing.
+//
+// It also reports back what it was TOLD — argv and the stdin prompt — because
+// the half of this door that cannot be seen from the outside is what actually
+// reached the binary, which is exactly where the claude path's dropped
+// max_tokens hid for a whole wave.
+const FAKE_CODEX_CLI = `#!/usr/bin/env node
+const fs = require('fs');
+const s = process.env.BRIDGE_CODEX_SCENARIO || 'ok';
+const w = (o) => process.stdout.write(JSON.stringify(o) + '\\n');
+let stdin = '';
+process.stdin.on('data', (d) => { stdin += d; });
+process.stdin.on('end', () => {
+  w({ type: 'thread.started', thread_id: 'fake-thread' });
+  w({ type: 'turn.started' });
+  if (s === 'echo-invocation') {
+    // The mirror: what the bridge actually built. The schema file is READ from
+    // disk, because '--output-schema takes a path' is a claim about the file
+    // system, not about argv.
+    const i = process.argv.indexOf('--output-schema');
+    let schemaText = '';
+    if (i !== -1) { try { schemaText = fs.readFileSync(process.argv[i + 1], 'utf8'); } catch (e) { schemaText = 'UNREADABLE'; } }
+    w({ type: 'item.completed', item: { id: 'item_0', type: 'agent_message',
+      text: JSON.stringify({ argv: process.argv.slice(2), stdin: stdin, schemaText: schemaText }) } });
+    w({ type: 'turn.completed', usage: {} });
+    process.exit(0);
+  }
+  if (s === 'api-failure') {
+    // VERBATIM from the probe that found the model wall — including the exit
+    // code. This CLI exits 0 on a failed turn.
+    w({ type: 'item.completed', item: { id: 'item_0', type: 'error',
+      message: 'Model metadata for \\\`gpt-5.4\\\` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.' } });
+    const inner = JSON.stringify({ type: 'error', status: 400, error: { type: 'invalid_request_error', message: "The 'gpt-5.4' model is not supported when using Codex with a ChatGPT account." } });
+    w({ type: 'error', message: inner });
+    w({ type: 'turn.failed', error: { message: inner } });
+    process.exit(0);
+  }
+  if (s === 'throttled') {
+    const inner = JSON.stringify({ type: 'error', status: 429, error: { type: 'rate_limit_error', message: 'You have hit your usage limit. Try again later.' } });
+    w({ type: 'error', message: inner });
+    w({ type: 'turn.failed', error: { message: inner } });
+    process.exit(0);
+  }
+  if (s === 'no-message') { w({ type: 'turn.completed', usage: {} }); process.exit(0); }
+  if (s === 'schema') {
+    w({ type: 'item.completed', item: { id: 'item_0', type: 'agent_message', text: '{"title":"Midnight Iron","weeks":6}' } });
+    w({ type: 'turn.completed', usage: { input_tokens: 17311, cached_input_tokens: 0, cache_write_input_tokens: 0, output_tokens: 21, reasoning_output_tokens: 0 } });
+    process.exit(0);
+  }
+  // 'ok' — the plain probe, verbatim.
+  w({ type: 'item.completed', item: { id: 'item_0', type: 'error', message: 'a non-fatal notice rides the same frame type as the answer' } });
+  w({ type: 'item.completed', item: { id: 'item_0', type: 'agent_message', text: 'PROBE' } });
+  w({ type: 'turn.completed', usage: { input_tokens: 17269, cached_input_tokens: 11008, cache_write_input_tokens: 0, output_tokens: 6, reasoning_output_tokens: 0 } });
+  process.exit(0);
+});
+`;
 
 const FAKE_CLI = `#!/usr/bin/env node
 const s = process.env.BRIDGE_TEST_SCENARIO || 'ok';
@@ -1286,6 +1930,31 @@ async function selfTest() {
     JSON.parse(structuredBody.choices[0].message.content).ok === true);
   ok('structured usage counts cache reads as input', structuredBody.usage.prompt_tokens === 9);
 
+  // 3b. THE MEASURED-COST CHANNEL. The CLI computes the dollars for its own
+  // call; before 2026-08-19 that number was parsed and dropped, so the run
+  // panel reported every bridge run as unpriced while the true figure sat in a
+  // local variable. All four assertions below are ones the pre-fix bridge fails.
+  //
+  // The last one is the anti-vacuity arm and matters most: the fake CLI's
+  // SCHEMA result frame carries no `total_cost_usd`, exactly as the real one
+  // does not. If `cost_usd` appeared there anyway, this channel would be
+  // manufacturing a number rather than relaying one — so absence is asserted as
+  // hard as presence.
+  {
+    const plain = await post({ model: 'default', messages: msg });
+    const plainBody = await plain.json();
+    ok('claude: the CLI\'s own measured cost reaches the wire',
+      plainBody.usage.cost_usd === 0.0011, JSON.stringify(plainBody.usage));
+    ok('claude: the measured figure is not zero (a real number, not a placeholder)',
+      Number(plainBody.usage.cost_usd) > 0);
+    ok('claude: the wire declares HOW the door is billed, not just what it cost',
+      plainBody.usage.billing_mode === 'measured', plainBody.usage.billing_mode);
+    ok('claude: a call the CLI priced NOTHING for carries no cost_usd (schema path)',
+      structuredBody.usage.cost_usd === undefined
+      && structuredBody.usage.billing_mode === 'measured',
+      JSON.stringify(structuredBody.usage));
+  }
+
   // 4. THE GATE: exhaustion before the stream opens -> 429 -> retryable.
   // Two scenarios, because the bridge has two detectors and either one going
   // blind must be visible here. The structural detector (rate_limit_event) is
@@ -1538,6 +2207,229 @@ async function selfTest() {
     ok('text with no stop_reason warns about masked truncation',
       said.length === 1 && /NO stop_reason/.test(said[0]), said.length + ' line(s)');
   }
+
+  // 11. THE SCAFFOLDED BACKENDS (2026-08-19). Every assertion here runs with
+  // ZERO auth and touches NO real binary — which is the whole point: the codex
+  // refresh token is dead and gemini has no auth at all, so this is exactly the
+  // part of those backends that can be proven today. What it pins is the shape
+  // of the refusal, because the two ways this scaffolding could be wrong are
+  // both SILENT: a 5xx would be retried three times by the client's own
+  // escalation ladder against a backend that can never answer, and a message
+  // carrying refusal-plus-forcing-subject vocabulary would be read as a
+  // structured-output capability miss and degrade a forced stage to an
+  // unforced one.
+  for (const scaffolded of ['gemini']) {
+    const prefix = BACKENDS[scaffolded].prefix;
+    const before = liveChildren.size;
+    const res = await fetch(base + prefix + '/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'default', messages: msg })
+    });
+    const body = await res.json();
+    const message = String((body.error && body.error.message) || '');
+    ok(scaffolded + ': the route exists and refuses rather than 404ing',
+      res.status !== 404, 'got ' + res.status);
+    ok(scaffolded + ': the refusal names itself as not implemented',
+      body.error && body.error.type === 'backend_not_implemented',
+      JSON.stringify(body).slice(0, 160));
+    ok(scaffolded + ': the refusal names what is blocking it',
+      message.includes('Blocked on:') && message.length > 80, message.slice(0, 160));
+    // THE RETRY SHAPE. 429/503 is a throttle the client waits out without
+    // consuming an attempt; >=500 is retryable and burns the whole ladder.
+    // A permanent condition must be neither.
+    ok(scaffolded + ': the refusal is FATAL, not retryable and not a throttle',
+      res.status < 500 && res.status !== 429 && res.status !== 503, 'got ' + res.status);
+    ok(scaffolded + ': the refusal reads as no throttle to error-classify.js',
+      !classify.isLikelyThrottleError({ status: res.status, message }));
+    ok(scaffolded + ': the refusal reads as no structured-output miss',
+      classify.structuredOutputRefusalReason(message) === '',
+      'matched ' + classify.structuredOutputRefusalReason(message));
+    // NOTHING WAS SPAWNED. This is the wave's actual promise.
+    ok(scaffolded + ': no child process was spawned', liveChildren.size === before,
+      before + ' -> ' + liveChildren.size);
+
+    // Every method and every path under the prefix answers the same way —
+    // model discovery and the health probe included, so the door cannot look
+    // configured and the bench cannot read a scaffolded backend as up.
+    const models = await fetch(base + prefix + '/v1/models');
+    ok(scaffolded + ': model discovery refuses too', !models.ok && models.status < 500,
+      'got ' + models.status);
+    const health = await fetch(base + prefix + '/healthz');
+    ok(scaffolded + ': the health probe reports NOT up', !health.ok,
+      'got ' + health.status);
+  }
+
+  // 11a. THE CODEX BACKEND (2026-08-19), against a fake CLI that REPLAYS the
+  // real transcript rather than an invented one. Everything asserted here is
+  // either a shape the binary was observed producing, or a fact about what the
+  // bridge sends it — the two halves nobody can see from the outside.
+  const fakeCodex = path.join(dir, 'fake-codex.cjs');
+  fs.writeFileSync(fakeCodex, FAKE_CODEX_CLI);
+  fs.chmodSync(fakeCodex, 0o755);
+  process.env.LIFTRPG_BRIDGE_CODEX_BIN = fakeCodex;
+  const codexPost = (body, scenario) => {
+    process.env.BRIDGE_CODEX_SCENARIO = scenario || 'ok';
+    return fetch(base + '/codex/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+  };
+
+  {
+    const res = await codexPost({ model: 'default', messages: msg }, 'ok');
+    const out = await res.json();
+    ok('codex: a plain call answers 200 with the assistant message',
+      res.status === 200 && out.choices && out.choices[0].message.content === 'PROBE',
+      JSON.stringify(out).slice(0, 200));
+    ok('codex: a non-fatal item error does not fail the turn',
+      out.choices && out.choices[0].finish_reason === 'stop');
+    // THE SILENT ONE. codex reports cached tokens INSIDE input_tokens, so
+    // adding them (the Anthropic mapping's correct behaviour) would inflate
+    // every figure the run panel shows, invisibly and forever.
+    ok('codex: cached input is a detail, never added to the prompt total',
+      !!out.usage && out.usage.prompt_tokens === 17269 && out.usage.total_tokens === 17275
+        && out.usage.prompt_tokens_details.cached_tokens === 11008,
+      JSON.stringify(out.usage || null));
+    ok('codex: the model reported is the one this door can actually select',
+      out.model === 'codex-cli-default', out.model);
+    // NOT-METERED IS A CLAIM, NOT A GAP. The client renders this door
+    // differently from "we have no pricing row" — the second sentence blames
+    // our table for a number that does not exist anywhere. The zero-cost
+    // assertion is the load-bearing half: `generateCodex` hardcodes
+    // `costUsd: 0`, and a 0 arriving as a DOLLAR AMOUNT would print a
+    // subscription run as a free run.
+    ok('codex: the door declares itself unmetered rather than merely unpriced',
+      out.usage.billing_mode === 'not_metered', out.usage.billing_mode);
+    ok('codex: the door names WHY there is no price',
+      /subscription/i.test(String(out.usage.billing_source || '')), out.usage.billing_source);
+    ok('codex: a zero cost is never shipped as a dollar figure',
+      out.usage.cost_usd === undefined, JSON.stringify(out.usage.cost_usd));
+  }
+
+  // What reached the binary. The claude path lost its whole budget ladder for a
+  // wave by dropping max_tokens silently; this is the same class of check.
+  {
+    const res = await codexPost({
+      model: 'default',
+      messages: [{ role: 'system', content: 'SYSTEM-MARKER' }, { role: 'user', content: 'USER-MARKER' }],
+      response_format: { type: 'json_schema', json_schema: { schema: { type: 'object', properties: { a: { type: 'string' } } } } }
+    }, 'echo-invocation');
+    const seen = JSON.parse((await res.json()).choices[0].message.content);
+    const argv = seen.argv;
+    ok('codex: the invocation carries exec --json and the read-only sandbox',
+      argv[0] === 'exec' && argv.includes('--json') && argv.includes('-s')
+        && argv[argv.indexOf('-s') + 1] === 'read-only', argv.join(' '));
+    // Both of these were learned the hard way: without --skip-git-repo-check the
+    // CLI refuses to run in os.tmpdir(), and without --ignore-user-config the
+    // user's config-pinned model failed EVERY call with a 400.
+    ok('codex: --skip-git-repo-check is sent (children run outside a repo)',
+      argv.includes('--skip-git-repo-check'));
+    ok('codex: --ignore-user-config is sent (the config-pinned model 400s)',
+      argv.includes('--ignore-user-config'));
+    ok('codex: no --model is sent for the default sentinel',
+      argv.indexOf('-m') === -1 && argv.indexOf('--model') === -1, argv.join(' '));
+    // No system-prompt flag exists, so the system message must be IN the prompt
+    // or it was silently discarded — and the model would never see it.
+    ok('codex: the system message is folded into the prompt, not dropped',
+      seen.stdin.includes('SYSTEM-MARKER') && seen.stdin.includes('USER-MARKER')
+        && seen.stdin.includes('END INSTRUCTIONS'), seen.stdin.slice(0, 120));
+    // --output-schema takes a PATH. Asserted by reading the file back.
+    ok('codex: the schema reaches the CLI as a readable FILE, not inline JSON',
+      argv.includes('--output-schema') && seen.schemaText.includes('"properties"'),
+      seen.schemaText.slice(0, 120));
+  }
+  {
+    const res = await codexPost({ model: 'gpt-5-codex', messages: msg }, 'echo-invocation');
+    const seen = JSON.parse((await res.json()).choices[0].message.content);
+    ok('codex: a requested model reaches the binary verbatim',
+      seen.argv[seen.argv.indexOf('-m') + 1] === 'gpt-5-codex', seen.argv.join(' '));
+  }
+
+  // THE EXIT-CODE TRAP. The real CLI exits 0 on a failed turn, so a wrapper
+  // keyed on the exit code reports an API rejection as a successful empty
+  // generation. This is the assertion that catches that, and the fake exits 0
+  // exactly as the binary did.
+  {
+    const res = await codexPost({ model: 'default', messages: msg }, 'api-failure');
+    const out = await res.json();
+    ok('codex: a failed turn is a failure even though the CLI exits 0',
+      res.status !== 200 && out.error, res.status + ' ' + JSON.stringify(out).slice(0, 120));
+    ok('codex: the API\'s own message is unwrapped from the JSON envelope',
+      /not supported when using Codex/.test(String(out.error.message)),
+      String(out.error.message).slice(0, 160));
+    // A permanent 400 must not be retried three times with an escalating budget.
+    ok('codex: the API\'s own status is propagated, so a 400 is not retried',
+      res.status === 400, 'got ' + res.status);
+    ok('codex: a permanent failure is not shaped as a throttle',
+      !classify.isLikelyThrottleError({ status: res.status, message: String(out.error.message) }));
+  }
+  {
+    const res = await codexPost({ model: 'default', messages: msg }, 'throttled');
+    const out = await res.json();
+    ok('codex: a quota wall arrives as a structural 429 the client already retries',
+      res.status === 429 && out.error.type === 'rate_limit_error',
+      res.status + ' ' + JSON.stringify(out.error).slice(0, 120));
+  }
+  {
+    const res = await codexPost({ model: 'default', messages: msg }, 'no-message');
+    const out = await res.json();
+    ok('codex: a turn with no assistant message is an error, never an empty success',
+      res.status !== 200 && /no assistant message/.test(String(out.error.message)),
+      res.status + ' ' + JSON.stringify(out).slice(0, 140));
+  }
+
+  // Streaming. This CLI emits NO incremental deltas, so the danger is the D102
+  // one: a streaming client handed an empty stream. The accumulated text must
+  // arrive as a chunk on EVERY request, not only the schema ones.
+  {
+    process.env.BRIDGE_CODEX_SCENARIO = 'schema';
+    const res = await fetch(base + '/codex/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'default', stream: true, messages: msg })
+    });
+    const raw = await res.text();
+    const chunks = raw.split('\n').filter((l) => l.startsWith('data: ') && !l.includes('[DONE]'))
+      .map((l) => { try { return JSON.parse(l.slice(6)); } catch (_e) { return null; } }).filter(Boolean);
+    const streamed = chunks.map((c) => (c.choices && c.choices[0] && c.choices[0].delta || {}).content || '').join('');
+    ok('codex: a streaming request carries the whole answer, not an empty stream',
+      streamed.includes('Midnight Iron'), JSON.stringify(streamed).slice(0, 160));
+    ok('codex: the stream still closes with a finish reason and a usage frame',
+      chunks.some((c) => c.choices && c.choices[0] && c.choices[0].finish_reason === 'stop')
+        && chunks.some((c) => c.usage && c.usage.prompt_tokens === 17311)
+        && raw.includes('[DONE]'));
+    ok('codex: the answer is not duplicated across chunks',
+      (streamed.match(/Midnight Iron/g) || []).length === 1, streamed.slice(0, 160));
+  }
+  {
+    const models = await (await fetch(base + '/codex/v1/models')).json();
+    ok('codex: model discovery advertises only what this door can select',
+      Array.isArray(models.data) && models.data.length === 1 && models.data[0].id === 'default',
+      JSON.stringify(models.data));
+  }
+
+  // 11b. THE CLAUDE SURFACE IS UNMOVED. The prefix lookup runs in front of
+  // every claude route, so the regression to fear is that it swallowed one.
+  const liveModels = await (await fetch(base + '/v1/models')).json();
+  ok('claude: /v1/models still lists the CLI aliases',
+    Array.isArray(liveModels.data) && liveModels.data.some((m) => m.id === 'sonnet'));
+  const rootHealth = await fetch(base + '/healthz');
+  const rootBody = await rootHealth.json();
+  ok('claude: /healthz is still ok and still names the service and format',
+    rootHealth.status === 200 && rootBody.ok === true
+      && rootBody.service === 'liftrpg-bridge' && rootBody.format === 'openai-compatible');
+  ok('/healthz reports every backend\'s true state',
+    Array.isArray(rootBody.backends) && rootBody.backends.length === 3
+      && rootBody.backends.find((b) => b.name === 'claude').state === 'live'
+      && rootBody.backends.find((b) => b.name === 'codex').state === 'live'
+      && rootBody.backends.find((b) => b.name === 'gemini').state === 'scaffolded',
+    JSON.stringify(rootBody.backends || null).slice(0, 200));
+  // An unknown prefix is still a 404 — the lookup must not adopt every path.
+  const unknown = await fetch(base + '/openai/v1/models');
+  ok('an unnamed prefix is still a 404, not a backend', unknown.status === 404,
+    'got ' + unknown.status);
 
   await new Promise((r) => server.close(r));
   fs.rmSync(dir, { recursive: true, force: true });

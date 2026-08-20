@@ -351,6 +351,65 @@ export var PROVIDERS = {
     modelDiscovery: 'openai',
     noKey: true
   },
+  // ── The bridge's other two backends (2026-08-19) — SCAFFOLDING ─────────
+  // The same bridge process, on the same port, behind a path PREFIX. That is
+  // the whole mechanism, and it is the D94 law again: the OpenAI adapter
+  // builds its endpoint as normalizeUrl(baseUrl) + '/chat/completions' and its
+  // model list as baseUrl + '/models', so a backend is a different baseUrl and
+  // NOTHING else. Not a query param (baseUrl gets a path appended AFTER any
+  // query string, which would break it) and not a header (that would need
+  // client code, which is the change being avoided).
+  //
+  // `modelDiscovery:'openai'` is load-bearing here for exactly the reason it is
+  // on the bridge row above: listProviderModels falls back BY URL SHAPE when
+  // the kind is empty, and that fallback reads any loopback base URL as Ollama.
+  //
+  // THE TWO ROWS ARE NOT IN THE SAME STATE, and each label says which.
+  //
+  // `bridgeCodex` is LIVE, proven end to end on 2026-08-19: a real request
+  // through the real bridge to the real `codex` binary returned a
+  // schema-conforming answer, one-shot and streaming. Its parser was written
+  // from observed transcripts, which is where its three traps came from (the
+  // CLI exits 0 on a FAILED turn; the user's config-pinned model 400s every
+  // call without --ignore-user-config; warnings share the answer's frame type).
+  //
+  // THREE THINGS THE READER IS OWED before choosing it. (1) NO OUTPUT CEILING:
+  // that CLI has no max-tokens lever, so the STAGE_BUDGETS row (D97) is
+  // advisory on this door — stated to the model in words, enforced by nothing.
+  // (2) The CLI prepends its own agent framing, measured at ~17.3k input tokens
+  // on a call whose prompt was six words, and it is charged on every stage.
+  // (3) It is LANDED, not PROVEN: no full book has been built through it.
+  //
+  // These three are OWED TO THE READER, not just to us, and since 2026-08-19
+  // they are said out loud on the door: index.html's BRIDGE_BACKEND_UI carries
+  // a `caveats` array for this backend that states them in plain words under
+  // the Codex chip and above the Build button. This comment is the finding;
+  // that array is the sentence a reader sees. When the CLI grows an output
+  // ceiling or a truncation signal — or when a book finishes through it — both
+  // move in the same change, or the door is telling someone a stale story.
+  //
+  // `bridgeGemini` is SCAFFOLDING. The bridge routes the prefix and answers
+  // every request under it with a fatal, self-describing refusal naming the
+  // blocker — no spawn, no partial success — because that CLI has no auth
+  // configured here and a parser built from zero observed successes is how a
+  // silently-wrong transport ships. The BACKENDS table in the bridge holds what
+  // a follow-up wave owes; the label is what the person choosing sees.
+  bridgeCodex: {
+    label: 'Codex CLI (on this machine — no token ceiling)',
+    baseUrl: 'http://127.0.0.1:8090/codex/v1',
+    defaultModel: 'default',
+    format: 'openai',
+    modelDiscovery: 'openai',
+    noKey: true
+  },
+  bridgeGemini: {
+    label: 'Gemini CLI (on this machine — not implemented yet)',
+    baseUrl: 'http://127.0.0.1:8090/gemini/v1',
+    defaultModel: 'default',
+    format: 'openai',
+    modelDiscovery: 'openai',
+    noKey: true
+  },
   gemini: {
     label: 'Google Gemini',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
