@@ -3337,11 +3337,27 @@ export function cadenceConformanceFloorErrors(weekObj, weekNumber, playSpine) {
     // record and checks as nothing. The schema catches `late` without an
     // introWeek; `window` owes `closesAtWeek`, which is a SIBLING of cadence and
     // so cannot be conditioned on the schema node. Both read one table.
+    //
+    // THE ONE ARM IN THIS FLOOR THAT DOES NOT CARRY THE WEEK'S LABEL (the
+    // teaching audit, 2026-08-20). Every other arm above and below asks the week
+    // for something the week can give — print the surface, or stop printing it —
+    // so an unprefixed `Week N → ` message correctly means "the seat that raised
+    // this owns the fix". This arm does not: the missing number lives on a spine
+    // EDGE, authored at the shell seat and paced by the economy-graph stage, and
+    // the week unit has no field to put it in. Labelled with the owning stage so
+    // repairOwnerForError routes it BACKWARD to the seat that can repair it —
+    // which is the route REPAIR_STAGE_ORDER's own comment already anticipated
+    // and no label had ever made reachable. Guarded upstream today
+    // (validateEconomyGraphStage checks the same table on every edge it returns,
+    // and that stage always precedes weeks), so this fires only if stage order
+    // changes or a resumed checkpoint carries an old spine past the graph gate —
+    // exactly the cases where burning every week attempt on an unfixable defect
+    // would be worst.
     var owed = EDGE_CADENCE_REQUIRED_FIELDS[mode];
     if (owed) {
       var owedValue = owed === 'introWeek' ? cadence.introWeek : edge[owed];
       if (!(Number(owedValue) > 0)) {
-        errors.push('Week ' + wk + ' → the economy-graph edge ' + edgeLabel + ' declares '
+        errors.push('Economy Graph → the economy-graph edge ' + edgeLabel + ' declares '
           + '`cadence.mode: "' + mode + '"` and does not carry `' + owed + '`. That cadence is '
           + 'a promise about WHICH WEEKS the player touches this edge, and without `' + owed + '` '
           + 'it names no week — it reads as a declaration and checks as nothing. Give it '
@@ -6875,7 +6891,19 @@ var REPAIR_STAGE_LABEL_KEYS = {
   // in the document itself routes back to the stage that wrote it. Parity
   // defects deliberately do NOT carry it: they are labelled with the spine seat,
   // because rules-first means the projection changes to serve the source.
-  'game rulebook': 'gameRulebook'
+  'game rulebook': 'gameRulebook',
+  // The teaching audit (2026-08-20). REPAIR_STAGE_ORDER in api-generator.js
+  // already ranks `economyGraph` and says why in so many words — "the cadence
+  // floor blocks at the WEEK gate and names this stage's own declarations, so a
+  // cadence defect found in week 4 must route BACKWARD" — and REPAIR_STAGE_NAMES
+  // already carries its display name. This table was the missing third: no
+  // prefix resolved to the stage, so the route that comment describes could
+  // never be taken. `Economy Graph → ` is the prefix the stage's own gate writes
+  // (validateEconomyGraphStage's `S`), so there is one label for the seat, not
+  // two. Its own errors are unaffected — planRepairRoute refuses a same-stage
+  // owner, which is the behaviour they already had when the prefix resolved to
+  // nothing.
+  'economy graph': 'economyGraph'
 };
 
 /**
@@ -9660,13 +9688,14 @@ export function validateFragmentsStage(result, expectedRegistry, options) {
 
     // ── The answer-bearing seal, fragment seat (the doc-11 class) ──
     // Silent with no `componentInputs`/`demoPassword` on the options (D144's
-    // ungated-caller idiom). THIS SEAT IS NOT YET ARMED: neither pipeline puts
-    // the collected values on the fragment stage's config, so today this fires
-    // only through the assembled path, which HAS the whole booklet. Arming it
-    // is two option properties at the two fragment seats in api-generator.js —
-    // reported to the orchestrator, and deliberately not claimed here, because
-    // a registry row with an `armedBy` that does not resolve is the disarmed
-    // state W1 shipped by accident (D199).
+    // ungated-caller idiom). ARMED at W7's close: the week loop's collected
+    // component values ride the fragment config and reach all three fragment
+    // seats as the `componentInputs` option (`// W7-ARM seal-single`,
+    // `seal-batch`, `seal-sf` in api-generator.js), and the registry row's
+    // `armedBy` anchors those three marker comments — so this seat now fires on
+    // the staged path, not only through the assembled one. (This comment said
+    // the opposite until the teaching audit, 2026-08-20, caught it; a stale
+    // "not yet armed" note is how a live floor gets armed twice.)
     var answersOut = collectAnswerBearingFragmentFloorErrors(
       result.fragments, (options || {}).componentInputs);
     if (answersOut.length > 0) return fragmentVerdict(answersOut);
