@@ -5127,6 +5127,94 @@ export function buildSurfaceIndex(booklet) {
   return index;
 }
 
+// ── THE FIXED-FORM REF KINDS (the proving-run-4 defect, 2026-08-20) ────────
+// Two classes of surface id, and the difference is knowable WITHOUT a book.
+//
+// A ref kind whose ids `deriveWeekSurfaces()` mints from the week and session
+// NUMBERS can only ever hold a W-shaped id. Read that function: `markStrip` is
+// noted as `'W' + n` and `'W' + n + '.' + (si + 1)` and by no other route, so
+// `markStrip:Night` is not a name that happens to be missing from this book —
+// it is a name no LiftRPG book can ever have. `week`, `reckoning`, `oracle`,
+// `cipher` and `door` are the same: one note apiece, all of them `'W' + n`.
+// The other kinds — `clock`, `map`, `companion`, `fragment`, `seal`, `ending` —
+// take their ids from AUTHORED strings (clock names, region titles, fragment
+// ids), so a narrative label there is exactly right and must not be refused.
+//
+// D178'S "GRAMMAR ONLY AT THIS SEAT" IS SCOPED BY THIS, NOT VIOLATED. That
+// ruling's own rationale is quoted at its site below: "a ref cannot be resolved
+// against an index that has nothing in it." True for the declared kinds — at
+// the rulebook seat no clock has been written, so `clock:Relief Ledger` is a
+// forward promise and blocking it would make the design undeclarable. FALSE for
+// the derived kinds, whose legal SHAPE is knowable from the grammar alone, with
+// no index, no weeks and no content. This check is therefore syntactic and
+// fires here, where a refusal costs milliseconds, instead of two seats and two
+// paid 900-second attempts later at the shell gate — which is what it cost,
+// twice, on proving run 4 (`markStrip:Night`, and three more the shell gate
+// would have waved through as forward promises: `oracle:Arrivals`,
+// `cipher:Ledger`, `door:Threshold`).
+//
+// SHAPE ONLY, NEVER ARITY, and the restraint is deliberate. `surfaceRefResolves`
+// accepts any week-shaped id for any kind (`if (weekNo !== null) return ok`), so
+// `session:W3` resolves everywhere else in the machine. Refusing it here alone
+// would be a demand nobody diagnosed, blocking a book for something every other
+// seat tolerates. Separators are tolerated for the same reason: the index slugs
+// through `toSlugWords`, so `W3.2`, `W3-2` and `W3 2` are one id downstream and
+// all three must pass.
+//
+// ONE HOME, TWO READERS (D93/D133's idiom), and the second reader is why this
+// block sits beside surfaceRefResolves rather than inside the rulebook floors:
+//   · validateGameRulebookStage — the cheap kill, at the seat that writes the
+//     ref first, before a single week exists.
+//   · surfaceRefResolves        — every spine seat and the simulated player.
+// The second reader is not tidiness. The shell gate's PROMISE RULE accepts any
+// ref of a kind the index has no bucket for, and at the shell seat the skeleton
+// has no oracle, cipher or door — so of the FOUR derived-kind inventions in the
+// real run-4 rulebook (`markStrip:Night` `oracle:Arrivals` `cipher:Ledger`
+// `door:Threshold`) exactly ONE was ever reported. The other three were forward
+// promises to a machine and impossibilities to a printer, and the only gate that
+// would have seen them is report-class. A promise rule that cannot tell a
+// promise from an impossibility is what this predicate repairs.
+var FIXED_FORM_REF_KINDS = {
+  week: 1, session: 1, markStrip: 1, reckoning: 1, oracle: 1, cipher: 1, door: 1
+};
+var FIXED_FORM_REF_SHAPE = /^w\s*\d+(?:\s*[.\-]?\s*\d+)?$/i;
+
+/**
+ * fixedFormRefReason(parsed) -> string
+ *
+ * '' when the parsed ref is fine (a singleton, a declared kind, or a derived
+ * kind already written W-shaped — none of which this predicate has an opinion
+ * about), otherwise the reason clause: why it can never resolve and the shape
+ * to write instead. A CLAUSE, not a sentence, so both readers can prefix it
+ * with the ref in their own field's grammar and the wording stays identical.
+ */
+function fixedFormRefReason(parsed) {
+  var p = parsed || {};
+  if (!p.valid || !p.id) return '';
+  if (!FIXED_FORM_REF_KINDS[p.kind]) return '';
+  if (FIXED_FORM_REF_SHAPE.test(String(p.id).trim())) return '';
+  var sessioned = p.kind === 'session' || p.kind === 'markStrip';
+  return 'gives the `' + p.kind + '` the id "' + p.id
+    + '", and ' + p.kind + ' ids are DERIVED from the week and session numbers, never named'
+    + ' — write `' + p.kind + ':W3` for the week-3 surface'
+    + (sessioned ? ' or `' + p.kind + ':W3.2` for session 2 of week 3' : '')
+    + '. A narrative label here names a surface this book will never print, whatever else it'
+    + ' contains. Name it by its number, and put the world-name in the prose.';
+}
+
+/**
+ * fixedFormRefShapeError(ref) -> string
+ *
+ * The rulebook seat's reading: '' or the message with the offending ref quoted
+ * in front of it. The caller supplies the field path, so one message serves all
+ * four ref-carrying rulebook fields and the registry needs one anchor.
+ */
+function fixedFormRefShapeError(ref) {
+  var parsed = parseSurfaceRef(ref);
+  var reason = fixedFormRefReason(parsed);
+  return reason ? '"' + parsed.raw + '" ' + reason : '';
+}
+
 // A week-shaped id ('W3', 'W3.2') the index can place. Returns the week number
 // or null — the ordering floors need the NUMBER, not just existence.
 function surfaceRefWeek(parsed) {
@@ -5157,6 +5245,14 @@ export function surfaceRefResolves(index, ref) {
   if (weekNo !== null && !index.weeks[weekNo]) {
     return { ok: false, reason: 'names week ' + weekNo + ', which this book does not have' };
   }
+  // THE SHAPE QUESTION, ASKED BEFORE THE PROMISE RULE (2026-08-20). A derived
+  // kind's id is knowable without an index, so the promise rule below must not
+  // get to wave one through: `oracle:Arrivals` at the shell seat finds no
+  // oracle bucket and is accepted as an intention, and the intention is
+  // unbuildable. Ordered after the week check so `markStrip:W99` keeps the
+  // better message (the shape is right; the week is not).
+  var shapeReason = fixedFormRefReason(parsed);
+  if (shapeReason) return { ok: false, reason: shapeReason };
   // THE PROMISE RULE. The spine is declared before content exists, so a name
   // check has teeth exactly where the stage already knows the names:
   //   - nothing of this kind is authored yet  -> forward promise, accept. At
@@ -5500,6 +5596,11 @@ export function validateGameRulebookStage(result, options) {
       errors.push(S + 'gameRulebook.coreVerbs.verbs[' + vi + '].on "' + on
         + '" is not a surface ref — write it in the `kind:id` grammar from the Surface refs'
         + ' section, or the next stage cannot wire the verb to anything');
+    } else {
+      var onShape = fixedFormRefShapeError(on);
+      if (onShape) {
+        errors.push(S + 'gameRulebook.coreVerbs.verbs[' + vi + '].on ' + onShape);
+      }
     }
   });
 
@@ -5525,6 +5626,14 @@ export function validateGameRulebookStage(result, options) {
       if (!parseSurfaceRef(raw).valid) {
         errors.push(S + 'gameRulebook.' + row[0] + '.' + row[1] + '[' + ri + '] "' + raw
           + '" is not a surface ref — write it in the `kind:id` grammar from the Surface refs section');
+      } else {
+        // The SHAPE half of the same rule (see fixedFormRefShapeError above):
+        // grammar-only at this seat still, because a derived kind's legal form
+        // needs no index.
+        var listShape = fixedFormRefShapeError(raw);
+        if (listShape) {
+          errors.push(S + 'gameRulebook.' + row[0] + '.' + row[1] + '[' + ri + '] ' + listShape);
+        }
       }
     });
   });
@@ -5600,6 +5709,11 @@ export function validateGameRulebookStage(result, options) {
           + (ritualOn ? '"' + ritualOn + '" is not a surface ref' : 'is empty')
           + ' — the ritual happens somewhere, and the next stage has to wire it to that surface;'
           + ' write it in the `kind:id` grammar from the Surface refs section');
+      } else {
+        var ritualShape = fixedFormRefShapeError(ritualOn);
+        if (ritualShape) {
+          errors.push(S + 'gameRulebook.sessionShape.ritual.on ' + ritualShape);
+        }
       }
     }
   }

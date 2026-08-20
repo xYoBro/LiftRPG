@@ -4118,6 +4118,17 @@
         return '`' + String(r).trim() + '`';
       }).join(' '));
     }
+    // THE RITUAL'S SURFACE, on the same list as the verbs' (2026-08-20). The
+    // spine seat is required to carry `sessionShape.ritual.on` as a graph node
+    // (`parity-ritual-surface-into-graph`), and until this line it was the one
+    // ref-bearing rulebook field the given never echoed — so the seat that must
+    // wire it was shown the rule and not the value. Every other declaration
+    // below travels; this one was simply missed.
+    var ritual = (rulebook.sessionShape || {}).ritual;
+    var ritualOn = String(((ritual && typeof ritual === 'object') ? ritual.on : '') || '').trim();
+    if (ritualOn) {
+      declared.push('- The session opens on: `' + ritualOn + '`');
+    }
     if (declared.length) {
       lines.push('### The declarations this book is held to');
       lines = lines.concat(declared);
@@ -4455,12 +4466,27 @@
   window.INST_SURFACE_REFS = [
     '## Surface refs — how this book points at its own parts',
     'Every reference to a printed surface is written as `kind:id`, or as one of three singletons.',
-    'Kinds: `week:W3` `session:W3.2` `markStrip:W3.2` `reckoning:W3` `clock:<clock name>`',
-    '`oracle:W4` `cipher:W2` `map:<region or board name>` `companion:<label>` `fragment:F.07`',
-    '`door:W5` `seal:<fragment id>` `ending:E2`',
+    '',
+    '### DERIVE OR DECLARE — the id is one or the other, and guessing costs an attempt',
+    'SOME IDS ARE DERIVED, and you do not get to name them. The weeks and sessions of this book',
+    'are numbered by the training program, so every surface that sits ON a week or a session is',
+    'identified by that number and by nothing else. The id is always `W<week>`, or',
+    '`W<week>.<session>` where a single session is meant:',
+    'Kinds: `week:W3` `session:W3.2` `markStrip:W3.2` `reckoning:W3` `oracle:W4` `cipher:W2`',
+    '`door:W5`',
+    'A world-name in one of these — `markStrip:Night`, `oracle:Arrivals`, `door:Threshold` —',
+    'points at a surface this book will never print, however good the name is. The mark strip on',
+    'week 3 is `markStrip:W3` even in a book about nights; call it the Night Register in the',
+    'prose and `W3` in the ref.',
+    '',
+    'SOME IDS ARE DECLARED, and those are yours. The id is the name you are actually giving the',
+    'surface elsewhere in this book, spelled the same way every time you point at it:',
+    '`clock:<clock name>` `map:<region or board name>` `companion:<label>` `fragment:F.07`',
+    '`seal:<fragment id>` `ending:E2`',
+    '',
     'Singletons (no id — a book has at most one): `banked` `boss` `assembly`',
-    'Use the names you are actually giving these surfaces. A ref to a week this book does',
-    'not have, or to a fragment outside your registry, is a blocking error.'
+    'A ref to a week this book does not have, or to a fragment outside your registry, is a',
+    'blocking error.'
   ];
 
   window.INST_LUDIC_SPINE = [
