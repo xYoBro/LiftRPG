@@ -5464,6 +5464,16 @@ async function runApiPipeline(options) {
       // holds this week to ride the spine's economyGraph edges, so this one
       // option arms both the closure floors and cadence conformance.
       playSpine: ((shell || {}).meta || {}).playSpine || null,   // W3-ARM week-cadence
+      // ── THE BOOK-SCOPE INVENTORY, for the weekless-edge floor ─────────────
+      // A spine edge out of `banked` / `boss` / `assembly` names no week, so no
+      // single week's own payload can answer whether the book prints its
+      // surface. `weekCount` tells the floor which week is the LAST one (the
+      // only seat holding the whole union) and `priorWeeks` is what this run has
+      // banked so far. SLICED, not referenced: `finalWeeks` is appended after
+      // this stage returns, and the object the validator receives must be fixed
+      // for the whole iteration (the D173 hoisting rule).
+      weekCount: weekCount,
+      priorWeeks: finalWeeks.slice(),   // W9-ARM week-weekless
       owesLudicEntry: owesLudic,
       // The currency, for the week gate's conversion floor. Declared at the
       // shell stage, printed by THIS stage, and until now graded only after
@@ -7138,6 +7148,11 @@ async function runSkeletonFleshPipeline(options) {
       spineStageLabel: 'Skeleton',
       mechanicGrammarFamily: (((skeleton || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily || '',
       playSpine: ((skeleton || {}).meta || {}).playSpine || null,   // W3-ARM week-sf-cadence
+      // This pipeline's twin of the multi-stage rows — see there for why the
+      // weekless-edge floor needs the book's own week count and the weeks
+      // banked so far, and why the array is sliced rather than referenced.
+      weekCount: actualWeekCount,
+      priorWeeks: weekOutputs.slice(),   // W9-ARM week-sf-weekless
       // The arsenal row this week owes, if any — the same object the
       // prompt states as a GIVEN (D170).
       owesLudicEntry: owesLudicSF,

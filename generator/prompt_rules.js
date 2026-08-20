@@ -306,6 +306,17 @@
     '- If the rules describe a clock as something the player touches every week, it belongs in',
     '  every week. A clock that only arrives later should say from which week in the rulebook\'s',
     '  weekShape answer.',
+    // ── THE TAUGHT HALF of weeklessEdgeRedemptionFloorErrors (the forge's
+    // HOLE 1, 2026-08-20). The sentence above covers edges that name a week.
+    // An edge out of `banked` / `boss` / `assembly` names none, so no single
+    // week owes it — and until this floor landed, nobody did. Registry row
+    // `week-weekless-edge-redeemed` holds the two halves together.
+    '- A spine edge that names NO week (one out of `banked`, `boss` or `assembly`) still names a',
+    '  real surface. `banked -> clock:<name>`, `banked -> map:<name>` and `banked -> companion:<name>`',
+    '  each promise that SOME week of this book prints that clock, map or companion under exactly',
+    '  that name. Any week may keep the promise, so if the surface has not appeared by the final',
+    '  week, the final week owes it — print it there, or the book ships an economy the reader is',
+    '  told about and can never touch.',
     '',
     '### bossEncounter',
     '- Shape: { title, narrative, mechanismDescription, componentInputs, decodingKey, convergenceProof, passwordRevealInstruction, binaryChoiceAcknowledgement?: { ifA, ifB } }',
