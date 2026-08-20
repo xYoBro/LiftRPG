@@ -204,7 +204,53 @@ export var STAGE_BUDGETS = {
   // third attempt is bought against the cost of a stopped run rather than
   // against the cost of a call. The prompt-side fix (the derived GIVENS block)
   // is the load-bearing half; this is the cushion under it.
-  shell:      { maxTokens: 56000, timeoutMs: 900000, attempts: 3 },
+  // ── THE SHELL SPLIT: one row became four (PROVISIONAL) ──────────────────
+  // The `shell` row is GONE rather than kept as an alias, and that asymmetry
+  // with STAGE_SCHEMA_MAP (where `'shell'` survives) is the right one: the map
+  // row survives because the GUIDED WIZARD builds a real prompt from it, and
+  // that door pastes rather than calls, so it spends no token budget at all.
+  // Nothing dispatches `stageBudget('shell')` any more, and a row for a stage
+  // no caller names is a number that goes stale unobserved.
+  //
+  // DERIVATION, named as the economy protocol asks. Not a guess and not a
+  // proportional slice of 56,000 for its own sake: the four numbers come from
+  // the MEASURED output shares of the real 2026-08-19 banked shell
+  // (liftrpg-checkpoint-2026-08-19T0300.json, the six-week delivered book),
+  // serialized per surface —
+  //
+  //     identity (meta minus designLanguage/arrangement/playSpine)  12,014 ch  37.5%
+  //     rules    (cover + rulesSpread)                               6,231 ch  19.5%
+  //     theme    (theme + designLanguage + arrangement)              1,991 ch   6.2%
+  //     spine    (meta.playSpine)                                   11,797 ch  36.8%
+  //                                                                 ─────────
+  //                                                                 32,033 ch
+  //
+  // — at roughly four characters per token, and then carried at the SAME
+  // generosity ratio the 56,000 row already ran at (~7× the largest observed
+  // payload, bought against the cost of a truncation rather than the cost of a
+  // call). The four sum to 64,000 rather than 56,000 and that is correct: they
+  // are four separate ceilings on four separate calls, never one budget shared.
+  //
+  // PROVISIONAL, every row, until the proving round measures a real split run.
+  // One book is one draw; these shares are that book's, and a spine-heavy or a
+  // rules-heavy brief will move them. The row that would hurt first is
+  // `shellTheme` — it is the smallest and the one whose payload is least
+  // predictable, so it carries the largest headroom multiple of the four.
+  //
+  // ATTEMPTS. The 56,000 row's third attempt was bought for CROSS-REFERENCE
+  // DENSITY, and that density did not divide evenly: it is almost entirely the
+  // spine's (the decisionLedger row-per-door failure that earned the row is a
+  // playSpine defect) with a second concentration at the identity seat, whose
+  // floors read the rulebook, the brief and the die at once. Those two keep
+  // three. `shellRules` keeps three as well — its floors are the content ones
+  // that have failed real books (rules teaching, orientation, assembly
+  // disclosure). `shellTheme` takes the ladder default of two: its floors are
+  // enum-shaped and mostly auto-repairable, and D166's rule is that an attempt
+  // is raised on evidence, not on symmetry.
+  shellIdentity: { maxTokens: 24000, timeoutMs: 600000, attempts: 3 },
+  shellRules:    { maxTokens: 12000, timeoutMs: 480000, attempts: 3 },
+  shellTheme:    { maxTokens: 6000,  timeoutMs: 300000 },
+  shellSpine:    { maxTokens: 22000, timeoutMs: 600000, attempts: 3 },
   fragment:   { maxTokens: 24000, timeoutMs: 720000 },
   // Critic loop (D66). Both rows were sized before the critic had eight
   // dimensions and machine findings, and both were the smallest rows in the

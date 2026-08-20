@@ -141,6 +141,11 @@ import {
   validateWeekSchema,
   normalizeShellShape,
   validateShellSchema,
+  validateShellIdentitySchema,
+  validateShellRulesSchema,
+  validateShellThemeSchema,
+  validateShellSpineSchema,
+  shellStageLabel,
   validateAssembledBooklet,
   validateLayerBibleStage,
   normalizeCampaignPlanOwnership,
@@ -1030,6 +1035,122 @@ function withPlaySpine(schema) {
       meta: Object.assign({}, meta, { properties: nextProps, required: nextRequired })
     })
   });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// THE SHELL SPLIT — four transport schemas, DERIVED (the shell split)
+// ══════════════════════════════════════════════════════════════════════════
+//
+// STRUCTURED_SCHEMA_SHELL above stays the ONE authored literal. The four
+// sub-stage schemas are SLICES of it, computed here, and that is not a style
+// choice: a hand-written second copy of `artifactIntent` or `orientation` is
+// the skeleton-triple defect (D101) — two surfaces describing one field,
+// drifting one at a time, and the drift shows as a stage failing on output its
+// own prompt demanded. Add a property to the literal above and the owning
+// sub-stage gets it for free; there is nothing to remember.
+//
+// THE PARTITION IS ASSERTED, NOT ASSUMED: `shellSubSchemaPartition()` below is
+// exported on the manual surface and checked by the floors harness — every
+// property of the union literal is claimed by exactly one sub-stage, and every
+// `required` entry rides with its property.
+//
+// KNOWN BLIND SPOT, INHERITED AND WIDENED (D220's note): the schemas defined in
+// this file are not vm-evaluable from prompt_rules.js, so `gradeTransport`'s
+// arsenal-audit walk does not see them. This change adds three more unwalked
+// schemas to the four already there. Not fixed here — the auditor's reach is
+// its own wave — but stated so the number is known.
+
+// The meta properties each sub-stage owns. `arrangement` and `playSpine` are
+// absent on purpose: they are injected by withArrangement/withPlaySpine from
+// prompt_rules.js's own literals, the same borrow the monolith used.
+var SHELL_META_BY_SUB_STAGE = {
+  shellIdentity: ['schemaVersion', 'generatedAt', 'blockTitle', 'blockSubtitle', 'worldContract',
+    'narrativeVoice', 'literaryRegister', 'structuralShape', 'artifactIdentity', 'artifactIntent',
+    'economy', 'weeklyComponentType', 'passwordEncryptedEnding', 'liftoScript'],
+  shellRules: [],
+  shellTheme: ['designLanguage'],
+  shellSpine: []
+};
+
+// The top-level properties each sub-stage owns.
+var SHELL_TOP_BY_SUB_STAGE = {
+  shellIdentity: [],
+  shellRules: ['cover', 'rulesSpread'],
+  shellTheme: ['theme'],
+  shellSpine: []
+};
+
+function pickSchemaProps(node, keys) {
+  var props = {};
+  var required = [];
+  keys.forEach(function (key) {
+    if (!Object.prototype.hasOwnProperty.call(node.properties, key)) {
+      throw new Error('[LiftRPG] shell sub-schema names "' + key + '", which STRUCTURED_SCHEMA_SHELL '
+        + 'does not carry — the slice and the literal have drifted.');
+    }
+    props[key] = node.properties[key];
+    if ((node.required || []).indexOf(key) !== -1) required.push(key);
+  });
+  return { type: 'object', properties: props, required: required };
+}
+
+function buildShellSubSchema(subStage) {
+  var metaKeys = SHELL_META_BY_SUB_STAGE[subStage];
+  var topKeys = SHELL_TOP_BY_SUB_STAGE[subStage];
+  var out = pickSchemaProps(STRUCTURED_SCHEMA_SHELL, topKeys);
+  // `shellRules` authors no meta at all and gets no meta node — asking a stage
+  // for an empty object it must not fill is how a model decides to fill it.
+  // The other three carry one: shellIdentity for its own fields, shellTheme and
+  // shellSpine as the node withArrangement/withPlaySpine press their borrowed
+  // literals onto (an empty `required` there means "nothing but what is about
+  // to be injected").
+  if (subStage !== 'shellRules') {
+    out.properties.meta = pickSchemaProps(STRUCTURED_SCHEMA_SHELL.properties.meta, metaKeys);
+    out.required = out.required.concat(['meta']);
+  }
+  return out;
+}
+
+var STRUCTURED_SCHEMA_SHELL_IDENTITY = buildShellSubSchema('shellIdentity');
+var STRUCTURED_SCHEMA_SHELL_RULES = buildShellSubSchema('shellRules');
+var STRUCTURED_SCHEMA_SHELL_THEME = buildShellSubSchema('shellTheme');
+var STRUCTURED_SCHEMA_SHELL_SPINE = buildShellSubSchema('shellSpine');
+
+/**
+ * shellSubSchemaPartition() -> { unclaimed, doubled, byStage }
+ *
+ * THE PARTITION'S OWN GATE. The four slices must together claim every property
+ * of STRUCTURED_SCHEMA_SHELL exactly once, or a field the monolith demanded is
+ * a field no sub-stage asks for — and that failure is SILENT: the run
+ * completes, the gate that reads the field is the one that fails, three stages
+ * later, on a model that was never asked.
+ *
+ * `arrangement` and `playSpine` are exempt by construction — they are not in
+ * the union literal at all (injected from prompt_rules.js), so they cannot be
+ * unclaimed here. Their own routing is asserted by the stage wiring below.
+ */
+function shellSubSchemaPartition() {
+  var stages = ['shellIdentity', 'shellRules', 'shellTheme', 'shellSpine'];
+  var seen = {};
+  var doubled = [];
+  var byStage = {};
+  stages.forEach(function (s) {
+    byStage[s] = { top: SHELL_TOP_BY_SUB_STAGE[s].slice(), meta: SHELL_META_BY_SUB_STAGE[s].slice() };
+    SHELL_TOP_BY_SUB_STAGE[s].forEach(function (k) {
+      if (seen['top:' + k]) doubled.push('top:' + k); seen['top:' + k] = s;
+    });
+    SHELL_META_BY_SUB_STAGE[s].forEach(function (k) {
+      if (seen['meta:' + k]) doubled.push('meta:' + k); seen['meta:' + k] = s;
+    });
+  });
+  var unclaimed = [];
+  Object.keys(STRUCTURED_SCHEMA_SHELL.properties).forEach(function (k) {
+    if (k !== 'meta' && !seen['top:' + k]) unclaimed.push('top:' + k);
+  });
+  Object.keys(STRUCTURED_SCHEMA_SHELL.properties.meta.properties).forEach(function (k) {
+    if (!seen['meta:' + k]) unclaimed.push('meta:' + k);
+  });
+  return { unclaimed: unclaimed, doubled: doubled, byStage: byStage };
 }
 
 var STRUCTURED_SCHEMA_FRAGMENTS = {
@@ -1942,9 +2063,56 @@ var REPAIR_STAGE_ORDER = [
   // declarations, so a cadence defect found in week 4 must route BACKWARD past
   // three banked weeks to the seat that wrote the cadence. A stage missing from
   // this table ranks -1 and its repairs vanish.
+  // THE SHELL SPLIT ranks the four sub-stages in RUN ORDER, which is what this
+  // table is for: a defect found at the spine seat that belongs to the identity
+  // seat must route BACKWARD, and it can only do that if identity ranks lower.
+  // `shell` is gone from this table rather than kept as an alias — a legacy
+  // `Shell → ` prefix now resolves to `shellIdentity` at the label table
+  // (REPAIR_STAGE_LABEL_KEYS), so it arrives here already translated, and a row
+  // for a stage no pipeline runs is a route that re-enters nothing.
   'workoutCanonical', 'canonicalize', 'gameRulebook', 'layerBible', 'campaignPlan',
-  'skeleton', 'shell', 'knowing', 'economyGraph', 'rules', 'weeks', 'fragments', 'endings'
+  'skeleton', 'shellIdentity', 'shellRules', 'shellTheme', 'shellSpine',
+  'knowing', 'economyGraph', 'rules', 'weeks', 'fragments', 'endings'
 ];
+
+// The four seats one Booklet Setup became. One home, read by the repair sweep,
+// the rail wiring and the harness — a second hand-written list of these four is
+// the roster that drifts (D242's lesson at a smaller scale).
+var SHELL_SUB_STAGE_KEYS = ['shellIdentity', 'shellRules', 'shellTheme', 'shellSpine'];
+
+/**
+ * mergeShellParts(...parts) -> shell
+ *
+ * ONE MERGE, used by every sub-stage gate and by the delivered object. Shallow
+ * at the top, one level deep on `meta`, which is exactly the shape of the
+ * split: four sub-stages write four disjoint sets of top-level keys, and three
+ * of them write disjoint `meta` fields. A deep merge would be a licence for a
+ * later sub-stage to overwrite an earlier one's decision, which is the whole
+ * thing the GIVENS exist to prevent — so later parts add fields and never
+ * replace a `meta` object wholesale.
+ *
+ * MODULE SCOPE, not a closure inside the pipeline, so the integration harness
+ * (scripts/check-shell-split.mjs) can prove "the four banked parts ARE the
+ * monolith's shell" through THIS function rather than through a second
+ * implementation of it — which is the D93 defect wearing a test's clothes: two
+ * merges, one of them never exercised by a run.
+ */
+function mergeShellParts() {
+  var out = { meta: {} };
+  for (var i = 0; i < arguments.length; i++) {
+    var part = arguments[i];
+    if (!part || typeof part !== 'object') continue;
+    Object.keys(part).forEach(function (key) {
+      if (key === 'meta') {
+        var m = part.meta || {};
+        Object.keys(m).forEach(function (mk) { out.meta[mk] = m[mk]; });
+      } else {
+        out[key] = part[key];
+      }
+    });
+  }
+  return out;
+}
 
 // A routing loop is a new failure mode, so the hops are bounded and the
 // same-wall-twice → fresh-rebuild policy stays as the outermost resort.
@@ -2057,7 +2225,17 @@ var REPAIR_STAGE_NAMES = {
   layerBible: 'Layer Codex',
   campaignPlan: 'Story Plan',
   skeleton: 'Skeleton',
-  shell: 'Booklet Setup',
+  // ── THE SHELL SPLIT's four display names ──────────────────────────────
+  // UNIFIED WITH index.html's STAGE_LABELS by ruling: before the split these
+  // two tables disagreed about the same seat (`Identity` on the rail,
+  // `Booklet Setup` in every repair directive), so a directive and a UI card
+  // said different words for the same card. One convention now, both tables,
+  // asserted by the floors harness. "Booklet Setup" survives as the FAMILY
+  // name in prose, not as any one seat's label.
+  shellIdentity: 'Identity',
+  shellRules: 'Rules & Cover',
+  shellTheme: 'Theme & Layout',
+  shellSpine: 'Play Spine',
   knowing: 'World Detail',
   rules: 'Rules Spread',
   weeks: 'Week',
@@ -2367,7 +2545,17 @@ function getApiPromptBuilders() {
     gameRulebook: window.generateGameRulebookPrompt,
     stage1: window.generateApiStage1Prompt || window.generateStage1Prompt,
     stage2: window.generateApiStage2Prompt || window.generateStage2Prompt,
-    shell: window.generateApiShellPrompt || window.generateShellPrompt,
+    // ── THE SHELL SPLIT: four seats where one stood ────────────────────
+    // `shell` is GONE from this registry rather than aliased, and that is the
+    // point: an alias would let a caller keep dispatching the monolith against
+    // four gates that each expect a quarter, and the failure would be a run
+    // that pays once and is refused four times.
+    // `window.generateApiShellPrompt` still exists — as the union MEASUREMENT
+    // surface on the `window.generatePrompt()` precedent (D189), never a door.
+    shellIdentity: window.generateApiShellIdentityPrompt,
+    shellRules: window.generateApiShellRulesPrompt,
+    shellTheme: window.generateApiShellThemePrompt,
+    shellSpine: window.generateApiShellSpinePrompt,
     // Shared with the Skeleton+Flesh pipeline — same builder, same head.
     knowing: window.generateKnowingPrompt,
     // §4.11 — the economy graph's week axis. Staged pipelines only: S+F is
@@ -2393,8 +2581,14 @@ function getApiPromptBuilders() {
 }
 
 function assertApiPromptBuilders(builders) {
+  // THE SHELL SPLIT: four builders where `shell` stood. Named individually
+  // rather than collapsed behind a helper, because this guard's whole job is to
+  // fail LOUDLY at the top of a run instead of at the seat that needs the
+  // missing builder — twelve stages in, with everything upstream paid for.
   if (!builders.gameRulebook || !builders.economyGraph ||
-    !builders.stage1 || !builders.stage2 || !builders.shell || !builders.knowing ||
+    !builders.stage1 || !builders.stage2 || !builders.knowing ||
+    !builders.shellIdentity || !builders.shellRules
+    || !builders.shellTheme || !builders.shellSpine ||
     !builders.singleWeekFinal ||
     !builders.singleFragment ||
     !builders.fragmentBatch || !builders.singleEnding) {
@@ -4299,7 +4493,12 @@ async function runApiPipeline(options) {
   // draws one more card than the counter knows about is the D110 UI lie in
   // miniature. BOTH assignments move together: this one and the mid-run
   // recompute below, which is an ASSIGNMENT and silently overwrites this.
-  var totalStages = 6 + weekCount + 2;
+  // THE SHELL SPLIT made `shell` four seats, so the setup count is 9, not 6
+  // (rulebook, codex, campaign, shellIdentity, shellRules, shellTheme,
+  // shellSpine, knowing, economyGraph). BOTH assignments move together — see
+  // the mid-run recompute below, which is an ASSIGNMENT and silently
+  // overwrites this one.
+  var totalStages = 9 + weekCount + 2;
   var stageNum = 0;
   // Whether the canonicalize stage counted itself (0 or 1). It bumps
   // `totalStages` when it runs — and the mid-run recompute below is an
@@ -4374,6 +4573,17 @@ async function runApiPipeline(options) {
   var divergenceSeed = resolveRepairAwareSeed(repairSeedCarry,
     earliestSeedCarrier(
       (checkpoint && checkpoint.stages && checkpoint.stages.gameRulebook) || null,
+      // THE SHELL SPLIT: the earliest banked SHELL seat, in run order. A resume
+      // that banked identity and died at the spine must reuse identity's seed,
+      // not draw a fresh one — the spine would then be wired for a world the
+      // banked identity was not designed under, and nothing would throw.
+      (checkpoint && checkpoint.stages && checkpoint.stages.shellIdentity) || null,
+      (checkpoint && checkpoint.stages && checkpoint.stages.shellRules) || null,
+      (checkpoint && checkpoint.stages && checkpoint.stages.shellTheme) || null,
+      (checkpoint && checkpoint.stages && checkpoint.stages.shellSpine) || null,
+      // The pre-split monolith, last: a checkpoint written before the split is
+      // migrated into the four keys above at the resume seat, so this only
+      // answers for a carrier the migration could not reach.
       (checkpoint && checkpoint.stages && checkpoint.stages.shell) || null
     ), brief);
   // The assignments are a pure function of the seed, so a resume and a repair
@@ -4621,178 +4831,346 @@ async function runApiPipeline(options) {
   // (see the block above repairDirectiveFor) — from the cached compiler stage
   // when resuming, drawn exactly once otherwise. See resolveRunSeed.
 
+  // ══════════════════════════════════════════════════════════════════════
+  // THE BOOKLET SETUP, IN FOUR (the shell split)
+  // ══════════════════════════════════════════════════════════════════════
+  //
+  // One 155,000-character call authoring four sibling booklet surfaces became
+  // four sequential, individually-banked, individually-retryable calls:
+  //
+  //     shellIdentity → shellRules → shellTheme → shellSpine
+  //
+  // THE PRIMARY MECHANISM IS SEQUENCING WITH FIXED GIVENS, not smaller
+  // prompts. The measured failure this attacks is a COMPLETE, well-formed
+  // response whose spine contradicts an identity decision made earlier in the
+  // same call — a model reconciling four designs at once against a doctrine
+  // bundle it read forty thousand characters ago. A decision handed over as a
+  // finished GIVEN is not a decision the next call can drift from.
+  //
+  // The cheaper wins ride along: a failed retry re-pays a quarter instead of
+  // the monolith, and each call carries its own timeout.
+  //
+  // EACH SUB-STAGE'S GATE IS HANDED THE ACCUMULATED SHELL, never its own bare
+  // payload. It has to be: `theme.visualArchetype`'s obedience evidence lives
+  // at `meta.artifactIntent.selectionReason`, which the identity stage wrote
+  // three calls earlier, and a gate asked for evidence its own payload
+  // structurally cannot carry fails every book. See mergeShellParts below.
+  var shellIdentityStage, shellRulesStage, shellThemeStage, shellSpineStage;
   var shell;
-  if (checkpoint && checkpoint.stages && checkpoint.stages.shell) {
-    shell = checkpoint.stages.shell;
-    stageNum++;
-    console.log('[LiftRPG] Resumed: Booklet Setup (cached)');
-    emitPipelineEvent(onProgress, stageNum, totalStages, 'Booklet setup restored from checkpoint.', {
-      phase: 'complete',
-      stageKey: 'shell',
-      stageName: 'Booklet Setup',
-      completionSource: 'checkpoint'
+
+  // ── THE PRE-SPLIT CHECKPOINT MIGRATION ────────────────────────────────
+  // A checkpoint banked before this split carries one `stages.shell` holding
+  // {meta, cover, rulesSpread, theme}. Projected into the four slots it stops
+  // being a stranded payment: all four sub-stages restore from cache and the
+  // resume costs nothing. Additive and one-directional — the monolith key is
+  // left in place, so a checkpoint written today still opens in a build of
+  // this code from before the split.
+  //
+  // `checkpoint.js` itself is untouched: it has never carried a shell
+  // reference (its storage is generic over stage keys), so this belongs at the
+  // resume seat that knows what a shell IS, not in the persistence module.
+  if (checkpoint && checkpoint.stages && checkpoint.stages.shell
+      && !checkpoint.stages.shellIdentity && !checkpoint.stages.shellRules
+      && !checkpoint.stages.shellTheme && !checkpoint.stages.shellSpine) {
+    var legacyShell = checkpoint.stages.shell;
+    var legacyMeta = legacyShell.meta || {};
+    var legacyIdentityMeta = {};
+    Object.keys(legacyMeta).forEach(function (k) {
+      if (k === 'playSpine' || k === 'arrangement' || k === 'designLanguage') return;
+      legacyIdentityMeta[k] = legacyMeta[k];
     });
-  } else {
-    progress('shell', 'Building booklet setup\u2026');
-    shell = await runJsonStage(settings, {
-      stageKey: 'shell',
-      stageName: 'Booklet Setup',
+    checkpoint.stages.shellIdentity = { meta: legacyIdentityMeta, _x: legacyShell._x };
+    checkpoint.stages.shellRules = { cover: legacyShell.cover, rulesSpread: legacyShell.rulesSpread };
+    checkpoint.stages.shellTheme = {
+      theme: legacyShell.theme,
+      meta: { designLanguage: legacyMeta.designLanguage, arrangement: legacyMeta.arrangement }
+    };
+    checkpoint.stages.shellSpine = { meta: { playSpine: legacyMeta.playSpine } };
+    console.log('[LiftRPG] Pre-split checkpoint: projected the banked Booklet Setup into four sub-stages.');
+  }
+
+  // The shell sub-stages' shared expectation rail. Built once so the four
+  // gates cannot form different opinions about the book they are grading —
+  // the same argument derivePlannedWeekShapes carries one derivation for
+  // (D166), read at four seats instead of two.
+  function shellSubStageExpectations(extra) {
+    return Object.assign({
+      weekCount: weekCount,
+      totalSessions: totalSessions,
+      generationFloors: true,
+      brief: brief,
+      seedAssignments: seedAssignments,
+      plannedWeeks: plannedWeekShapes,
+      fragmentRegistry: campaignPlan.fragmentRegistry,
+      gameRulebook: gameRulebook
+    }, extra || {});
+  }
+
+  /**
+   * runShellSubStage(spec) -> banked stage output
+   *
+   * The four calls differ in their schema, their builder, their gate and their
+   * givens, and in NOTHING else. Everything they share — the checkpoint read,
+   * the two progress events (D110: start AND complete, per sub-stage), the
+   * normalize/repair pair, the seed stamp and the bank — lives here once. Four
+   * hand-written copies of this ceremony is four places for one of them to
+   * quietly stop emitting a `complete`, which is the UI lie D110 named.
+   */
+  async function runShellSubStage(spec) {
+    if (checkpoint && checkpoint.stages && checkpoint.stages[spec.stageKey]) {
+      stageNum++;
+      console.log('[LiftRPG] Resumed: ' + spec.stageName + ' (cached)');
+      emitPipelineEvent(onProgress, stageNum, totalStages, spec.stageName + ' restored from checkpoint.', {
+        phase: 'complete',
+        stageKey: spec.stageKey,
+        stageName: spec.stageName,
+        completionSource: 'checkpoint'
+      });
+      return checkpoint.stages[spec.stageKey];
+    }
+    progress(spec.stageKey, spec.startMessage);
+    var out = await runJsonStage(settings, {
+      stageKey: spec.stageKey,
+      stageName: spec.stageName,
       stageIndex: stageNum,
-      completeMessage: 'Booklet setup complete.',
+      completeMessage: spec.stageName + ' complete.',
       onProgress: onProgress,
       getTotalStages: function () { return totalStages; },
-      schema: withArrangement(withPlaySpine(STRUCTURED_SCHEMA_SHELL)),
-      unwrapKey: 'meta',
-      // NO maxAttempts literal here: this stage's attempt count is a ladder row
-      // (STAGE_BUDGETS.shell.attempts), read through stageBudget() like its
-      // tokens and its timeout.
+      schema: spec.schema,
+      unwrapKey: spec.unwrapKey,
+      // NO maxAttempts literal at any of these four call sites: each stage's
+      // attempt count is its own ladder row (STAGE_BUDGETS.shell*.attempts),
+      // read through stageBudget() like its tokens and its timeout (D97/D166).
       rateLimiter: rateLimiter,
       budgetEnforce: useGeminiBudget,
-      // ── THE SHELL SEAT'S UNKNOWN-KEY SCOPE (W3, closing W2's named gap) ──
-      // W2 swept five seats and left this one, which is the biggest single
-      // stage output in the pipeline: four top-level booklet surfaces, and the
-      // one that carries every identity declaration a later floor reads. An
-      // invented key here is worse than one in a week — it is a declaration
-      // nobody is holding this book to, on the object the whole book is
-      // written against.
-      //
-      // FOUR SCOPES, NOT ONE, because the shell writes four SIBLING booklet
-      // properties rather than one unit: there is no `$defs:shell` to address
-      // and inventing one would be a second, worse schema (D136 — derive,
-      // don't describe). Each scope names a real property node in
-      // booklet-schema.mjs; `resolveSchemaNodeAt` shouts if one stops
-      // resolving, so a renamed surface reports UNSWEPT instead of passing.
-      //
-      // MEASURED BEFORE WIRING, against two real books (the delivered proving
-      // run and the demo): zero findings on cover, rulesSpread and theme in
-      // both, zero on the demo's meta, and on the delivered book's meta exactly
-      // the four `answer_length_note` keys that reached the canonical validator
-      // after the money was spent. No surface was guessed at.
-      unknownKeyScopes: [
-        { from: 'meta', schemaPath: 'meta', label: 'meta' },
-        { from: 'cover', schemaPath: 'cover', label: 'cover' },
-        { from: 'rulesSpread', schemaPath: 'rulesSpread', label: 'rulesSpread' },
-        { from: 'theme', schemaPath: 'theme', label: 'theme' }
-      ],
+      // The unknown-key scopes, narrowed with the seat. The monolith swept four
+      // sibling properties because it wrote four; each sub-stage sweeps only
+      // what it authors, so an invented key is reported against the stage that
+      // invented it rather than against the setup as a whole.
+      unknownKeyScopes: spec.unknownKeyScopes,
       normalizeResult: function (result) {
-        if (result && result.meta && Array.isArray(result.weeks)) {
+        if (result && Array.isArray(result.weeks)) {
           delete result.weeks; delete result.fragments; delete result.endings;
         }
-        if (result && result.meta && !('passwordEncryptedEnding' in result.meta)) {
-          result.meta.passwordEncryptedEnding = '';
+        if (spec.normalizeResult) spec.normalizeResult(result);
+        // ── A SEAT BANKS ONLY WHAT IT AUTHORS ──────────────────────────────
+        // `normalizeShellShape` INVENTS an empty `rulesSpread` on any payload
+        // it is handed — correct for the monolith, which authored one, and
+        // wrong here: the identity and theme seats would bank a surface they
+        // must not write, and the bank would then claim they produced it. The
+        // merge overwrites it a call later, so the defect is inert AND
+        // invisible, which is the pair this repo treats as worse than a loud
+        // one. Measured, not guessed: an identity payload came back carrying
+        // `rulesSpread.leftPage.title = ''`.
+        //
+        // DERIVED from the same table the transport slice is cut from, so a
+        // surface that moves seats moves this with it. A surface the MODEL
+        // wrote (rather than the normalizer) is announced before it is dropped
+        // — a silent strip of real content is how a stage's output goes missing
+        // with nothing to read afterwards.
+        if (result && typeof result === 'object') {
+          var owned = (SHELL_TOP_BY_SUB_STAGE[spec.stageKey] || []).concat(['meta', '_x']);
+          Object.keys(result).forEach(function (key) {
+            if (owned.indexOf(key) !== -1) return;
+            var value = result[key];
+            var wrote = value && typeof value === 'object'
+              ? JSON.stringify(value).replace(/[{}\[\]",:]|""/g, '').trim().length > 0
+              : !!value;
+            if (wrote) {
+              console.warn('[LiftRPG] ' + spec.stageName + ' returned `' + key + '`, which this '
+                + 'stage does not author — dropped before banking. A later sub-stage writes it.');
+            }
+            delete result[key];
+          });
         }
-        normalizeShellShape(result);
         return result;
       },
-      autoRepair: function (result) {
-        normalizeShellShape(result);
-        if (result && result.theme && result.theme.visualArchetype) {
-          result.theme.visualArchetype = normalizeThemeArchetype(result.theme.visualArchetype);
-        }
-        return result;
-      },
-      repairDirective: repairDirectiveFor('shell'),
-      validate: function(result) {
-        var v = validateShellSchema(result, {
-          weekCount: weekCount,
-          totalSessions: totalSessions,
-          generationFloors: true,  // F2: componentDialect is declared here or nowhere
-          // D144: the unearned-packet arm of artifactIntentFloorErrors needs the
-          // brief to ask whether an institution was ever in it.
-          brief: brief,
-          // D148: the obedience floor's evidence. The SAME map the builder was
-          // handed above — one draw per run, shown and checked, so the gate can
-          // never demand a value the prompt did not carry.
-          seedAssignments: seedAssignments,
-          // ── The earliest-stage pre-flight's inputs (D143) ──
-          // The campaign plan ran two stages ago and the program is on the
-          // desk; between them they know which weeks will owe a door and which
-          // week each fragment lands in. That is everything the spine can be
-          // held to before a single week is written.
-          plannedWeeks: plannedWeekShapes,
-          fragmentRegistry: campaignPlan.fragmentRegistry,
-          // D173 — the rulebook⇄spine parity floor's evidence. THE SAME object
-          // the builder below is handed, so the gate can never demand a
-          // projection of a document the prompt did not carry.
-          gameRulebook: gameRulebook
-        });
-        if (!v.valid) {
-          // ── THE VERDICT OBJECT, NOT A JOINED STRING ────────────────────────
-          // THE BYPASS THIS KILLS. extractErrorList() treats a string as ONE
-          // error, so `v.errors.join('; ')` handed classifyValidationErrors a
-          // single blob. That classifier tests REPAIRABLE_PATTERNS against each
-          // element — and one element containing "Unknown visualArchetype"
-          // anywhere in it classified the WHOLE blob as repairable. blocking
-          // became empty, the stage was ACCEPTED, and every blocking floor in
-          // the blob — a missing playSpine, an unwired currency, a threshold
-          // tollgate — was silently disarmed by one cosmetic defect sitting
-          // beside it. That is the strongest gate in the pipeline, defeatable
-          // by an unrelated typo.
-          //
-          // The S+F week gate was converted for this exact reason; this is the
-          // same fix at the seat that authors the spine. Returning the object
-          // also publishes deltaTargets, so a one-field defect (the currency
-          // parity floor) takes the 4k delta path instead of re-rolling a shell.
-          return v;
-        }
+      autoRepair: spec.autoRepair,
+      repairDirective: repairDirectiveFor(spec.stageKey),
+      validate: function (result) {
+        // THE VERDICT OBJECT, NOT A JOINED STRING (the monolith's ruling,
+        // unchanged and now made four times). extractErrorList() treats a
+        // string as ONE error, so a joined blob containing one cosmetic
+        // repairable defect classified the WHOLE blob as repairable and
+        // silently disarmed every blocking floor beside it.
+        var v = spec.validate(result);
+        if (!v.valid) return v;
         if (result && result.weeks) { delete result.weeks; }
         if (result && result.fragments) { delete result.fragments; }
         if (result && result.endings) { delete result.endings; }
         return '';
       },
       buildPrompt: function (retryState) {
-        return builders.shell(brief, layerBible, campaignPlan, {
-          retryMode: retryState.attempt > 0 ? 'tight' : undefined,
-          // The compiler stage needs the program to derive its topology digest;
-          // this builder's signature never carried it.
-          workout: workout,
-          // Passing the run's seed is what makes retries reuse it instead of
-          // drawing a fresh world on attempt 2.
-          divergenceSeed: divergenceSeed,
-          // The GIVENS this seat owes an answer for. Same slice the obedience
-          // floor below reads, from one accessor, because a stage checked
-          // against axes it was never shown is the derived-or-strict trap.
-          seedAssignments: seedAssignments,
-          identityAxes: identityAxesForStage('shell'),
-          // The door GIVENS. THE SAME derivation the validate() above is
-          // checked against, one line up — the prompt and the floor read one
-          // array or they form different opinions about who owes a door, which
-          // is the two-algorithms defect this pipeline has paid for once
-          // already (D93). Deliberately NOT the topology digest's "lighter
-          // weeks" line: that is a second, independent deload heuristic.
-          plannedWeekShapes: plannedWeekShapes,
-          // THE RULEBOOK (D173). This seat authors the spine — the rulebook's
-          // projection — and `rulesSpread`, which prints its point-of-use
-          // subset. Shown here and checked one block up, one object.
-          gameRulebook: gameRulebook
-        });
+        return spec.buildPrompt(retryState);
       }
     });
-    recordSeedOnStage(shell, divergenceSeed);
-    checkpoint = saveCheckpoint('shell', shell, checkpoint);
+    recordSeedOnStage(out, divergenceSeed);
+    checkpoint = saveCheckpoint(spec.stageKey, out, checkpoint);
+    return out;
+  }
 
-    // ── Downstream sweep after a cross-stage repair (D143) ─────────────
-    // The shell has just been rewritten. Weeks already banked were written
-    // against the old one, so each is re-asked its own gate against the new
-    // spine — and only the ones that ACTUALLY fail are dropped. A blanket
-    // invalidation here would discard paid work for a defect it may not have.
-    if (repairPending && repairPending.to === 'shell') {
-      var staleWeeks = sweepStaleBankedWeeks(checkpoint, {
-        weekCount: weekCount,
-        upstream: shell,
-        plannedWeekShapes: plannedWeekShapes,
-        spineStageLabel: 'Shell'
-      });
-      if (staleWeeks.length) {
-        staleWeeks.forEach(function (key) { delete checkpoint.stages[key]; });
-        checkpoint = pruneCheckpointStages(checkpoint, staleWeeks);
-        var sweptLine = 'Repair swept ' + staleWeeks.length + ' banked week(s) that no longer satisfy the'
-          + ' corrected setup: ' + staleWeeks.join(', ') + '. Everything else stays banked.';
-        console.warn('[LiftRPG] ' + sweptLine);
-        emitPipelineEvent(onProgress, stageNum, totalStages, sweptLine, {
-          phase: 'start', stageKey: 'shell', stageName: 'Booklet Setup', noticeLevel: 'warn'
-        });
+  // The GIVENS every sub-stage after the first is handed, plus the run-level
+  // options all four share. `shellIdentity` is filled in as soon as 3a returns
+  // and read by 3b/3c/3d — the sequencing that IS this split's mechanism.
+  function shellBuilderOptions(retryState, extra) {
+    return Object.assign({
+      retryMode: (retryState && retryState.attempt > 0) ? 'tight' : undefined,
+      // The compiler stages need the program to derive their topology digest;
+      // these builders' signatures never carried it.
+      workout: workout,
+      totalSessions: totalSessions,
+      // Passing the run's seed is what makes retries reuse it instead of
+      // drawing a fresh world on attempt 2.
+      divergenceSeed: divergenceSeed,
+      // The GIVENS this seat owes an answer for. The SAME slice its own gate
+      // reads, from one accessor, because a stage checked against axes it was
+      // never shown is the derived-or-strict trap (D149).
+      seedAssignments: seedAssignments,
+      // THE SAME derivation every gate is checked against (D166) — never the
+      // topology digest's "lighter weeks" line, which is a second, independent
+      // deload heuristic.
+      plannedWeekShapes: plannedWeekShapes,
+      // THE RULEBOOK (D173). The source these four seats serve.
+      gameRulebook: gameRulebook
+    }, extra || {});
+  }
+
+  // ── 3a. IDENTITY ──────────────────────────────────────────────────────
+  shellIdentityStage = await runShellSubStage({
+    stageKey: 'shellIdentity',
+    stageName: 'Identity',
+    startMessage: 'Deciding what this book is…',
+    schema: STRUCTURED_SCHEMA_SHELL_IDENTITY,
+    unwrapKey: 'meta',
+    unknownKeyScopes: [{ from: 'meta', schemaPath: 'meta', label: 'meta' }],
+    normalizeResult: function (result) {
+      if (result && result.meta && !('passwordEncryptedEnding' in result.meta)) {
+        result.meta.passwordEncryptedEnding = '';
       }
+      normalizeShellShape(result);
+    },
+    autoRepair: function (result) { normalizeShellShape(result); return result; },
+    validate: function (result) {
+      return validateShellIdentitySchema(mergeShellParts(result), shellSubStageExpectations());
+    },
+    buildPrompt: function (retryState) {
+      return builders.shellIdentity(brief, layerBible, campaignPlan,
+        shellBuilderOptions(retryState, { identityAxes: identityAxesForStage('shellIdentity') }));
+    }
+  });
+
+  // ── 3b. COVER + RULES SPREAD ──────────────────────────────────────────
+  shellRulesStage = await runShellSubStage({
+    stageKey: 'shellRules',
+    stageName: 'Rules & Cover',
+    startMessage: 'Writing the cover and the rules spread…',
+    schema: STRUCTURED_SCHEMA_SHELL_RULES,
+    unwrapKey: 'rulesSpread',
+    unknownKeyScopes: [
+      { from: 'cover', schemaPath: 'cover', label: 'cover' },
+      { from: 'rulesSpread', schemaPath: 'rulesSpread', label: 'rulesSpread' }
+    ],
+    validate: function (result) {
+      return validateShellRulesSchema(mergeShellParts(shellIdentityStage, result),
+        shellSubStageExpectations());
+    },
+    buildPrompt: function (retryState) {
+      // NO identityAxes: shellRules authors no axis (IDENTITY_AXES says so),
+      // so it is handed no assignments and told no assignment law. D149's trap
+      // read from the other end — a stage SHOWN axes it does not author would
+      // answer them into fields it must not write.
+      return builders.shellRules(brief, layerBible, campaignPlan,
+        shellBuilderOptions(retryState, { shellIdentity: shellIdentityStage }));
+    }
+  });
+
+  // ── 3c. THEME + DESIGN LANGUAGE + ARRANGEMENT ─────────────────────────
+  shellThemeStage = await runShellSubStage({
+    stageKey: 'shellTheme',
+    stageName: 'Theme & Layout',
+    startMessage: 'Choosing the paper, the press and the page…',
+    schema: withArrangement(STRUCTURED_SCHEMA_SHELL_THEME),
+    unwrapKey: 'theme',
+    // BOTH surfaces, because this seat writes both. Sweeping `theme` alone
+    // would have left `meta.designLanguage` and `meta.arrangement` unswept —
+    // the monolith's single `meta` scope covered them, and narrowing the scopes
+    // with the seats is exactly where that coverage goes missing quietly.
+    unknownKeyScopes: [
+      { from: 'theme', schemaPath: 'theme', label: 'theme' },
+      { from: 'meta', schemaPath: 'meta', label: 'meta' }
+    ],
+    autoRepair: function (result) {
+      if (result && result.theme && result.theme.visualArchetype) {
+        result.theme.visualArchetype = normalizeThemeArchetype(result.theme.visualArchetype);
+      }
+      return result;
+    },
+    validate: function (result) {
+      return validateShellThemeSchema(mergeShellParts(shellIdentityStage, result),
+        shellSubStageExpectations());
+    },
+    buildPrompt: function (retryState) {
+      return builders.shellTheme(brief, layerBible, campaignPlan,
+        shellBuilderOptions(retryState, {
+          shellIdentity: shellIdentityStage,
+          identityAxes: identityAxesForStage('shellTheme')
+        }));
+    }
+  });
+
+  // ── 3d. THE PLAY SPINE ────────────────────────────────────────────────
+  shellSpineStage = await runShellSubStage({
+    stageKey: 'shellSpine',
+    stageName: 'Play Spine',
+    startMessage: 'Wiring the play spine…',
+    schema: withPlaySpine(STRUCTURED_SCHEMA_SHELL_SPINE),
+    unwrapKey: 'meta',
+    // `meta` covers `meta.playSpine`, which is the whole of this seat's output
+    // and the densest invented-key surface in the pipeline. The monolith swept
+    // it under its own `meta` scope; leaving this seat unswept would have been
+    // the one place the split LOST unknown-key coverage.
+    unknownKeyScopes: [{ from: 'meta', schemaPath: 'meta', label: 'meta' }],
+    validate: function (result) {
+      return validateShellSpineSchema(mergeShellParts(shellIdentityStage, result),
+        shellSubStageExpectations());
+    },
+    buildPrompt: function (retryState) {
+      // NO `identityAxes`: this seat authors none (IDENTITY_AXES). The two
+      // spine-shaped axes are answered at the IDENTITY seat, which writes their
+      // evidence field; this seat builds what that block declared.
+      return builders.shellSpine(brief, layerBible, campaignPlan,
+        shellBuilderOptions(retryState, { shellIdentity: shellIdentityStage }));
+    }
+  });
+
+  shell = mergeShellParts(shellIdentityStage, shellRulesStage, shellThemeStage, shellSpineStage);
+
+  // ── Downstream sweep after a cross-stage repair (D143) ─────────────
+  // A shell sub-stage has just been rewritten. Weeks already banked were
+  // written against the old one, so each is re-asked its own gate against the
+  // new spine — and only the ones that ACTUALLY fail are dropped. A blanket
+  // invalidation here would discard paid work for a defect it may not have.
+  //
+  // ANY of the four triggers it, and that is deliberate rather than lazy: the
+  // week gate reads the spine, the currency and the grammar family, and those
+  // live at two different sub-stages. Scoping the sweep to `shellSpine` would
+  // leave weeks banked against a currency the identity repair just renamed.
+  if (repairPending && SHELL_SUB_STAGE_KEYS.indexOf(repairPending.to) !== -1) {
+    var staleWeeks = sweepStaleBankedWeeks(checkpoint, {
+      weekCount: weekCount,
+      upstream: shell,
+      plannedWeekShapes: plannedWeekShapes,
+      spineStageLabel: shellStageLabel('shellSpine')
+    });
+    if (staleWeeks.length) {
+      staleWeeks.forEach(function (key) { delete checkpoint.stages[key]; });
+      checkpoint = pruneCheckpointStages(checkpoint, staleWeeks);
+      var sweptLine = 'Repair swept ' + staleWeeks.length + ' banked week(s) that no longer satisfy the'
+        + ' corrected setup: ' + staleWeeks.join(', ') + '. Everything else stays banked.';
+      console.warn('[LiftRPG] ' + sweptLine);
+      emitPipelineEvent(onProgress, stageNum, totalStages, sweptLine, {
+        phase: 'start', stageKey: repairPending.to, stageName: REPAIR_STAGE_NAMES[repairPending.to] || 'Booklet Setup', noticeLevel: 'warn'
+      });
     }
   }
 
@@ -4989,7 +5367,7 @@ async function runApiPipeline(options) {
       isDeload: weekShape.isDeload,
       // The seat that authored the spine on THIS pipeline, so a spine defect
       // found here routes back to a prompt that can fix it (D129/D143).
-      spineStageLabel: 'Shell',
+      spineStageLabel: shellStageLabel('shellSpine'),
       mechanicGrammarFamily: (((shell || {}).meta || {}).artifactIntent || {}).mechanicGrammarFamily || '',
       // W4a: the spine was declared at the shell stage; the door and the clocks
       // are authored here. The closure floors that pair them need both, so the
@@ -5191,7 +5569,8 @@ async function runApiPipeline(options) {
   // initial estimate above rather than adjusting it — which is exactly how the
   // 15/14 defect happened. A stage added to the pipeline and to the estimate
   // but not to this line is the same bug with a new seat's name on it.
-  totalStages = canonicalizeStages + 6 + weekCount + totalBatches + 1;
+  // 9, not 6, since the shell split (see the initial estimate above).
+  totalStages = canonicalizeStages + 9 + weekCount + totalBatches + 1;
 
   for (var fb = 0; fb < fragmentBatches.length; fb++) {
     var batch = fragmentBatches[fb];
@@ -7507,6 +7886,17 @@ window.LiftRPGAPI = {
   manual: {
     structuredSchemas: {
       shell: STRUCTURED_SCHEMA_SHELL,
+      // ── THE SHELL SPLIT's four slices, and the partition's own reader ────
+      // Exported because the harness has to be able to ask the question the
+      // byte-diff cannot: does the union literal above still partition into
+      // exactly these four with nothing lost and nothing claimed twice? A
+      // property that fell out of the partition is a field no sub-stage asks
+      // the model for, and the gate that reads it fails three stages later.
+      shellIdentity: STRUCTURED_SCHEMA_SHELL_IDENTITY,
+      shellRules: STRUCTURED_SCHEMA_SHELL_RULES,
+      shellTheme: STRUCTURED_SCHEMA_SHELL_THEME,
+      shellSpine: STRUCTURED_SCHEMA_SHELL_SPINE,
+      shellSubSchemaPartition: shellSubSchemaPartition,
       // The spine injector, exported as a FUNCTION rather than as a second
       // pre-built schema: withPlaySpine() throws when prompt_rules.js has not
       // loaded, and a throw at module-evaluation time would take the whole API
@@ -7573,6 +7963,13 @@ window.LiftRPGAPI = {
     validateWeekSchema: validateWeekSchema,
     normalizeShellShape: normalizeShellShape,
     validateShellSchema: validateShellSchema,
+    validateShellIdentitySchema: validateShellIdentitySchema,
+    validateShellRulesSchema: validateShellRulesSchema,
+    validateShellThemeSchema: validateShellThemeSchema,
+    validateShellSpineSchema: validateShellSpineSchema,
+    shellStageLabel: shellStageLabel,
+    shellSubStageKeys: SHELL_SUB_STAGE_KEYS,
+    mergeShellParts: mergeShellParts,
     validateLayerBibleStage: validateLayerBibleStage,
     normalizeCampaignPlanOwnership: normalizeCampaignPlanOwnership,
     validateCampaignPlanStage: validateCampaignPlanStage,

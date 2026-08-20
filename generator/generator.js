@@ -3281,6 +3281,17 @@
     ].filter(Boolean).join('\n');
   };
 
+  /**
+   * THE UNION MEASUREMENT SURFACE — no longer a door (the shell split).
+   *
+   * `builders.shell` is gone: the API/bridge pipeline dispatches the four
+   * sub-stage builders below this one. This builder stays on the
+   * `window.generatePrompt()` precedent (D189) — it assembles the whole shell's
+   * worth of doctrine from the `'shell'` row, which is the row the guided
+   * wizard still runs, so a size or content comparison between the monolith and
+   * the four parts is a real measurement rather than a reconstruction. Several
+   * floors rows and browser specs read it for exactly that.
+   */
   window.generateApiShellPrompt = function (brief, layerBible, campaignPlan, options) {
     options = options || {};
     var blendContext = buildBlendContextFromPlans(layerBible, campaignPlan);
@@ -3291,16 +3302,17 @@
     // eval bench's stub router — added context goes BELOW it, never above.
     var armed = armCompilerContext(options.workout || blendContext, brief, options);
     // THE DOOR GIVENS, on the seat the multi-stage pipeline actually runs
-    // (`builders.shell` resolves to THIS builder). Same array the gate reads,
+    // (this builder is the union measurement surface). Same array the gate reads,
     // same formatter, and one entry rather than two so the `.filter(Boolean)`
     // below takes the separator with it when there is no week picture.
     var doorGivens = (typeof window.formatPlannedDoorGivensBlock === 'function')
       ? window.formatPlannedDoorGivensBlock(options.plannedWeekShapes)
       : '';
-    // THE RULEBOOK GIVEN (D173) — the live multi-stage seat. `builders.shell`
-    // resolves to THIS builder, so a rulebook threaded only into
-    // generateShellPrompt above would reach the wizard and never the pipeline:
-    // D174's measured defect, reproduced by inattention rather than by design.
+    // THE RULEBOOK GIVEN (D173). Kept on the union surface so its content stays
+    // comparable with the four live seats' — a rulebook threaded into
+    // generateShellPrompt (the wizard's) and not here would make this
+    // measurement lie about what the pipeline carries: D174's measured defect,
+    // reproduced by inattention rather than by design.
     // Placed directly under the opener and above the schema, because it is the
     // SOURCE the schema's `playSpine` and `rulesSpread` are written to serve.
     var rulebookGiven = (typeof window.formatGameRulebookGiven === 'function')
@@ -3356,6 +3368,351 @@
       '## Design Bias',
       compactJson(summarizeDesignBiasForApi(blend)),
       options.retryMode ? 'Retry mode: keep shells concise, specific, renderer-safe, and distinctive in diction before adding more labels. Preserve valid shell identity, but rewrite any malformed rules sections into explicit { heading, body } objects.' : '',
+      '',
+      'JSON only.'
+    ].filter(Boolean).join('\n');
+  };
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // THE SHELL SPLIT — four sequential sub-stage builders
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // `generateApiShellPrompt` above is no longer a door. It stays as the union
+  // MEASUREMENT SURFACE on the `window.generatePrompt()` precedent (D189): it
+  // builds the whole shell's worth of doctrine from the `'shell'` row, which is
+  // the row the guided wizard still runs, so a size or content comparison
+  // between the monolith and the four parts is a real measurement rather than
+  // a reconstruction. The pipeline calls the four builders below.
+  //
+  // THE MECHANISM IS SEQUENCING WITH FIXED GIVENS, not just smaller calls. The
+  // failure this attacks is a COMPLETE response whose spine contradicts an
+  // identity decision made earlier in the same call — a model cannot contradict
+  // a decision it is handed as a finished fact rather than making alongside
+  // everything else. Each builder therefore prints its predecessors' output as
+  // an immutable GIVEN, in the same shape and with the same law the week seats
+  // already use for the shell contract (D144's verbatim lesson: a value buried
+  // in a serialized blob is a value the model paraphrases, so the load-bearing
+  // ones print on their own lines).
+  //
+  // The cheaper win rides along: a failed retry re-pays a quarter, and each
+  // call's timeout exposure is its own.
+
+  // THE GIVEN'S LAW, stated once. Every sub-stage after the first opens with
+  // these two sentences, so "this is settled" is not left to inference.
+  var SHELL_GIVEN_LAW = [
+    'What follows was decided by an earlier stage of this same book and is FINAL.',
+    'You are not reviewing it, improving it, or choosing again. Write what you are asked',
+    'to write so that it is TRUE of these decisions. Where your instinct and this block',
+    'disagree, this block wins.'
+  ];
+
+  function formatShellGiven(heading, payload) {
+    if (!payload || typeof payload !== 'object') return '';
+    var keys = Object.keys(payload).filter(function (k) {
+      var v = payload[k];
+      if (v == null || v === '') return false;
+      if (Array.isArray(v)) return v.length > 0;
+      if (typeof v === 'object') return Object.keys(v).length > 0;
+      return true;
+    });
+    if (!keys.length) return '';
+    var trimmed = {};
+    keys.forEach(function (k) { trimmed[k] = payload[k]; });
+    return ['## ' + heading, ''].concat(SHELL_GIVEN_LAW).concat(['', compactJson(trimmed)]).join('\n');
+  }
+
+  /**
+   * summarizeShellIdentityFor(identity, slice) -> object
+   *
+   * ONE projection of the identity block, three slices. A second hand-built
+   * projection per consumer is the D93 defect at prompt scale — the seats would
+   * come to disagree about what "the identity" is, and the disagreement would
+   * be invisible because each prompt reads fine on its own.
+   *
+   *   'rules' — everything a cover and a rules page must be true of.
+   *   'theme' — the decisions a press and a page composition are composed ONTO.
+   *   'spine' — deliberately THIN. The spine seat's job is the graph, and the
+   *             three fields below are the only identity values its own floors
+   *             read back (the grammar family the pre-flight prices doors
+   *             against, the currency every edge is denominated in, and the
+   *             component family the weeks will carry). Handing it the whole
+   *             identity would re-create the monolith's failure mode inside the
+   *             one sub-stage that has it worst.
+   */
+  function summarizeShellIdentityFor(identity, slice) {
+    var meta = ((identity || {}).meta) || identity || {};
+    var intent = meta.artifactIntent || {};
+    var economy = meta.economy || {};
+    if (slice === 'spine') {
+      return {
+        worldContract: truncateText(meta.worldContract, 220),
+        mechanicGrammarFamily: intent.mechanicGrammarFamily || '',
+        arcFamily: intent.arcFamily || '',
+        homePull: intent.homePull || '',
+        currencyLabel: economy.currencyLabel || '',
+        weeklyComponentType: truncateText(meta.weeklyComponentType, 160)
+      };
+    }
+    if (slice === 'theme') {
+      return {
+        blockTitle: meta.blockTitle || '',
+        worldContract: truncateText(meta.worldContract, 320),
+        artifactIdentity: meta.artifactIdentity || null,
+        artifactIntent: {
+          arcFamily: intent.arcFamily || '',
+          mechanicGrammarFamily: intent.mechanicGrammarFamily || '',
+          homePull: intent.homePull || '',
+          documentEcology: intent.documentEcology || null,
+          selectionReason: truncateText(intent.selectionReason, 900)
+        },
+        literaryRegister: {
+          name: ((meta.literaryRegister || {}).name) || '',
+          typographicBehavior: truncateText((meta.literaryRegister || {}).typographicBehavior, 400)
+        }
+      };
+    }
+    return {
+      blockTitle: meta.blockTitle || '',
+      blockSubtitle: meta.blockSubtitle || '',
+      worldContract: meta.worldContract || '',
+      narrativeVoice: meta.narrativeVoice || null,
+      literaryRegister: meta.literaryRegister || null,
+      structuralShape: meta.structuralShape || null,
+      artifactIdentity: meta.artifactIdentity || null,
+      artifactIntent: meta.artifactIntent || null,
+      economy: economy,
+      weeklyComponentType: meta.weeklyComponentType || ''
+    };
+  }
+
+  // The reference context every sub-stage shares. Built once per call so the
+  // four prompts cannot drift on what the plan says, and so a change to the
+  // codex summary reaches all four seats rather than the one somebody
+  // remembered.
+  function shellSubStageContext(brief, layerBible, campaignPlan, options) {
+    var blendContext = buildBlendContextFromPlans(layerBible, campaignPlan);
+    var blend = deriveDesignBlend(brief, blendContext);
+    var weekCount = (campaignPlan.weeks || []).length || 6;
+    return {
+      blend: blend,
+      weekCount: weekCount,
+      armed: armCompilerContext(options.workout || blendContext, brief, options),
+      doorGivens: (typeof window.formatPlannedDoorGivensBlock === 'function')
+        ? window.formatPlannedDoorGivensBlock(options.plannedWeekShapes)
+        : '',
+      rulebookGiven: (typeof window.formatGameRulebookGiven === 'function')
+        ? window.formatGameRulebookGiven(options.gameRulebook)
+        : '',
+      campaignSummary: compactJson({
+        weekCount: weekCount,
+        topology: campaignPlan.topology || {},
+        bossPlan: campaignPlan.bossPlan || {},
+        fragmentCount: (campaignPlan.fragmentRegistry || []).length,
+        overflowCount: (campaignPlan.overflowRegistry || []).length
+      })
+    };
+  }
+
+  /**
+   * Sub-stage 1 of 4 — IDENTITY. Authors `meta` minus playSpine, arrangement
+   * and designLanguage: the world contract, the voice, the register, the
+   * structural shape, the artifact identity and intent, the economy.
+   *
+   * This is the compiler seat. It is the LEAST failure-prone of the four and
+   * the biggest prompt, and that is not a contradiction to fix: its doctrine
+   * (INST_ARTIFACT_COMPILER + INST_SHELL_CHOICE + the menus behind them) is
+   * irreducible — the model is choosing this book's identity from menus, and a
+   * menu it is not shown is a default it takes silently (VISION §12).
+   */
+  window.generateApiShellIdentityPrompt = function (brief, layerBible, campaignPlan, options) {
+    options = options || {};
+    var ctx = shellSubStageContext(brief, layerBible, campaignPlan, options);
+    var weekCount = ctx.weekCount;
+    return [
+      '# API Stage 3a — Booklet Identity',
+      '',
+      'Generate ONLY `meta` — this book\'s identity. Output a JSON object with exactly one',
+      'top-level key: `meta`.',
+      'Do NOT output cover, rulesSpread, theme, weeks, fragments or endings. Do NOT output',
+      '`meta.playSpine`, `meta.arrangement` or `meta.designLanguage` — three later stages of',
+      'this same run author those, against what you decide here.',
+      '',
+      ctx.rulebookGiven ? ctx.rulebookGiven + '\n' : '',
+      '## SCHEMA CONTRACT',
+      window.buildStageSchema('shellIdentity'),
+      '',
+      '## Stage Rules',
+      '- worldContract is the booklet north star. It must read like a testable governing tension, not a summary.',
+      '- narrativeVoice, literaryRegister, structuralShape, artifactIdentity and artifactIntent are downstream contracts. Three later stages and every prose stage in this book are held to them, so make them strong enough to be followed exactly.',
+      '- passwordEncryptedEnding stays blank; trusted tooling seals it later.',
+      '- meta.weekCount, meta.passwordLength and meta.totalSessions are injected by the tooling — do NOT output them. For your own planning: this book is ' + weekCount + ' weeks, its password is ' + Math.max(0, weekCount - 1) + ' characters'
+        + (options.totalSessions ? ', and it has ' + options.totalSessions + ' sessions' : '') + '. Design to those numbers; writing them is not your job.',
+      '',
+      '## Layer Codex Summary',
+      compactJson(summarizeLayerBibleForShell(layerBible)),
+      '',
+      '## Campaign Summary',
+      ctx.campaignSummary,
+      '',
+      '## Voice Packet',
+      compactJson(summarizeShellVoicePacket(layerBible, campaignPlan, ctx.blend)),
+      '',
+      '## Creative Direction',
+      ctx.armed.divergenceSeed
+        ? capText(ctx.armed.briefChannel(ctx.blend), 2800)
+        : truncateText(ctx.armed.briefChannel(ctx.blend), 1200),
+      '',
+      ctx.armed.contextBlock,
+      '',
+      '## Design Bias',
+      compactJson(summarizeDesignBiasForApi(ctx.blend)),
+      options.retryMode ? 'Retry mode: keep the identity concise, specific and distinctive in diction before adding more labels. Preserve whatever was already valid.' : '',
+      '',
+      'JSON only.'
+    ].filter(Boolean).join('\n');
+  };
+
+  /**
+   * Sub-stage 2 of 4 — COVER + RULES SPREAD. The first pages a reader meets,
+   * written against a finished identity.
+   */
+  window.generateApiShellRulesPrompt = function (brief, layerBible, campaignPlan, options) {
+    options = options || {};
+    var ctx = shellSubStageContext(brief, layerBible, campaignPlan, options);
+    return [
+      '# API Stage 3b — Cover and Rules Spread',
+      '',
+      'Generate ONLY `cover` and `rulesSpread`. Output a JSON object with exactly those two',
+      'top-level keys. Do NOT output meta, theme, weeks, fragments or endings.',
+      '',
+      formatShellGiven('THE BOOK\'S IDENTITY (decided — a GIVEN)',
+        summarizeShellIdentityFor(options.shellIdentity, 'rules')),
+      '',
+      ctx.rulebookGiven ? ctx.rulebookGiven + '\n' : '',
+      '## SCHEMA CONTRACT',
+      window.buildStageSchema('shellRules'),
+      '',
+      '## Stage Rules',
+      '- The cover, rules spread, sealed page and password assembly must all feel like the SAME object family the identity above declared. Read `artifactIdentity` before you name anything.',
+      '- Cover title and designation must feel like a real artifact: a dossier, journal, field report, operations manual, maintenance log, or similar in-world object. `cover.title` is `meta.blockTitle`, character for character.',
+      '- rulesSpread.leftPage MUST include title, reEntryRule, and a sections array of objects. Never return bare strings or unlabeled prose blocks in sections.',
+      '- Every rulesSpread.leftPage.sections entry MUST be exactly { heading, body } with both fields present and non-empty.',
+      '- rulesSpread.rightPage MUST include title and instruction; do not rename them to heading/body/text.',
+      '- Write in the literary register above. It is not a suggestion — it is the register every other page of this book is held to.',
+      '',
+      '## Layer Codex Summary',
+      compactJson(summarizeLayerBibleForShell(layerBible)),
+      '',
+      '## Campaign Summary',
+      ctx.campaignSummary,
+      '',
+      '## Creative Direction',
+      truncateText(ctx.armed.briefChannel(ctx.blend), 1200),
+      options.retryMode ? 'Retry mode: rewrite any malformed rules sections into explicit { heading, body } objects; keep valid content.' : '',
+      '',
+      'JSON only.'
+    ].filter(Boolean).join('\n');
+  };
+
+  /**
+   * Sub-stage 3 of 4 — THEME, DESIGN LANGUAGE and ARRANGEMENT. One sitting,
+   * one press: the archetype is the floor the design language is composed onto
+   * (W6) and the arrangement is how that object's page is put together
+   * (ARRANGEMENT §6). Splitting these three across sub-stages would have
+   * written two objects, which is the thing the adjacency ruling exists to
+   * stop — so they share a seat even though only one of them is `theme`.
+   */
+  window.generateApiShellThemePrompt = function (brief, layerBible, campaignPlan, options) {
+    options = options || {};
+    var ctx = shellSubStageContext(brief, layerBible, campaignPlan, options);
+    return [
+      '# API Stage 3c — Theme, Design Language and Arrangement',
+      '',
+      'Generate ONLY `theme` and the two meta surfaces named below. Output a JSON object with',
+      'exactly two top-level keys: `theme` and `meta`, where `meta` carries ONLY',
+      '`designLanguage` and `arrangement`. Do NOT restate any other meta field, and do NOT',
+      'output cover, rulesSpread, weeks, fragments or endings.',
+      '',
+      formatShellGiven('THE BOOK\'S IDENTITY (decided — a GIVEN)',
+        summarizeShellIdentityFor(options.shellIdentity, 'theme')),
+      '',
+      '## SCHEMA CONTRACT',
+      window.buildStageSchema('shellTheme'),
+      '',
+      '## Stage Rules',
+      '- Choose the archetype that serves the fiction above — not always "government". It is a legibility and print-safety FLOOR, not this book\'s identity; the design language and the arrangement are where the identity lands.',
+      '- Palette: 6 hex colors (ink, paper, accent, muted, rule, fog) that feel like this world\'s stationery. A government archive, a coastal field office, a corporate clinic and a maritime station all have different paper.',
+      '- The design language and the arrangement are ONE decision made twice: what this object is printed LIKE, and how its page is PUT TOGETHER. Answer them in one sitting, against the artifact identity above.',
+      '- Everything must read in black and white. Hue is never load-bearing.',
+      '',
+      '## Campaign Summary',
+      ctx.campaignSummary,
+      '',
+      '## Creative Direction',
+      ctx.armed.divergenceSeed
+        ? capText(ctx.armed.briefChannel(ctx.blend), 2000)
+        : truncateText(ctx.armed.briefChannel(ctx.blend), 1200),
+      '',
+      ctx.armed.contextBlock,
+      '',
+      '## Design Bias',
+      compactJson(summarizeDesignBiasForApi(ctx.blend)),
+      options.retryMode ? 'Retry mode: keep the palette renderer-safe (six 6-digit hex values) and name every axis from its menu.' : '',
+      '',
+      'JSON only.'
+    ].filter(Boolean).join('\n');
+  };
+
+  /**
+   * Sub-stage 4 of 4 — THE PLAY SPINE. The most cross-reference-dense payload
+   * in the pipeline, and the one this split exists for: it is now written
+   * against a rulebook AND an identity that are both already finished, so a
+   * spine that contradicts the book's grammar family or currency is a
+   * contradiction of a printed GIVEN rather than of a decision the same call
+   * happened to make forty thousand characters earlier.
+   */
+  window.generateApiShellSpinePrompt = function (brief, layerBible, campaignPlan, options) {
+    options = options || {};
+    var ctx = shellSubStageContext(brief, layerBible, campaignPlan, options);
+    return [
+      '# API Stage 3d — The Play Spine',
+      '',
+      'Generate ONLY `meta.playSpine`. Output a JSON object with exactly one top-level key:',
+      '`meta`, carrying exactly one field: `playSpine`. Do NOT restate any other meta field,',
+      'and do NOT output cover, rulesSpread, theme, weeks, fragments or endings.',
+      '',
+      ctx.rulebookGiven ? ctx.rulebookGiven + '\n' : '',
+      formatShellGiven('THE BOOK\'S IDENTITY (decided — a GIVEN)',
+        summarizeShellIdentityFor(options.shellIdentity, 'spine')),
+      '',
+      '## SCHEMA CONTRACT',
+      window.buildStageSchema('shellSpine'),
+      ctx.doorGivens ? '\n' + ctx.doorGivens : '',
+      '',
+      '## Stage Rules',
+      '- The spine is the rulebook\'s PROJECTION. Every rule above must be reachable in this graph, and every node in this graph must be a rule above. When the two disagree, the graph is what changes.',
+      '- The currency named in the identity block is the currency every edge is denominated in. Do not rename it, shorten it, or invent a second one.',
+      '- Every ref you write must resolve to a surface this book prints.',
+      '',
+      '## Campaign Summary',
+      ctx.campaignSummary,
+      '',
+      '## Fragment Registry',
+      compactJson((campaignPlan.fragmentRegistry || []).map(function (f) {
+        return { id: f.id, weekNumber: f.weekNumber, documentType: f.documentType, narrativeFunction: f.narrativeFunction };
+      })),
+      '',
+      '## Creative Direction',
+      truncateText(ctx.armed.briefChannel(ctx.blend), 1200),
+      '',
+      // NO ASSIGNMENTS BLOCK. This seat authors no identity axis: the two that
+      // land in `meta.playSpine` sit at the IDENTITY seat, because that is
+      // where their evidence field is written (the compiler declares, the spine
+      // builds — IDENTITY_AXES' own note carries the reasoning). A seat SHOWN
+      // assignments it does not author would answer them into fields it must
+      // not write, which is D149's trap read from the other end. What this seat
+      // is handed instead is the identity block's finished decisions, above.
+      options.retryMode ? 'Retry mode: fix the named cross-references. Preserve every edge, milestone and ledger row that already resolves.' : '',
       '',
       'JSON only.'
     ].filter(Boolean).join('\n');

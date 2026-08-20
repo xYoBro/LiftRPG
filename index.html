@@ -4394,7 +4394,23 @@
         gameRulebook: 'Game Design',
         layerBible: 'Foundation',
         campaignPlan: 'Booklet Plan',
+        // ── THE SHELL SPLIT: one card became four ─────────────────────────
+        // UNIFIED WITH api-generator.js's REPAIR_STAGE_NAMES by ruling. Before
+        // the split those two tables disagreed about the same seat — `Identity`
+        // on this rail, `Booklet Setup` in every repair directive — so the card
+        // a reader was watching and the sentence telling them what to fix used
+        // different words for the same thing. One convention now, both tables,
+        // asserted by the floors harness.
+        //
+        // `shell` STAYS, and it is the GUIDED WIZARD's key: WIZARD_STAGE_KEYS
+        // is a separate array (a few lines up) that still names it, and that
+        // door is untouched by this split by author ruling. The API rail below
+        // names the four sub-stages instead.
         shell: 'Identity',
+        shellIdentity: 'Identity',
+        shellRules: 'Rules & Cover',
+        shellTheme: 'Theme & Layout',
+        shellSpine: 'Play Spine',
         // D99 plain language: this stage authors the world's process
         // particulars. The reader is told what it produces, never the internal
         // pipeline name ("knowing"), which is the stageKey below and stays
@@ -4418,7 +4434,10 @@
           { key: 'gameRulebook', label: STAGE_LABELS.gameRulebook },
           { key: 'layerBible', label: STAGE_LABELS.layerBible },
           { key: 'campaign', label: STAGE_LABELS.campaignPlan },
-          { key: 'shell', label: STAGE_LABELS.shell },
+          { key: 'shellIdentity', label: STAGE_LABELS.shellIdentity },
+          { key: 'shellRules', label: STAGE_LABELS.shellRules },
+          { key: 'shellTheme', label: STAGE_LABELS.shellTheme },
+          { key: 'shellSpine', label: STAGE_LABELS.shellSpine },
           { key: 'knowing', label: STAGE_LABELS.knowing },
           { key: 'economyGraph', label: STAGE_LABELS.economyGraph },
           { key: 'weeks', label: STAGE_LABELS.weeks },
@@ -6528,7 +6547,15 @@
         var lower = String(message || '').toLowerCase();
         if (lower.indexOf('layer bible') !== -1 || lower.indexOf('layer codex') !== -1 || lower.indexOf('foundation') !== -1) return 'layerBible';
         if (lower.indexOf('campaign') !== -1 || lower.indexOf('story plan') !== -1 || lower.indexOf('planning story') !== -1) return 'campaign';
-        if (lower.indexOf('shell') !== -1 || lower.indexOf('booklet setup') !== -1 || lower.indexOf('identity') !== -1) return 'shell';
+        // THE SHELL SPLIT. Ordered MOST SPECIFIC FIRST: `booklet setup` and a
+        // bare `shell` are the family words and can only mean the run as a
+        // whole, so they resolve to the first sub-stage — the same conservative
+        // answer REPAIR_STAGE_LABEL_KEYS gives a legacy prefix, and for the
+        // same reason: identity is the seat everything else is written against.
+        if (lower.indexOf('play spine') !== -1) return 'shellSpine';
+        if (lower.indexOf('theme') !== -1 || lower.indexOf('layout') !== -1) return 'shellTheme';
+        if (lower.indexOf('rules & cover') !== -1 || lower.indexOf('rules and cover') !== -1) return 'shellRules';
+        if (lower.indexOf('shell') !== -1 || lower.indexOf('booklet setup') !== -1 || lower.indexOf('identity') !== -1) return 'shellIdentity';
         if (lower.indexOf('boss week') !== -1 || lower.indexOf('week ') !== -1 || lower.indexOf('weeks ') !== -1) return 'weeks';
         if (lower.indexOf('fragment') !== -1 || lower.indexOf('bonus page') !== -1 || lower.indexOf('extras') !== -1) return 'fragments';
         if (lower.indexOf('ending') !== -1 || lower.indexOf('finale') !== -1) return 'endings';
@@ -8897,9 +8924,28 @@
           does: 'Plans the block week by week against your real program: the arc, the found documents and their names, and the route to the ending.',
           limit: 'It plans; it writes no week and no document. A plan that promises a document is only kept because the later steps are checked against this list.'
         },
-        shell: {
-          does: 'Fixes the artifact: title, cover, the printed rules spread, the theme and the shell the book is dressed as — and checks the printed rules against the game rules in both directions.',
-          limit: 'This is where a disagreement between the rulebook and the book is caught, so a failure here is usually about the rules, not the cover.'
+        // ── THE SHELL SPLIT: four cards, four honest limits ──────────────
+        // The monolith's card said one stage did the cover AND the theme AND
+        // the rules-vs-graph comparison. That was true and useless: a reader
+        // watching it fail could not tell which of those was wrong. Four cards
+        // say four things, and each `limit` names what its own failure is
+        // usually ABOUT — which is the only part of a twenty-minute wait a
+        // reader can act on.
+        shellIdentity: {
+          does: 'Decides what this book IS: the governing tension it carries, the voice and prose register every later page is held to, the kind of object it pretends to be, and the one thing your workout pays out.',
+          limit: 'It decides; it prints nothing. The cover, the rules spread, the theme and the play graph are the three steps after this one, and each is handed these decisions as settled facts it may not revisit.'
+        },
+        shellRules: {
+          does: 'Writes the cover and the printed rules spread \u2014 the first pages a reader meets, and the ones that have to teach this game in this book\u2019s own voice.',
+          limit: 'It writes against an identity already fixed, so a failure here is usually about the rules page not teaching what the game actually does, rather than about the words being wrong.'
+        },
+        shellTheme: {
+          does: 'Chooses the paper, the press and the page: the archetype, the six-colour palette, the design language the object is printed in, and how its pages are put together.',
+          limit: 'The archetype is a legibility and print-safety floor, not the book\u2019s identity \u2014 the design language and the arrangement are where this book stops looking like every other one.'
+        },
+        shellSpine: {
+          does: 'Wires the play graph: what earns what, which surface every reference points at, which weeks pose a decision, and how the whole economy reaches the ending \u2014 then checks it against the game rules in both directions.',
+          limit: 'This is where a disagreement between the rulebook and the machine-readable graph is caught, and when those two disagree the graph is what changes. A failure here is almost always a missing connection, not a wrong idea.'
         },
         knowing: {
           does: 'Authors the world’s working detail — its instruments, procedures, ranks and vocabulary — so the weeks, documents and ending all reach for the same particulars instead of inventing their own.',

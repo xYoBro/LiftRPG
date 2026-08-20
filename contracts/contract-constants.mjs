@@ -3096,13 +3096,13 @@ export var IDENTITY_AXES = [
   // commit this landed (§18d-ii — a closed dodge must strike its line).
   { id: 'shellFamily', label: 'shellFamily', path: 'meta.artifactIdentity.shellFamily',
     menu: VALID_SHELL_FAMILIES, kind: 'scalar', answerRequired: true,
-    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shellIdentity', 'skeleton'] },
   { id: 'boardStateMode', label: 'boardStateMode', path: 'meta.artifactIdentity.boardStateMode',
     menu: VALID_BOARD_STATE_MODES, kind: 'scalar', answerRequired: true,
-    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shellIdentity', 'skeleton'] },
   { id: 'componentDialect', label: 'componentDialect', path: 'meta.artifactIdentity.componentDialect',
     menu: VALID_COMPONENT_DIALECTS, kind: 'scalar',
-    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shellIdentity', 'skeleton'] },
   // THE ONE AXIS THAT IS A FLOOR RATHER THAN A REGISTER (round directive 9,
   // 2026-08-17). Every other row here names something the book DECIDES about
   // itself — its shell, its board, its pull, its ecology. Since the composition
@@ -3123,18 +3123,38 @@ export var IDENTITY_AXES = [
   // identityAxesForStage and drawSeedAssignments read `id`, `menu` and
   // `stages`, none of which move: the die offers the same faces and every stage
   // is shown the same slice.
+  // THE SEAT IS THE EVIDENCE'S, NOT THE VALUE'S (the shell split). The VALUE
+  // `theme.visualArchetype` is written by the THEME seat; the EVIDENCE is
+  // `meta.artifactIntent.selectionReason`, written by the IDENTITY seat. This
+  // row therefore sits at the identity seat, under the rule
+  // `shellAxisEvidenceOwnership()` in validate.mjs now enforces for every axis:
+  // an obedience axis lives at a seat that writes its own evidence field, or
+  // its gate demands a sentence in a field the stage cannot write (D234).
+  //
+  // MEASURED, not reasoned: with this row at `shellTheme`, the theme seat's
+  // answer created `meta.artifactIntent` from nothing to hold its declination,
+  // and the merge then overwrote the identity block's whole intent bundle with
+  // a one-field stub — a later seat silently rewriting an earlier one's
+  // decision, which is the exact thing the fixed GIVENS exist to prevent.
+  // scripts/check-shell-split.mjs's arm A2c caught it.
+  //
+  // The theme seat is not left guessing: `summarizeShellIdentityFor(_, 'theme')`
+  // hands it the identity block's `artifactIntent` INCLUDING selectionReason, so
+  // the archetype the compiler declared arrives as a finished GIVEN. What it
+  // costs is the same thing the two spine axes cost — the DEPARTURE arm on this
+  // axis drops from blocking at a stage gate to report-class at the referee.
   { id: 'visualArchetype', label: 'theme.visualArchetype', path: 'theme.visualArchetype',
     menu: VALID_ARCHETYPES, kind: 'scalar', answerRequired: true, role: 'floor',
-    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shellIdentity', 'skeleton'] },
   { id: 'arcFamily', label: 'arcFamily', path: 'meta.artifactIntent.arcFamily',
     menu: VALID_ARC_FAMILIES, kind: 'scalar',
-    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shellIdentity', 'skeleton'] },
   { id: 'mechanicGrammarFamily', label: 'mechanicGrammarFamily', path: 'meta.artifactIntent.mechanicGrammarFamily',
     menu: VALID_MECHANIC_GRAMMAR_FAMILIES, kind: 'scalar',
-    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shellIdentity', 'skeleton'] },
   { id: 'homePull', label: 'homePull', path: 'meta.artifactIntent.homePull',
     menu: VALID_HOME_PULLS, kind: 'scalar', answerRequired: true,
-    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shellIdentity', 'skeleton'] },
   // THE MODE DIE (the settlement doctrine, 2026-08-18). VISION §14.1 says the
   // endgame PATTERN is part of what varies per book, and until this row the
   // only thing varying was the password's arithmetic (convergencePattern) —
@@ -3154,11 +3174,11 @@ export var IDENTITY_AXES = [
   // axis can be observed all the way to the artifact.
   { id: 'endingMode', label: 'endingMode', path: 'meta.artifactIntent.endingMode',
     menu: VALID_ENDING_MODES, kind: 'scalar', answerRequired: true,
-    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shellIdentity', 'skeleton'] },
   { id: 'documentEcologyDominant', label: 'documentEcology.dominant',
     path: 'meta.artifactIntent.documentEcology.dominant',
     menu: DOCUMENT_TYPE_ENUM, kind: 'member', answerRequired: true,
-    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell', 'skeleton'] },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shellIdentity', 'skeleton'] },
   // THE ONE AXIS THAT CAN BE DODGED BY SILENCE AND HAS A RULING ABOUT IT.
   // `harvestPatterns` is OPTIONAL by the W5a ruling — a book that composes with
   // none of these patterns is a legitimate book — and D149 measured what that
@@ -3173,9 +3193,43 @@ export var IDENTITY_AXES = [
   // silence became the error. The shape is the unearned packet's — demand a
   // sentence, never force the thing — because forcing adoption would install a
   // house economy on the one axis whose whole point is that a book may use none.
+  // ── THE COMPILER DECLARES; THE SPINE BUILDS (the shell split) ────────────
+  // THE PROBLEM THE SPLIT CREATED, stated plainly because the resolution costs
+  // something. This axis's VALUE lives at `meta.playSpine.harvestPatterns`,
+  // which the SPINE seat writes. Its EVIDENCE — the field a departure or a
+  // decline must be written in — lives at `meta.artifactIntent.selectionReason`,
+  // which the IDENTITY seat wrote three calls earlier and which no later seat
+  // may rewrite (a later sub-stage overwriting an earlier one's decision is the
+  // exact thing the fixed GIVENS exist to prevent). No single seat holds both.
+  //
+  // Tagging the SPINE alone hands it a gate it cannot satisfy: its own gate's
+  // departure arm demands a sentence in a field it must not write — the
+  // reviser-told-nothing shape (D234), nine paid attempts and nine rejections.
+  // MEASURED, not reasoned: scripts/check-shell-split.mjs failed exactly this
+  // way on the stub before the row moved.
+  //
+  // Tagging BOTH is worse in a subtler way: it makes the gate satisfiable only
+  // if the identity seat, which has not seen the spine yet, happens to name the
+  // instrument the spine will later choose. A gate whose satisfiability depends
+  // on two separate calls agreeing about an unmade decision is a gate that
+  // fails books for a coordination nobody asked for.
+  //
+  // SO THE AXIS SITS AT THE SEAT THAT WRITES ITS EVIDENCE, and the two halves
+  // divide the way the fields already imply: the COMPILER DECLARES (answers the
+  // die in its own selectionReason — adopt-or-decline, which is the only arm
+  // that can fire on a unit carrying no playSpine), and the SPINE BUILDS what
+  // was declared. The build is not unchecked: `collectSpineHarvestFloorErrors`
+  // is the declared-is-built floor and still blocks at the spine seat, and
+  // `auditIdentitySources` still reports a departure over the assembled book.
+  //
+  // WHAT THIS COSTS, said rather than buried: the DEPARTURE arm on these two
+  // axes drops from BLOCKING at a stage gate to REPORT-class at the referee.
+  // Restoring it means giving the spine an evidence field of its own — a
+  // doctrine decision about where a declination is recorded, which is an author
+  // ruling and is filed as one, not taken here.
   { id: 'harvestPatterns', label: 'playSpine.harvestPatterns', path: 'meta.playSpine.harvestPatterns',
     menu: VALID_HARVEST_PATTERNS, kind: 'member', answerRequired: true,
-    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell'] },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shellIdentity'] },
   // THE INSTRUMENT (D170). The ludic lens's own axis, and the last one to get
   // a die — which is why the first completed book's composition was four
   // pieces of furniture. VISION §4.6 asks the compiler for a COMPOSITION
@@ -3195,9 +3249,12 @@ export var IDENTITY_AXES = [
   // and for the same reason: forcing adoption would install a house economy on
   // the one axis whose whole point is that the game-kind is authored per book
   // (VISION §4.4). Declining is legitimate and costs one sentence.
+  // THE COMPILER DECLARES; THE SPINE BUILDS — harvestPatterns' ruling above,
+  // for the same reason and at the same cost. The composition's arity, menu,
+  // distinctness and role floors all still block at the spine seat.
   { id: 'ludicInstrument', label: 'playSpine.composition[].entry', path: 'meta.playSpine.composition',
     menu: LUDIC_DISCRETIONARY_ENTRIES, kind: 'objectMember', itemKey: 'entry', answerRequired: true,
-    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shell'] },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shellIdentity'] },
   // ── THE VOICE SKELETON AXES (the voice die, ratified 2026-08-17; W3) ─────
   // Five axes, one per structural dimension of the narrating hand. The menus
   // are up at VOICE_PERSON_REGIMES and its siblings; the reasoning for the
@@ -3236,23 +3293,23 @@ export var IDENTITY_AXES = [
   { id: 'voicePerson', label: 'narrativeVoice.voiceSkeleton.person',
     path: 'meta.narrativeVoice.voiceSkeleton.person',
     menu: VOICE_PERSON_REGIMES, kind: 'scalar', answerRequired: true, reportOnly: true,
-    evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shell'] },
+    evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shellIdentity'] },
   { id: 'voiceSentenceRegime', label: 'narrativeVoice.voiceSkeleton.sentenceRegime',
     path: 'meta.narrativeVoice.voiceSkeleton.sentenceRegime',
     menu: VOICE_SENTENCE_REGIMES, kind: 'scalar', answerRequired: true, reportOnly: true,
-    evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shell'] },
+    evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shellIdentity'] },
   { id: 'voiceFragmentLicense', label: 'narrativeVoice.voiceSkeleton.fragmentLicense',
     path: 'meta.narrativeVoice.voiceSkeleton.fragmentLicense',
     menu: VOICE_FRAGMENT_LICENSES, kind: 'scalar', answerRequired: true, reportOnly: true,
-    evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shell'] },
+    evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shellIdentity'] },
   { id: 'voicePunctuationSignature', label: 'narrativeVoice.voiceSkeleton.punctuationSignature',
     path: 'meta.narrativeVoice.voiceSkeleton.punctuationSignature',
     menu: VOICE_PUNCTUATION_SIGNATURES, kind: 'scalar', answerRequired: true, reportOnly: true,
-    evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shell'] },
+    evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shellIdentity'] },
   { id: 'voiceParagraphRegime', label: 'narrativeVoice.voiceSkeleton.paragraphRegime',
     path: 'meta.narrativeVoice.voiceSkeleton.paragraphRegime',
     menu: VOICE_PARAGRAPH_REGIMES, kind: 'scalar', answerRequired: true, reportOnly: true,
-    evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shell'] },
+    evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shellIdentity'] },
   // THE RESTRAINT DIE (ratified 2026-08-18 — the voice-axis draft's Part 2).
   // The sixth voice axis, and the only one that is not a shape the hand makes
   // but a RATE it makes them at. It rides this table for the reason Part 2
@@ -3270,25 +3327,25 @@ export var IDENTITY_AXES = [
   { id: 'voiceRestraint', label: 'narrativeVoice.voiceSkeleton.restraint',
     path: 'meta.narrativeVoice.voiceSkeleton.restraint',
     menu: VOICE_RESTRAINT_POSITIONS, kind: 'scalar', answerRequired: true, reportOnly: true,
-    evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shell'] },
+    evidencePath: 'meta.narrativeVoice.voiceRationale', stages: ['shellIdentity'] },
   { id: 'productionTexture', label: 'designLanguage.productionTexture', path: 'meta.designLanguage.productionTexture',
     menu: VALID_PRODUCTION_TEXTURES, kind: 'scalar',
-    evidencePath: 'meta.designLanguage.designEvidence', stages: ['shell'] },
+    evidencePath: 'meta.designLanguage.designEvidence', stages: ['shellTheme'] },
   { id: 'toneTexture', label: 'designLanguage.toneTexture', path: 'meta.designLanguage.toneTexture',
     menu: TONE_TEXTURE_LADDER, kind: 'scalar',
-    evidencePath: 'meta.designLanguage.designEvidence', stages: ['shell'] },
+    evidencePath: 'meta.designLanguage.designEvidence', stages: ['shellTheme'] },
   { id: 'typeVoice', label: 'designLanguage.typeVoice', path: 'meta.designLanguage.typeVoice',
     menu: VALID_TYPE_VOICES, kind: 'scalar',
-    evidencePath: 'meta.designLanguage.designEvidence', stages: ['shell'] },
+    evidencePath: 'meta.designLanguage.designEvidence', stages: ['shellTheme'] },
   { id: 'marginSemantics', label: 'designLanguage.marginSemantics', path: 'meta.designLanguage.marginSemantics',
     menu: VALID_MARGIN_SEMANTICS, kind: 'scalar',
-    evidencePath: 'meta.designLanguage.designEvidence', stages: ['shell'] },
+    evidencePath: 'meta.designLanguage.designEvidence', stages: ['shellTheme'] },
   { id: 'inkDiscipline', label: 'designLanguage.inkDiscipline', path: 'meta.designLanguage.inkDiscipline',
     menu: VALID_INK_DISCIPLINES, kind: 'scalar',
-    evidencePath: 'meta.designLanguage.designEvidence', stages: ['shell'] },
+    evidencePath: 'meta.designLanguage.designEvidence', stages: ['shellTheme'] },
   { id: 'sealTreatment', label: 'designLanguage.sealTreatment', path: 'meta.designLanguage.sealTreatment',
     menu: VALID_SEAL_TREATMENTS, kind: 'scalar',
-    evidencePath: 'meta.designLanguage.designEvidence', stages: ['shell'] },
+    evidencePath: 'meta.designLanguage.designEvidence', stages: ['shellTheme'] },
   // ── THE ARRANGEMENT AXES (ARRANGEMENT §8) ────────────────────────────────
   // "The arrangement axes join the two-source law rather than getting an
   // exemption from it — every axis needs a die, not just a list." The measured
@@ -3314,19 +3371,19 @@ export var IDENTITY_AXES = [
   // precisely the condition under which D146's original reasoning holds.
   { id: 'arrangementGrammar', label: 'arrangement.grammar', path: 'meta.arrangement.grammar',
     menu: VALID_ARRANGEMENT_GRAMMARS, kind: 'scalar',
-    evidencePath: 'meta.arrangement.arrangementEvidence', stages: ['shell', 'skeleton'] },
+    evidencePath: 'meta.arrangement.arrangementEvidence', stages: ['shellTheme', 'skeleton'] },
   { id: 'sectionFurniture', label: 'arrangement.sectionFurniture', path: 'meta.arrangement.sectionFurniture',
     menu: VALID_SECTION_FURNITURE, kind: 'scalar',
-    evidencePath: 'meta.arrangement.arrangementEvidence', stages: ['shell', 'skeleton'] },
+    evidencePath: 'meta.arrangement.arrangementEvidence', stages: ['shellTheme', 'skeleton'] },
   { id: 'tableTreatment', label: 'arrangement.tableTreatment', path: 'meta.arrangement.tableTreatment',
     menu: VALID_TABLE_TREATMENTS, kind: 'scalar',
-    evidencePath: 'meta.arrangement.arrangementEvidence', stages: ['shell', 'skeleton'] },
+    evidencePath: 'meta.arrangement.arrangementEvidence', stages: ['shellTheme', 'skeleton'] },
   { id: 'annotationPattern', label: 'arrangement.annotationPattern', path: 'meta.arrangement.annotationPattern',
     menu: VALID_ANNOTATION_PATTERNS, kind: 'scalar',
-    evidencePath: 'meta.arrangement.arrangementEvidence', stages: ['shell', 'skeleton'] },
+    evidencePath: 'meta.arrangement.arrangementEvidence', stages: ['shellTheme', 'skeleton'] },
   { id: 'leitmotif', label: 'arrangement.leitmotif', path: 'meta.arrangement.leitmotif',
     menu: VALID_LEITMOTIF_GESTURES, kind: 'scalar',
-    evidencePath: 'meta.arrangement.arrangementEvidence', stages: ['shell', 'skeleton'] },
+    evidencePath: 'meta.arrangement.arrangementEvidence', stages: ['shellTheme', 'skeleton'] },
   // THE GEOMETRY, AND ITS ONE EXEMPTION. D144 W-2 landed the rule that governs
   // this axis — "the DESIGN BIAS proposes geometries; the mechanic grammar
   // family DECIDES" — and that rule is not a third source: the family is itself
@@ -3375,7 +3432,7 @@ export var IDENTITY_AXES = [
     menu: formPlansFor(family),
     kind: 'scalar',
     evidencePath: 'meta.arrangement.arrangementEvidence',
-    stages: ['shell', 'skeleton']
+    stages: ['shellTheme', 'skeleton']
   };
 }));
 
@@ -3388,17 +3445,49 @@ export var IDENTITY_AXIS_STAGES = IDENTITY_AXES.reduce(function (acc, axis) {
   return acc;
 }, []);
 
+// ── STAGE FAMILIES: one seat that became four (the shell split) ────────────
+// `shell` was one call authoring four sibling booklet surfaces, and every axis
+// above named it. It is now four sequential sub-stages, and each axis names the
+// ONE that authors its own surface — D149's own law, applied to a finer seat:
+// a stage checked against axes it was never shown is the derived-or-strict
+// trap, and after the split each sub-stage is shown only its own quarter.
+//
+// The family key is a UNION ACCESSOR, not a stage. Nothing is tagged `shell`
+// any more, so `IDENTITY_AXIS_STAGES` (derived from the rows) names only real
+// seats — the gate in validate.mjs that demands a builder be handed
+// `identityAxesForStage('<seat>')` therefore demands the three real ones and
+// cannot be satisfied by a family name nobody builds a prompt for. Callers that
+// legitimately want the whole shell's worth of axes at once (the eval bench's
+// corpus reader, the floors harness's census rows) ask for the family and get
+// the same set they got before the split, in the same order.
+//
+// The guided wizard still authors the whole shell in one prompt (its builder is
+// untouched by ruling), so the family is what that path means by "shell".
+export var IDENTITY_AXIS_STAGE_FAMILIES = {
+  shell: ['shellIdentity', 'shellRules', 'shellTheme', 'shellSpine']
+};
+
 /**
  * identityAxesForStage(stage) -> axis[]
  *
  * SINGLE HOME (D93). The prompt asks for the axes it must show, the floor asks
  * for the axes it may check, and the two must be the same list or the system
  * demands a value it never handed over.
+ *
+ * A FAMILY KEY expands to the union of its members, in table order and without
+ * duplicates. A real stage key never collides with a family key — the family
+ * table's own keys are the retired seats, and `IDENTITY_AXIS_STAGES` is derived
+ * from the rows, so the two namespaces cannot overlap by construction.
  */
 export function identityAxesForStage(stage) {
   var key = String(stage || '').trim();
+  var members = IDENTITY_AXIS_STAGE_FAMILIES[key] || [key];
   return IDENTITY_AXES.filter(function (axis) {
-    return (axis.stages || []).indexOf(key) !== -1;
+    var stages = axis.stages || [];
+    for (var i = 0; i < members.length; i++) {
+      if (stages.indexOf(members[i]) !== -1) return true;
+    }
+    return false;
   });
 }
 

@@ -5921,7 +5921,52 @@
     // is how its page is PUT TOGETHER (VISION §8: layout IS the identity), and
     // a model that fixes the press and then composes the page in a different
     // sitting writes two objects. Same stage-only ruling, same reason.
+    //
+    // ── THE SHELL SPLIT (four sub-stages) ────────────────────────────────
+    // Everything above stays true; it is now distributed rather than bundled.
+    // The `'shell'` row below is the UNION and the GUIDED WIZARD'S row: that
+    // door still authors the whole shell in one prompt (author ruling — the
+    // wizard is untouched by this split), and `generateShellPrompt` reads this
+    // row. The API/bridge pipeline reads the four sub-stage rows instead.
+    //
+    // THE UNION IS GATED, NOT MAINTAINED. `shellSplitRoutingParity()` in
+    // scripts/validate.mjs fails the build when the four sub-rows and this row
+    // stop being the same two sets — otherwise doctrine could quietly come to
+    // live on the wizard path alone while `promptSectionReachability()` still
+    // reported it ROUTED, which is the vacuity this split could have bought.
+    //
+    // WHAT MOVED WHERE, and why each is true at its seat (D128's law — a
+    // section routed to a stage it is FALSE at teaches the model that this
+    // prompt's rules may not apply to the shape in front of it):
+    //   · shellIdentity — SCHEMA_META and the compiler. This is the seat that
+    //     runs INST_ARTIFACT_COMPILER's steps, so SHELL_CHOICE (Steps 7/7a/9),
+    //     CONVERGENCE_DESIGN (Step 6) and ENDING_SETTLEMENT ride with it, and
+    //     MARK_SURFACE rides because `meta.economy` is authored here.
+    //   · shellRules — cover + rulesSpread. RULES_TEACH is the whole reason
+    //     the seat exists; VOICE_DISCIPLINE because the rules page is the
+    //     first prose a reader meets and carries the play kit.
+    //   · shellTheme — theme, designLanguage and arrangement, which the
+    //     paragraphs above call ONE SITTING of one decision. Splitting them
+    //     across sub-stages would have made two objects out of one press;
+    //     they move together or not at all. (This is the one place the round's
+    //     own cut was corrected on contact: `meta.designLanguage` was briefed
+    //     into the identity block, which would have separated it from both the
+    //     archetype it is composed onto and the arrangement it is one sitting
+    //     with.)
+    //   · shellSpine — `meta.playSpine`. LUDIC_SPINE and SURFACE_REFS (every
+    //     spine edge is a pair of refs) and SHELL_SELF_CHECK, whose seven
+    //     questions are all spine questions.
+    // SEED_ASSIGNMENT rides identity and theme — the TWO seats IDENTITY_AXES
+    // says author an axis. shellRules and shellSpine author none and are
+    // therefore handed no assignments and told no assignment law: D149's own
+    // trap read from the other end. (The spine's two axes sit at the identity
+    // seat because that is where their EVIDENCE field is written — the compiler
+    // declares, the spine builds; see IDENTITY_AXES' own note.)
     'shell':          { schemas: ['META', 'THEME', 'DESIGN_LANGUAGE', 'ARRANGEMENT', 'COVER_RULES'],              instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'SHELL_CHOICE', 'SEED_ASSIGNMENT', 'SURFACE_REFS', 'LUDIC_SPINE', 'CONVERGENCE_DESIGN', 'ENDING_SETTLEMENT', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'VOICE_SKELETON', 'RULES_TEACH', 'VISUAL_DIRECTION', 'DESIGN_LANGUAGE', 'ARRANGEMENT', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS', 'STRUCTURAL_RULES', 'SHELL_SELF_CHECK'] },
+    'shellIdentity':  { schemas: ['META'],                                                                        instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'ARTIFACT_COMPILER', 'SHELL_CHOICE', 'SEED_ASSIGNMENT', 'CONVERGENCE_DESIGN', 'ENDING_SETTLEMENT', 'WORLD_CONTRACT', 'VOICE_DISCIPLINE', 'STORY_ENGINE', 'ENVIRONMENT', 'CHARACTER_WEB', 'MARK_SURFACE', 'VOICE_SKELETON', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'CONTRACT_GUARDRAILS'] },
+    'shellRules':     { schemas: ['COVER_RULES'],                                                                 instructions: ['BRIEF_FIDELITY', 'RULES_TEACH', 'VOICE_DISCIPLINE', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'STRUCTURAL_RULES'] },
+    'shellTheme':     { schemas: ['THEME', 'DESIGN_LANGUAGE', 'ARRANGEMENT'],                                     instructions: ['BRIEF_INTERPRETATION', 'BRIEF_FIDELITY', 'SEED_ASSIGNMENT', 'VISUAL_DIRECTION', 'DESIGN_LANGUAGE', 'ARRANGEMENT', 'OUTPUT_RULES', 'CONTRACT_GUARDRAILS'] },
+    'shellSpine':     { schemas: [],                                                                              instructions: ['BRIEF_FIDELITY', 'SURFACE_REFS', 'LUDIC_SPINE', 'VOICE_DISCIPLINE', 'OUTPUT_RULES', 'OUTPUT_BUDGETS', 'SHELL_SELF_CHECK'] },
     // Knowing: the world's process particulars, authored once after the
     // skeleton/shell and consumed by every prose stage (§11 Wave 1.5). It
     // writes no prose, so it carries no VOICE_DISCIPLINE — it carries the
