@@ -4020,7 +4020,7 @@
     // owes nothing, so a book with no cadence declarations builds the prompt it
     // always built, byte for byte.
     var msCadenceGiven = (typeof window.formatWeekCadenceGiven === 'function')
-      ? window.formatWeekCadenceGiven(options.playSpine, weekPlan.weekNumber)
+      ? window.formatWeekCadenceGiven(options.playSpine, weekPlan.weekNumber, isBossWeek)
       : '';
 
     // D186's shape at the unit seats (found live - the finale death): the one

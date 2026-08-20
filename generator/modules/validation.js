@@ -3476,8 +3476,22 @@ function clockArmAlreadyOwns(edge, kind, wk) {
  * introWeek on; late withholds before introWeek and owes from it; window
  * withholds after closesAtWeek. `once` and half-declared modes make no
  * per-week demand here — the half-declaration arm owns the latter.
+ *
+ * THE BOSS EXEMPTION (author-ratified 2026-08-20): the adapter's boss branch
+ * renders the encounter and never the week's fieldOps furniture, so a `map:`
+ * or `companion:` owe on the boss week is unsatisfiable ON PAPER — a payload
+ * that stuffed them in would pass this gate and print nothing, the weekly
+ * promise kept in JSON and broken to the player. Owes for those kinds are
+ * therefore scoped to weeks 1..N-1 when `isBossWeek` is passed; `clock:`
+ * demands still bind the boss week, because boss weeks DO render
+ * gameplayClocks (D109). Withholds are untouched — a surface the boss page
+ * cannot print trivially satisfies them. If a future round rules the boss
+ * page should print the loop furniture (the filed design question), this
+ * exemption is the one seam to lift.
  */
-export function cadenceContradictionsForWeek(graph, weekNumber) {
+export var BOSS_EXEMPT_CADENCE_KINDS = ['map', 'companion'];
+
+export function cadenceContradictionsForWeek(graph, weekNumber, isBossWeek) {
   var wk = Number(weekNumber);
   var edges = Array.isArray(graph) ? graph : [];
   if (!(wk > 0)) return [];
@@ -3493,9 +3507,21 @@ export function cadenceContradictionsForWeek(graph, weekNumber) {
     if (mode === 'window' && !closesAtWeek) return;
     var edgeLabel = '`' + String(edge.from || '?') + '` → `' + String(edge.to || '?') + '`';
     cadenceCheckableEndpoints(edge).forEach(function (ep) {
+      // The boss exemption, kind-scoped: no owe demand for furniture the boss
+      // page cannot render. See the header.
+      var bossExempt = !!isBossWeek && BOSS_EXEMPT_CADENCE_KINDS.indexOf(ep.kind) !== -1;
       var slotKey = ep.kind + ':' + ep.key;
       var slot = demands[slotKey]
         || (demands[slotKey] = { kind: ep.kind, id: ep.id, key: ep.key, owe: null, withhold: null });
+      if (bossExempt) {
+        // Withholds still record (trivially satisfiable); owes are skipped.
+        if (mode === 'late' && wk < introWeek) {
+          slot.withhold = slot.withhold || edgeLabel + ' (`late`, absent until week ' + introWeek + ')';
+        } else if (mode === 'window' && wk > closesAtWeek) {
+          slot.withhold = slot.withhold || edgeLabel + ' (`window`, closed at week ' + closesAtWeek + ')';
+        }
+        return;
+      }
       if (mode === 'weekly' && wk >= introWeek) {
         slot.owe = slot.owe || edgeLabel + ' (`weekly`'
           + (introWeek > 1 ? ' from week ' + introWeek : '') + ')';
@@ -3538,8 +3564,9 @@ export function cadenceConformanceFloorErrors(weekObj, weekNumber, playSpine) {
   // conflicted surfaces are SUPPRESSED from the owe/withhold arms below, so
   // the model is never handed the oscillating pair alongside the routing
   // error.
+  var isBossCadenceWeek = !!weekObj.isBossWeek;
   var conflictedKeys = {};
-  cadenceContradictionsForWeek(graph, wk).forEach(function (c) {
+  cadenceContradictionsForWeek(graph, wk, isBossCadenceWeek).forEach(function (c) {
     conflictedKeys[c.kind + ':' + c.key] = true;
     errors.push('Economy Graph → the graph owes and forbids `' + c.kind + ':' + c.id
       + '` in week ' + wk + ' at once: ' + c.owe + ' requires it on the page, and '
@@ -3598,11 +3625,19 @@ export function cadenceConformanceFloorErrors(weekObj, weekNumber, playSpine) {
       // A conflicted surface already carries the routed coherence error above;
       // its owe/withhold arms would hand the model the oscillating pair.
       if (conflictedKeys[ep.kind + ':' + ep.key]) return;
+      // THE BOSS EXEMPTION (author-ratified 2026-08-20), kind-scoped, mirrored
+      // from cadenceContradictionsForWeek's header: the boss page renders the
+      // encounter, never the week's fieldOps furniture, so a map/companion owe
+      // here demands ink the renderer cannot produce. Owes are skipped;
+      // withholds below stay live (trivially satisfied). Clocks still bind —
+      // boss weeks render gameplayClocks (D109).
+      var bossExemptOwe = isBossCadenceWeek
+        && BOSS_EXEMPT_CADENCE_KINDS.indexOf(ep.kind) !== -1;
       var present = weekPrintsSurface(surfaces, ep.kind, ep.key);
       var named = '`' + ep.kind + ':' + ep.id + '`';
 
       if (mode === 'weekly') {
-        if (wk < introWeek || present) return;
+        if (bossExemptOwe || wk < introWeek || present) return;
         if (clockArmAlreadyOwns(edge, ep.kind, wk)) return;
         errors.push('Week ' + wk + ' → the economy-graph edge ' + edgeLabel + ' is declared '
           + '`cadence.mode: "weekly"`' + (introWeek > 1 ? ' from week ' + introWeek : '')
@@ -3624,6 +3659,7 @@ export function cadenceConformanceFloorErrors(weekObj, weekNumber, playSpine) {
           return;
         }
         if (wk >= introWeek && !present) {
+          if (bossExemptOwe) return;
           if (clockArmAlreadyOwns(edge, ep.kind, wk)) return;
           errors.push('Week ' + wk + ' → the economy-graph edge ' + edgeLabel + ' is declared '
             + '`cadence.mode: "late"` arriving in week ' + introWeek + ', and this week is at or '
@@ -5924,7 +5960,10 @@ export function validateEconomyGraphStage(result, options) {
   if (sweepWeeks > 0) {
     var conflictSeen = {};
     for (var cw = 1; cw <= sweepWeeks; cw++) {
-      cadenceContradictionsForWeek(graph, cw).forEach(function (c) {
+      // The final week is the boss by contract (the assembled gate asserts
+      // it), so the sweep applies the boss exemption there — the same reading
+      // the week gate will make of `isBossWeek` on the payload itself.
+      cadenceContradictionsForWeek(graph, cw, cw === sweepWeeks).forEach(function (c) {
         var conflictKey = c.kind + ':' + c.key;
         if (conflictSeen[conflictKey]) return;
         conflictSeen[conflictKey] = true;

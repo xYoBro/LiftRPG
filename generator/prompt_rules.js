@@ -1724,7 +1724,13 @@
     '`late` arriving week 6 on another is not two schedules — it is one surface ordered onto the',
     'page and off the page in the same week, and no week can obey both. The graph is refused',
     'whole for it, before any week is written. Before you answer, read your edges surface by',
-    'surface: if two disagree, the LATEST arrival is usually the true design — align the others.'
+    'surface: if two disagree, the LATEST arrival is usually the true design — align the others.',
+    '',
+    'THE BOSS WEEK OWES ONLY CLOCKS. The final week prints the boss encounter, not the weekly',
+    'loop furniture — a `weekly` or `late` promise on a `map:` or `companion:` surface binds',
+    'through the week BEFORE the boss and is complete there. Clock promises still bind every',
+    'week including the boss. Do not pace a map or companion to arrive IN the boss week: a',
+    'surface only the boss week would owe is a surface no page will ever print.'
   ];
 
   // Structured-output twin. ONE literal, borrowed by both transports — the same
@@ -4305,13 +4311,23 @@
    * named surfaces this week owes and which it must not print yet. Two seats, two
    * halves of one rule.
    */
-  window.formatWeekCadenceGiven = function (playSpine, weekNumber) {
+  window.formatWeekCadenceGiven = function (playSpine, weekNumber, isBossWeek) {
     var spine = (playSpine && typeof playSpine === 'object') ? playSpine : null;
     if (!spine) return '';
     var n = Number(weekNumber);
     if (!(n > 0)) return '';
     var graph = Array.isArray(spine.economyGraph) ? spine.economyGraph : [];
     if (!graph.length) return '';
+
+    // THE BOSS EXEMPTION (author-ratified 2026-08-20) — MIRROR of
+    // BOSS_EXEMPT_CADENCE_KINDS in validation.js (this file is a classic IIFE
+    // and cannot import; comment-reciprocal, the ladder-mirror idiom). The
+    // boss page renders the encounter and never fieldOps furniture, so map/
+    // companion owes are not stated to the boss seat — a demand the floor no
+    // longer makes must not be taught, or the model prints unrenderable ink.
+    // Clock demands still bind (boss weeks render gameplayClocks, D109).
+    var bossExemptKinds = isBossWeek ? ['map', 'companion'] : [];
+    var bossSkipped = [];
 
     var owes = [];
     var withhold = [];
@@ -4337,6 +4353,14 @@
         var dedupe = mode + '::' + label;
         if (seen[dedupe]) return;
         seen[dedupe] = true;
+        if (bossExemptKinds.indexOf(kind) !== -1) {
+          // Owes are exempt on the boss week; withholds are trivially met by a
+          // page that cannot print the surface. Record the label so the seat
+          // can be told WHY the graph mentions surfaces it does not owe.
+          if ((mode === 'weekly' || mode === 'late') && n >= introWeek
+            && bossSkipped.indexOf(label) === -1) bossSkipped.push(label);
+          return;
+        }
         if (mode === 'weekly' && n >= introWeek) {
           owes.push('- ' + label + ' — declared WEEKLY'
             + (introWeek > 1 ? ' from week ' + introWeek : '') + '.');
@@ -4350,7 +4374,7 @@
         }
       });
     });
-    if (!owes.length && !withhold.length) return '';
+    if (!owes.length && !withhold.length && !bossSkipped.length) return '';
 
     var lines = [
       '### The surfaces this week owes — a GIVEN, and it is checked',
@@ -4374,6 +4398,13 @@
       lines = lines.concat(withhold);
       lines.push('This is design, not omission. Printing one early makes the book\'s own'
         + ' declaration false.');
+      lines.push('');
+    }
+    if (bossSkipped.length) {
+      lines.push('NOT OWED THIS WEEK, though the graph names them: ' + bossSkipped.join(', ')
+        + '. The boss page prints the encounter, not the weekly loop furniture — those'
+        + ' surfaces ran through the prior weeks and their promise is already kept. Do not'
+        + ' print them here; follow the boss-week structure exactly.');
       lines.push('');
     }
     return lines.join('\n').replace(/\n+$/, '');
