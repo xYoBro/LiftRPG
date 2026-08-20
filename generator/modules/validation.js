@@ -4324,6 +4324,9 @@ function validateShellStage(shell, expectedOptions, stageKey) {
   // that can name one field and one coordinate publishes them here so the stage
   // can rewrite that field instead of re-rolling the whole shell.
   var deltaTargets = [];
+  // Structured Floor 5 findings are separate from prose delta targets: this
+  // repair replaces one declared table, not an individual string leaf.
+  var tensionBudgetFindings = [];
   if (!shell) { return { valid: false, errors: [WHERE + ' is null'], deltaTargets: [] }; }
   normalizeShellShape(shell);
   // Hard failures: match pre-restructure checks exactly
@@ -4600,6 +4603,11 @@ function validateShellStage(shell, expectedOptions, stageKey) {
       // on the tension floor; a caller with no plan gets no exemption.
       (expectedOptions || {}).plannedWeeks
     ));
+    tensionBudgetFindings = collectMissingTensionBudgetRowFindings(
+      (shell.meta || {}).playSpine,
+      { weekCount: Number((expectedOptions || {}).weekCount) || 0 },
+      WHERE
+    );
 
     // ── The rulebook⇄spine parity floor (D173) ──
     // The spine is the rulebook's PROJECTION (PLAY.md §3.2), so the check runs
@@ -4694,7 +4702,8 @@ function validateShellStage(shell, expectedOptions, stageKey) {
     valid: errors.length === 0,
     errors: errors,
     warnings: warnings,
-    deltaTargets: deltaTargets
+    deltaTargets: deltaTargets,
+    tensionBudgetFindings: tensionBudgetFindings
   };
 }
 
@@ -6496,11 +6505,16 @@ export function collectSpineSkeletonFloorErrors(spine, skeleton, stageLabel, pla
   budget.forEach(function (row) {
     if (row && Number.isInteger(row.week)) budgetByWeek[row.week] = row;
   });
+  // The string errors below are derived from these findings rather than
+  // duplicated. The repair runner needs the week coordinates, while every
+  // existing validator consumer still reads the same human sentence it always
+  // did. A missing table and a malformed non-array table both become the same
+  // missing-row findings, matching this floor's long-standing `[]` behavior.
+  var missingTensionRows = collectMissingTensionBudgetRowFindings(spine, skeleton, stageLabel);
+  missingTensionRows.forEach(function (finding) { errors.push(finding.message); });
   plannedWeeks.forEach(function (n) {
     var row = budgetByWeek[n];
     if (!row) {
-      errors.push(S + 'playSpine.tensionBudget has no row for week ' + n
-        + ' — every week declares what is scarce, what can be lost, or where the player can fall behind');
       return;
     }
     var named = ['scarce', 'losable', 'fallBehind'].filter(function (axis) {
@@ -6531,6 +6545,36 @@ export function collectSpineSkeletonFloorErrors(spine, skeleton, stageLabel, pla
   errors.push.apply(errors, collectSpineHarvestFloorErrors(spine, index, parsedEdges, S));
 
   return errors;
+}
+
+/**
+ * collectMissingTensionBudgetRowFindings(spine, skeleton, stageLabel) -> finding[]
+ *
+ * The structured half of Floor 5. `kind` and `week` are the repair contract;
+ * consumers never infer either from the display sentence. This is deliberately
+ * limited to absent rows: a row that exists but names no axis is authored
+ * content, so it keeps the ordinary full-stage retry.
+ */
+export function collectMissingTensionBudgetRowFindings(spine, skeleton, stageLabel) {
+  var index = buildSurfaceIndex(skeleton || {});
+  var S = (stageLabel || 'Skeleton') + ' → ';
+  var budget = Array.isArray((spine || {}).tensionBudget) ? spine.tensionBudget : [];
+  var budgetByWeek = {};
+  budget.forEach(function (row) {
+    if (row && Number.isInteger(row.week)) budgetByWeek[row.week] = row;
+  });
+  return Object.keys(index.weeks).map(Number).sort(function (a, b) { return a - b; })
+    .filter(function (week) { return !budgetByWeek[week]; })
+    .map(function (week) {
+      return {
+        kind: 'missing-tension-budget-row',
+        week: week,
+        path: 'meta.playSpine.tensionBudget',
+        pathParts: ['meta', 'playSpine', 'tensionBudget'],
+        message: S + 'playSpine.tensionBudget has no row for week ' + week
+          + ' — every week declares what is scarce, what can be lost, or where the player can fall behind'
+      };
+    });
 }
 
 // ════════════════════════════════════════════════════════════════════════════

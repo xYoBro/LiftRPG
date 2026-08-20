@@ -7536,3 +7536,64 @@
       '- Return valid JSON only. No fences, no commentary.'
     ]).join('\n');
   };
+
+  // The repair has one legal payload: the complete tension table. It is a
+  // separate wire schema from delta's string-only envelope because pretending
+  // an array is text would defeat the merge guard before the stage gate can
+  // reject it.
+  window.STRUCTURED_SCHEMA_TENSION_BUDGET_REPAIR = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      tensionBudget: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            week: { type: 'integer' },
+            scarce: { type: 'string' },
+            losable: { type: 'string' },
+            fallBehind: { type: 'string' }
+          },
+          required: ['week']
+        }
+      }
+    },
+    required: ['tensionBudget']
+  };
+
+  window.buildTensionBudgetRepairPrompt = function (stageName, weeks, plannedWeekShapes) {
+    var requested = (weeks || []).slice().sort(function (a, b) { return a - b; });
+    var deloads = {};
+    (plannedWeekShapes || []).forEach(function (shape) {
+      var week = Number((shape || {}).weekNumber);
+      if (Number.isInteger(week) && shape && shape.isDeload) deloads[week] = true;
+    });
+    var rows = requested.map(function (week) {
+      return '- Week ' + week + (deloads[week]
+        ? ': planned DELOAD — you may leave scarce, losable, and fallBehind empty.'
+        : ': working week — at least one of scarce, losable, or fallBehind must be a real non-empty string.');
+    });
+    return [
+      '# Tension Budget Repair — ' + stageName,
+      '',
+      'Your previous answer was accepted in every respect except that it omitted its tension table.',
+      'Return ONLY `playSpine.tensionBudget`. Nothing else about the answer may change.',
+      '',
+      '## Required Weeks',
+      '- Return exactly ' + requested.length + ' rows, one row for each of these weeks: ' + requested.join(', ') + '.',
+      '- Every row has this shape: `{ "week": N, "scarce"?: "...", "losable"?: "...", "fallBehind"?: "..." }`.',
+      '- Do not add any other keys, weeks, rows, commentary, or surrounding object.',
+      ''
+    ].concat(rows, [
+      '',
+      '## Output Contract',
+      'Return ONLY this JSON object:',
+      '{ "tensionBudget": [ { "week": 1, "scarce": "..." } ] }',
+      '',
+      '- Keep each pressure tied to its week. This is a complete replacement table, not a patch list.',
+      '- A non-deload row with all three axes empty fails. A planned deload row may leave all three empty.',
+      '- Return valid JSON only. No fences, no commentary.'
+    ]).join('\n');
+  };

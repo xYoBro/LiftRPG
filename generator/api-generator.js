@@ -1784,13 +1784,19 @@ function applyDeltaFixes(payload, targets, fixes) {
       rejected.push('unnamed path: ' + (path || '(missing)'));
       return;
     }
-    if (typeof fix.value !== 'string') {
-      rejected.push('non-string value at ' + path);
+    // Text repairs are scalar-only. The tension-table repair is the one
+    // explicitly table-valued exception, marked on its target by the floor
+    // that licensed it; accepting arbitrary objects for ordinary delta targets
+    // would turn a field repair into an unbounded subtree replacement.
+    var acceptsJson = allowed[path].valueKind === 'json';
+    if ((!acceptsJson && typeof fix.value !== 'string')
+        || (acceptsJson && (fix.value === null || typeof fix.value !== 'object'))) {
+      rejected.push((acceptsJson ? 'non-object' : 'non-string') + ' value at ' + path);
       return;
     }
     if (seen[path]) { rejected.push('duplicate fix for ' + path); return; }
     seen[path] = true;
-    normalized.push({ target: allowed[path], value: fix.value, order: targetOrder[path] });
+    normalized.push({ target: allowed[path], value: acceptsJson ? deltaClone(fix.value) : fix.value, order: targetOrder[path] });
   });
   // Applied in the GATE's order, never the model's. For text repairs this is
   // cosmetic; for presence-class repairs it is load-bearing — the order the
@@ -2341,6 +2347,172 @@ async function runEnumRepairCall(ctx) {
  */
 function describeEnumPicks(picks) {
   return (picks || []).map(function (p) { return p.path + ' → ' + p.value; }).join(', ');
+}
+
+// ── THE TENSION-TABLE REPAIR ───────────────────────────────────────────────
+//
+// A shell-spine answer can be sound everywhere except for the table that gives
+// every planned week its pressure. Prompt-only transports have now omitted that
+// table wholesale, repeatedly. Unlike a prose delta or enum pick, the smallest
+// safe remedy is one declared table at one declared path: it may fire only when
+// the gate publishes nothing but structured missing-row findings, it may write
+// only that table, and the ordinary stage gate still decides whether it banks.
+var TENSION_BUDGET_REPAIR_BUDGET_KEY = 'tensionBudgetRepair';
+
+function partitionTensionBudgetRepair(findings) {
+  var all = (findings || []).slice();
+  if (!all.length) return { eligible: false, reason: 'no-tension-findings', targets: [], structural: [] };
+  var weeks = [];
+  var structural = [];
+  var seenWeeks = {};
+  all.forEach(function (finding) {
+    if (!finding || finding.kind !== 'missing-tension-budget-row'
+      || finding.path !== 'meta.playSpine.tensionBudget'
+      || !Array.isArray(finding.pathParts)
+      || finding.pathParts.join('.') !== 'meta.playSpine.tensionBudget'
+      || !Number.isInteger(finding.week) || finding.week < 1 || seenWeeks[finding.week]) {
+      structural.push((finding && finding.message) || 'invalid tension-budget finding');
+      return;
+    }
+    seenWeeks[finding.week] = true;
+    weeks.push(finding.week);
+  });
+  if (structural.length) return { eligible: false, reason: 'mixed-or-malformed-tension-findings', targets: [], structural: structural };
+  weeks.sort(function (a, b) { return a - b; });
+  return {
+    eligible: true,
+    reason: '',
+    targets: [{
+      path: 'meta.playSpine.tensionBudget',
+      pathParts: ['meta', 'playSpine', 'tensionBudget'],
+      // A missing table is the exact path the floor named. This is the sole
+      // presence-class write: it creates no sibling, row, or nested field.
+      presence: true,
+      valueKind: 'json',
+      weeks: weeks
+    }],
+    structural: []
+  };
+}
+
+function tensionBudgetFindingsMatchBlocking(blocking, findings) {
+  if (!Array.isArray(blocking) || !Array.isArray(findings) || blocking.length !== findings.length) return false;
+  var expected = {};
+  findings.forEach(function (finding) {
+    var message = String((finding || {}).message || '');
+    expected[message] = (expected[message] || 0) + 1;
+  });
+  for (var i = 0; i < blocking.length; i++) {
+    var key = String(blocking[i] || '');
+    if (!expected[key]) return false;
+    expected[key] -= 1;
+  }
+  return Object.keys(expected).every(function (key) { return expected[key] === 0; });
+}
+
+function tensionBudgetRefusalRecord(partition) {
+  return {
+    calls: 0, inputTokens: 0, outputTokens: 0,
+    fields: [], weeks: [], resolved: false,
+    refused: partition.reason || 'ineligible',
+    structural: (partition.structural || []).slice(), notes: []
+  };
+}
+
+function validateTensionBudgetRepairTable(table, weeks, plannedWeekShapes) {
+  if (!Array.isArray(table)) return { ok: false, reason: 'tensionBudget is not an array' };
+  var expected = {};
+  (weeks || []).forEach(function (week) { expected[week] = true; });
+  var deloads = {};
+  (plannedWeekShapes || []).forEach(function (shape) {
+    var week = Number((shape || {}).weekNumber);
+    if (Number.isInteger(week) && shape && shape.isDeload) deloads[week] = true;
+  });
+  var seen = {};
+  for (var i = 0; i < table.length; i++) {
+    var row = table[i];
+    if (!row || typeof row !== 'object' || Array.isArray(row)) return { ok: false, reason: 'row ' + (i + 1) + ' is not an object' };
+    var rowWeek = row.week;
+    if (!Number.isInteger(rowWeek) || !expected[rowWeek] || seen[rowWeek]) {
+      return { ok: false, reason: 'row ' + (i + 1) + ' has an unknown or duplicate week' };
+    }
+    var keys = Object.keys(row);
+    if (keys.some(function (key) { return ['week', 'scarce', 'losable', 'fallBehind'].indexOf(key) === -1; })) {
+      return { ok: false, reason: 'row ' + (i + 1) + ' has an unknown field' };
+    }
+    var named = 0;
+    ['scarce', 'losable', 'fallBehind'].forEach(function (axis) {
+      if (row[axis] !== undefined && typeof row[axis] !== 'string') named = -99;
+      if (String(row[axis] || '').trim()) named += 1;
+    });
+    if (named < 0) return { ok: false, reason: 'row ' + (i + 1) + ' has a non-string axis' };
+    if (!named && !deloads[rowWeek]) return { ok: false, reason: 'working week ' + rowWeek + ' names no axis' };
+    seen[rowWeek] = true;
+  }
+  if (table.length !== (weeks || []).length || Object.keys(seen).length !== (weeks || []).length) {
+    return { ok: false, reason: 'the table does not contain exactly one row for every requested week' };
+  }
+  return { ok: true, reason: '' };
+}
+
+async function runTensionBudgetRepairCall(ctx) {
+  var targets = ctx.targets;
+  var target = targets[0];
+  var notes = [];
+  var ledger = {
+    calls: 0, inputTokens: 0, outputTokens: 0,
+    fields: target ? [target.path] : [], weeks: target ? target.weeks.slice() : [],
+    resolved: false, refused: '', structural: [], notes: notes
+  };
+  var builder = (typeof window !== 'undefined') && window.buildTensionBudgetRepairPrompt;
+  var schema = (typeof window !== 'undefined') && window.STRUCTURED_SCHEMA_TENSION_BUDGET_REPAIR;
+  if (!target || typeof builder !== 'function') {
+    notes.push('tension-budget repair prompt builder unavailable');
+    return { repaired: null, ledger: ledger, notes: notes };
+  }
+  var budget = stageBudget(TENSION_BUDGET_REPAIR_BUDGET_KEY, ctx.settings.requestTimeoutMs);
+  var repairSettings = Object.assign({}, ctx.settings, {
+    requestTimeoutMs: budget.requestTimeoutMs({ attempt: 0, error: null })
+  });
+  ctx.emit('Repairing ' + ctx.stageName + ': restoring its tension table for week'
+    + (target.weeks.length === 1 ? ' ' : 's ') + target.weeks.join(', ')
+    + '. The rest of the answer is kept.', {
+    phase: 'delta_repair', repairKind: 'tensionBudget', round: 1, maxRounds: 1,
+    fields: ledger.fields.slice(), weeks: ledger.weeks.slice(), fieldCount: 1
+  });
+  var response;
+  try {
+    response = await callProviderStructured(repairSettings,
+      builder(ctx.stageName, target.weeks, ctx.plannedWeekShapes), schema || null,
+      budget.maxTokens({ attempt: 0, error: null }), ctx.stageName + ' tension budget repair',
+      { signal: runAbortSignal(repairSettings) });
+  } catch (err) {
+    if (isUserAbortError(err)) throw err;
+    notes.push('tension-budget repair call failed: ' + String((err && err.message) || err || 'unknown'));
+    return { repaired: null, ledger: ledger, notes: notes };
+  }
+  ledger.calls += 1;
+  var usage = (response && response.usage && response.usage.usage) || null;
+  if (usage) {
+    ledger.inputTokens += safeNumber(usage.inputTokens);
+    ledger.outputTokens += safeNumber(usage.outputTokens);
+  }
+  recordStageUsage(ctx.telemetry, response);
+  var answer = response && response.result;
+  var table = Array.isArray(answer) ? answer : (answer && answer.tensionBudget);
+  var tableVerdict = validateTensionBudgetRepairTable(table, target.weeks, ctx.plannedWeekShapes);
+  if (!tableVerdict.ok) {
+    ledger.refused = 'malformed-answer';
+    notes.push('repair returned an illegal tension table: ' + tableVerdict.reason);
+    return { repaired: null, ledger: ledger, notes: notes };
+  }
+  var merge = applyDeltaFixes(ctx.payload, targets, [{ path: target.path, value: table }]);
+  if (!merge.ok) {
+    ledger.refused = 'merge-rejected';
+    notes.push('merge rejected: ' + merge.rejected.join('; '));
+    return { repaired: null, ledger: ledger, notes: notes };
+  }
+  return { repaired: merge.merged, ledger: ledger, notes: notes };
 }
 
 // ── CROSS-STAGE REPAIR ROUTING (D143) ───────────────────────────────────────
@@ -2948,6 +3120,10 @@ function createStageTelemetry(stageKey, stageName) {
     // value), and one slot for two records is one record lost. Token counts
     // here are a SUBSET of `usage`, never an addition to it.
     enumRepair: null,
+    // The field-scoped shell-spine repair. Kept apart from enumRepair because
+    // it carries an authored table and its own week coordinates; one generic
+    // slot would lose which repair actually spent the call.
+    tensionBudgetRepair: null,
     usage: blankUsageTotals(),
     estimatedCostUsd: 0,
     pricing: null
@@ -2992,6 +3168,14 @@ function summarizeStageTelemetry(telemetry) {
         notes: (telemetry.enumRepair.notes || []).slice(),
         structural: (telemetry.enumRepair.structural || []).slice(),
         claimed: (telemetry.enumRepair.claimed || []).slice()
+      })
+      : null,
+    tensionBudgetRepair: telemetry && telemetry.tensionBudgetRepair
+      ? Object.assign({}, telemetry.tensionBudgetRepair, {
+        fields: (telemetry.tensionBudgetRepair.fields || []).slice(),
+        weeks: (telemetry.tensionBudgetRepair.weeks || []).slice(),
+        notes: (telemetry.tensionBudgetRepair.notes || []).slice(),
+        structural: (telemetry.tensionBudgetRepair.structural || []).slice()
       })
       : null,
     usage: {
@@ -3677,6 +3861,63 @@ async function runJsonStage(settings, config) {
             }
             // fall through to success
           } else {
+            // ── TENSION-TABLE REPAIR BEFORE THE RE-ROLL ───────────────────
+            // This is eligible only when the stage's ENTIRE blocking list is
+            // exactly the structured missing-row findings the floor published.
+            // The comparison is identity of those published messages, never a
+            // regex over display prose, so a reworded diagnostic cannot widen
+            // the repair's authority.
+            var tensionFindings = (validationResult && validationResult.tensionBudgetFindings) || [];
+            var tensionPartition = partitionTensionBudgetRepair(tensionFindings);
+            var tensionEligible = tensionPartition.eligible
+              && tensionBudgetFindingsMatchBlocking(classified.blocking, tensionFindings);
+            if (tensionEligible) {
+              var tensionOutcome = await runTensionBudgetRepairCall({
+                settings: settings,
+                stageName: config.stageName,
+                payload: result,
+                targets: tensionPartition.targets,
+                plannedWeekShapes: config.plannedWeekShapes || [],
+                telemetry: stageTelemetry,
+                emit: function (message, meta) {
+                  emitPipelineEvent(config.onProgress, config.stageIndex || 0,
+                    config.getTotalStages ? config.getTotalStages() : 0, message,
+                    Object.assign({
+                      stageKey: config.stageKey || '', stageName: config.stageName,
+                      attempt: attempt, attemptCount: attemptCount
+                    }, meta));
+                }
+              });
+              stageTelemetry.tensionBudgetRepair = tensionOutcome.ledger;
+              if (tensionOutcome.repaired && !validationFailed(config.validate(tensionOutcome.repaired))) {
+                result = tensionOutcome.repaired;
+                stageTelemetry.hadRepair = true;
+                stageTelemetry.tensionBudgetRepair.resolved = true;
+                console.info('[LiftRPG] ' + config.stageName + ' tension table repaired — no re-roll needed.');
+              } else {
+                if (tensionOutcome.repaired) {
+                  stageTelemetry.tensionBudgetRepair.refused = 'regate-failed';
+                  tensionOutcome.ledger.notes.push('re-gate failed after patch');
+                }
+                var tensionErr = new Error(classified.blocking.join('; '));
+                tensionErr.errorType = 'schema';
+                tensionErr.retryable = true;
+                tensionErr.budgetBreachCount = 0;
+                tensionErr.blockingCount = classified.blocking.length;
+                tensionErr.finishReason = attemptFinishReason;
+                // The repair never changes the failed-attempt teaching payload.
+                tensionErr._failedOutput = result;
+                tensionErr._blockingErrors = classified.blocking;
+                tensionErr._stageKey = config.stageKey || '';
+                tensionErr.repairRoute = describeRepairRoute(tensionErr, config.stageName);
+                throw tensionErr;
+              }
+            } else {
+            if (tensionFindings.length) {
+              var tensionRefusal = tensionBudgetRefusalRecord(tensionPartition);
+              if (tensionPartition.eligible) tensionRefusal.refused = 'mixed-with-other-blocking';
+              stageTelemetry.tensionBudgetRepair = tensionRefusal;
+            }
             // ── DELTA REPAIR BEFORE THE RE-ROLL (D167) ───────────────────────
             // Every blocking error named one field and one coordinate? Then ask
             // the model for those fields only, merge under the guard, and
@@ -3774,6 +4015,7 @@ async function runJsonStage(settings, config) {
               // owns its own defect", which is a real and useful answer.
               err.repairRoute = describeRepairRoute(err, config.stageName);
               throw err;
+            }
             }
           }
         }
@@ -5465,6 +5707,9 @@ async function runApiPipeline(options) {
       // read through stageBudget() like its tokens and its timeout (D97/D166).
       rateLimiter: rateLimiter,
       budgetEnforce: useGeminiBudget,
+      // The repair prompt receives this same one-time derivation the spine
+      // prompt and its floor already use; it never infers deloads independently.
+      plannedWeekShapes: plannedWeekShapes,
       // The unknown-key scopes, narrowed with the seat. The monolith swept four
       // sibling properties because it wrote four; each sub-stage sweeps only
       // what it authors, so an invented key is reported against the stage that
@@ -8591,6 +8836,12 @@ window.LiftRPGAPI = {
     enumRefusalRecord: enumRefusalRecord,
     describeEnumPicks: describeEnumPicks,
     enumRepairBudgetKey: ENUM_REPAIR_BUDGET_KEY,
+    // ── The tension-table repair seam, exported for the gates ───────────────
+    partitionTensionBudgetRepair: partitionTensionBudgetRepair,
+    tensionBudgetFindingsMatchBlocking: tensionBudgetFindingsMatchBlocking,
+    tensionBudgetRefusalRecord: tensionBudgetRefusalRecord,
+    validateTensionBudgetRepairTable: validateTensionBudgetRepairTable,
+    tensionBudgetRepairBudgetKey: TENSION_BUDGET_REPAIR_BUDGET_KEY,
     // ── The delta-repair seam (D167), exported for the gates ────────────────
     // Pure functions with no transport, no DOM and no window dependency, so the
     // floors harness can hold them to their contracts with no port and no

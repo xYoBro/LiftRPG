@@ -320,7 +320,11 @@ export var STAGE_BUDGETS = {
   // reads one. The repair is ONE call inside an attempt of the stage it repairs;
   // the escalation is that stage's own re-roll (see the D265 header in
   // api-generator.js for why a round loop would buy nothing here).
-  enumRepair:     { maxTokens: 1500, timeoutMs: 120000 }
+  enumRepair:     { maxTokens: 1500, timeoutMs: 120000 },
+  // The tension repair returns one small row per planned week (at most 12),
+  // never a shell. It remains a call inside the failed attempt; this row owns
+  // only its output ceiling and wall-clock budget.
+  tensionBudgetRepair: { maxTokens: 1800, timeoutMs: 120000 }
 };
 
 // ── The delta-repair round bound (D167) ──────────────────────────────────────
