@@ -1717,7 +1717,14 @@
     'promise the pages break, and it is checked week by week — it will be refused, and the week',
     'that refuses it is the week you will have to rewrite. If a surface genuinely appears in some',
     'weeks and not others on no schedule, that is `once` or a `late` with the right week, not a',
-    '`weekly` you hope nobody counts.'
+    '`weekly` you hope nobody counts.',
+    '',
+    'ONE SURFACE, ONE CADENCE STORY. Several edges may touch the same named surface, and every',
+    'one of them must agree on when that surface exists. `weekly` from week 1 on one edge and',
+    '`late` arriving week 6 on another is not two schedules — it is one surface ordered onto the',
+    'page and off the page in the same week, and no week can obey both. The graph is refused',
+    'whole for it, before any week is written. Before you answer, read your edges surface by',
+    'surface: if two disagree, the LATEST arrival is usually the true design — align the others.'
   ];
 
   // Structured-output twin. ONE literal, borrowed by both transports — the same

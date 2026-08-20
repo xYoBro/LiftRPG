@@ -7189,7 +7189,9 @@ async function runEconomyGraphStage(settings, config) {
         // builder was handed, so the gate can never accuse the model of dropping
         // an edge it was never shown.
         priorGraph: config.priorGraph,
-        weekCount: config.weekCount
+        // Arms the introWeek ceiling AND the coherence sweep — without it the
+        // satisfiability check has no week axis to walk (the D144 idiom).
+        weekCount: config.weekCount   // CAD6-ARM economy-cadence-coherence
       });
     },
     buildPrompt: function (retryState) {

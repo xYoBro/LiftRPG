@@ -3453,6 +3453,71 @@ function clockArmAlreadyOwns(edge, kind, wk) {
   return !!m && Number(m[1]) === wk;
 }
 
+/**
+ * cadenceContradictionsForWeek(graph, weekNumber) -> [{kind, id, key, week, owe, withhold}]
+ *
+ * THE COHERENCE PREDICATE — one home, two readers (the D93/D133 idiom):
+ * `validateEconomyGraphStage` sweeps it across every week of the book at the
+ * seat that AUTHORS the cadences, and `cadenceConformanceFloorErrors` reads it
+ * for the one week it holds as a backstop for resumed checkpoints whose graph
+ * predates this floor. It answers one question: is any named surface both OWED
+ * and FORBIDDEN in this week by the graph's own cadence declarations?
+ *
+ * THE DEFECT THAT EARNED IT (the Codex week-1 deadlock, 2026-08-20): a banked
+ * graph declared `companion:Continuity Sheet` weekly-from-week-1 on one edge
+ * and late-arriving-week-6 on another. Week 1 was required to print it and
+ * forbidden from printing it; six paid attempts oscillated between the two
+ * arms of the conformance floor, each retry directive demanding "fix ALL",
+ * against a demand set with no satisfying assignment. The model complied with
+ * whichever arm was quoted at it — the contradiction was the book's, and no
+ * week seat could ever have resolved it.
+ *
+ * Demand derivation mirrors the conformance arms exactly: weekly owes from
+ * introWeek on; late withholds before introWeek and owes from it; window
+ * withholds after closesAtWeek. `once` and half-declared modes make no
+ * per-week demand here — the half-declaration arm owns the latter.
+ */
+export function cadenceContradictionsForWeek(graph, weekNumber) {
+  var wk = Number(weekNumber);
+  var edges = Array.isArray(graph) ? graph : [];
+  if (!(wk > 0)) return [];
+  var demands = {};
+  edges.forEach(function (edge) {
+    if (!edge || typeof edge !== 'object') return;
+    var cadence = edge.cadence;
+    if (!cadence || typeof cadence !== 'object' || Array.isArray(cadence)) return;
+    var mode = String(cadence.mode || '').trim();
+    var introWeek = Number(cadence.introWeek) > 0 ? Number(cadence.introWeek) : 1;
+    var closesAtWeek = Number(edge.closesAtWeek) > 0 ? Number(edge.closesAtWeek) : 0;
+    if (mode === 'late' && !(Number(cadence.introWeek) > 0)) return;
+    if (mode === 'window' && !closesAtWeek) return;
+    var edgeLabel = '`' + String(edge.from || '?') + '` → `' + String(edge.to || '?') + '`';
+    cadenceCheckableEndpoints(edge).forEach(function (ep) {
+      var slotKey = ep.kind + ':' + ep.key;
+      var slot = demands[slotKey]
+        || (demands[slotKey] = { kind: ep.kind, id: ep.id, key: ep.key, owe: null, withhold: null });
+      if (mode === 'weekly' && wk >= introWeek) {
+        slot.owe = slot.owe || edgeLabel + ' (`weekly`'
+          + (introWeek > 1 ? ' from week ' + introWeek : '') + ')';
+      } else if (mode === 'late' && wk >= introWeek) {
+        slot.owe = slot.owe || edgeLabel + ' (`late`, arriving week ' + introWeek + ')';
+      } else if (mode === 'late' && wk < introWeek) {
+        slot.withhold = slot.withhold || edgeLabel + ' (`late`, absent until week ' + introWeek + ')';
+      } else if (mode === 'window' && wk > closesAtWeek) {
+        slot.withhold = slot.withhold || edgeLabel + ' (`window`, closed at week ' + closesAtWeek + ')';
+      }
+    });
+  });
+  var out = [];
+  Object.keys(demands).forEach(function (slotKey) {
+    var d = demands[slotKey];
+    if (d.owe && d.withhold) {
+      out.push({ kind: d.kind, id: d.id, key: d.key, week: wk, owe: d.owe, withhold: d.withhold });
+    }
+  });
+  return out;
+}
+
 export function cadenceConformanceFloorErrors(weekObj, weekNumber, playSpine) {
   var errors = [];
   var wk = Number(weekNumber);
@@ -3461,6 +3526,27 @@ export function cadenceConformanceFloorErrors(weekObj, weekNumber, playSpine) {
   if (!graph) return errors;
 
   var surfaces = deriveWeekSurfaces(weekObj, wk);
+
+  // ── The coherence backstop (the Codex week-1 deadlock, 2026-08-20) ───────
+  // A surface the graph both owes and forbids in this week is the GRAPH's
+  // defect, and no revision of this week can satisfy it — the compliant
+  // payload fails the withhold arm and the abstaining payload fails the owe
+  // arm, forever. Guarded upstream at validateEconomyGraphStage (the seat that
+  // authors the cadences), so like the half-declaration arm above this fires
+  // only for a resumed checkpoint whose banked graph predates that floor —
+  // exactly the case where burning every week attempt would be worst. The
+  // conflicted surfaces are SUPPRESSED from the owe/withhold arms below, so
+  // the model is never handed the oscillating pair alongside the routing
+  // error.
+  var conflictedKeys = {};
+  cadenceContradictionsForWeek(graph, wk).forEach(function (c) {
+    conflictedKeys[c.kind + ':' + c.key] = true;
+    errors.push('Economy Graph → the graph owes and forbids `' + c.kind + ':' + c.id
+      + '` in week ' + wk + ' at once: ' + c.owe + ' requires it on the page, and '
+      + c.withhold + ' requires it absent. A week cannot print and not print one surface, '
+      + 'so no revision of this week can satisfy the graph — every edge touching this '
+      + 'surface must tell the same story about when it exists.');
+  });
 
   graph.forEach(function (edge) {
     if (!edge || typeof edge !== 'object') return;
@@ -3509,6 +3595,9 @@ export function cadenceConformanceFloorErrors(weekObj, weekNumber, playSpine) {
     var closesAtWeek = Number(edge.closesAtWeek) > 0 ? Number(edge.closesAtWeek) : 0;
 
     cadenceCheckableEndpoints(edge).forEach(function (ep) {
+      // A conflicted surface already carries the routed coherence error above;
+      // its owe/withhold arms would hand the model the oscillating pair.
+      if (conflictedKeys[ep.kind + ':' + ep.key]) return;
       var present = weekPrintsSurface(surfaces, ep.kind, ep.key);
       var named = '`' + ep.kind + ':' + ep.id + '`';
 
@@ -5819,6 +5908,34 @@ export function validateEconomyGraphStage(result, options) {
         + weekCount + ' weeks. A surface that arrives after the last week never arrives.');
     }
   });
+
+  // ── The coherence arm (the Codex week-1 deadlock, 2026-08-20) ────────────
+  // Satisfiability is checkable HERE, statically, before a single week is paid
+  // for — the same seat-economics argument as the fixed-form ref check. A
+  // graph that declares one named surface `weekly` from week 1 on one edge and
+  // `late` until week 6 on another has ordered every early week to print and
+  // not print the same thing; banked past this gate, that contradiction costs
+  // six paid week attempts oscillating between two arms of the conformance
+  // floor (measured, not imagined — 2026-08-20). One error per surface, both
+  // edges quoted, at the first conflicted week. Absent weekCount the sweep is
+  // disarmed (the D144 ungated-caller idiom); the week gate's backstop still
+  // holds the line one seat later.
+  var sweepWeeks = Number(opts.weekCount) > 0 ? Math.floor(Number(opts.weekCount)) : 0;
+  if (sweepWeeks > 0) {
+    var conflictSeen = {};
+    for (var cw = 1; cw <= sweepWeeks; cw++) {
+      cadenceContradictionsForWeek(graph, cw).forEach(function (c) {
+        var conflictKey = c.kind + ':' + c.key;
+        if (conflictSeen[conflictKey]) return;
+        conflictSeen[conflictKey] = true;
+        errors.push(S + 'one surface, one cadence story: `' + c.kind + ':' + c.id + '` is owed '
+          + 'and forbidden in the same week (first at week ' + c.week + '). ' + c.owe
+          + ' requires it on the page, and ' + c.withhold + ' requires it absent. No week can '
+          + 'print and not print one surface, so no week stage could ever satisfy this graph — '
+          + 'make every edge touching this surface tell the same story about when it exists.');
+      });
+    }
+  }
 
   return errors.length ? errors.join('; ') : '';
 }
