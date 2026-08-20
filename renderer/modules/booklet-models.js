@@ -21,6 +21,33 @@ function humanizeComponentType(value) {
   return String(value || 'component').replace(/-/g, ' ');
 }
 
+// THE SHELL IS A STRUCTURE, NOT A GENRE.
+//
+// Every string below is printed unconditionally by the page models for whatever
+// shell family the book carries — and shell family is DRAWN BY THE DIE
+// (`drawSeedAssignments`, D149), independently of the brief's literal subject.
+// The prompt doctrine says so in as many words: "A pastoral book can be a court
+// packet; a government-styled book can be a household archive. Do not let one
+// choose the other." So a book about a maximum-security prison legitimately
+// draws `ship-logbook` — and the copy it prints may not tell that reader about a
+// captain, a vessel or a bridge, none of which appear anywhere else in its 40
+// pages. That is exactly what happened, and it is a distribution defect, not a
+// one-book fluke: every shell/brief pairing where the die assigns a STRUCTURAL
+// fit hits it again.
+//
+// The register to write in is SHELL_CITATION_STYLES' (contract-constants.mjs),
+// which solved this first: ship-logbook cites Entry / Watch / Bearing / Fathom —
+// the shell's own procedural furniture, true whether the book means it literally
+// or metaphorically. Name what the FORM does (a watch is stood, a leaf is filed,
+// an annex is withheld); never name what the world contains.
+//
+// Two failure shapes to check any new string against:
+//   1. a subject noun the brief may not own (captain, vessel, family, incident);
+//   2. a setting the brief may not have (at sea, at home).
+// Both read as an authoring error to a player who has met neither. The form's
+// OWN vocabulary is not one of them — a survey is filed from the field and a
+// packet withholds an annex whatever the book is about, which is why
+// field-survey's "returned to the field" stays and the logbook's "at sea" went.
 const SHELL_FAMILY_COPY = {
   'field-survey': {
     rulesTitle: 'Field Briefing',
@@ -37,29 +64,29 @@ const SHELL_FAMILY_COPY = {
   },
   'classified-packet': {
     rulesTitle: 'Operational Briefing',
-    sealedTitle: 'Sealed Incident Annex',
-    sealedBody: 'Do not open this annex until the packet’s logged values have been reconciled and the final incident designation has been derived.',
+    sealedTitle: 'Sealed Annex',
+    sealedBody: 'Do not open this annex until the packet’s logged values have been reconciled and the final designation has been derived.',
     gaugeTitle: 'Recorded Values Log',
     gaugeLabel: 'Full Designation',
-    assemblyTitle: 'Incident Designation Assembly',
-    assemblySubtitle: 'Transfer each recorded value into the final designation ladder. The annex opens only after the incident name is reconstructed in order.',
-    finalLabel: 'Incident Name',
-    lockedEndingTitle: 'Sealed Incident Annex',
+    assemblyTitle: 'Packet Designation Assembly',
+    assemblySubtitle: 'Transfer each recorded value into the final designation ladder. The annex opens only after the designation is reconstructed in order.',
+    finalLabel: 'Final Designation',
+    lockedEndingTitle: 'Sealed Annex',
     lockedEndingBody: 'This annex stays sealed until the final designation is reconstructed from the packet. No preview text is available before unlock.',
     backColophon: 'Filed for internal circulation. Complete in pencil. Unlock only after full convergence.'
   },
   'ship-logbook': {
-    rulesTitle: 'Bridge Procedure',
-    sealedTitle: 'Sealed Captain\'s Addendum',
-    sealedBody: 'Log each weekly reading, then reconstruct the vessel designation before opening the captain’s addendum.',
-    gaugeTitle: 'Bridge Log',
-    gaugeLabel: 'Final Designation',
-    assemblyTitle: 'Vessel Designation Assembly',
-    assemblySubtitle: 'Transfer each logged reading into the final designation ladder. Confirm the designation before opening the captain’s addendum.',
-    finalLabel: 'Vessel Designation',
-    lockedEndingTitle: 'Captain\'s Addendum',
-    lockedEndingBody: 'The captain’s final addendum remains sealed until the bridge log resolves into a complete designation.',
-    backColophon: 'Logged at sea, completed by hand, resolved from the bridge.'
+    rulesTitle: 'Watch Procedure',
+    sealedTitle: 'Sealed Closing Entry',
+    sealedBody: 'Log each weekly reading in the order the watches fall, then reconstruct the full designation before opening the closing entry.',
+    gaugeTitle: 'Watch Log',
+    gaugeLabel: 'Complete Designation',
+    assemblyTitle: 'Final Entry Assembly',
+    assemblySubtitle: 'Transfer each logged reading into the final designation ladder. Confirm the designation before opening the closing entry.',
+    finalLabel: 'Final Designation',
+    lockedEndingTitle: 'Sealed Closing Entry',
+    lockedEndingBody: 'The closing entry remains sealed until the log resolves into a complete designation.',
+    backColophon: 'Logged watch by watch, completed by hand, closed only once the record is whole.'
   },
   'witness-binder': {
     rulesTitle: 'Binder Orientation',
@@ -68,7 +95,7 @@ const SHELL_FAMILY_COPY = {
     gaugeTitle: 'Evidence Log',
     gaugeLabel: 'Resolved Name',
     assemblyTitle: 'Evidence Chain Assembly',
-    assemblySubtitle: 'Transfer each recorded clue into the final evidence chain. Open the sealed testimony only after the name resolves in order.',
+    assemblySubtitle: 'Transfer each recorded value into the final evidence chain. Open the sealed testimony only after the name resolves in order.',
     finalLabel: 'Resolved Name',
     lockedEndingTitle: 'Sealed Testimony',
     lockedEndingBody: 'This testimony remains sealed until the binder’s evidence chain is complete.',
@@ -102,16 +129,16 @@ const SHELL_FAMILY_COPY = {
   },
   'household-archive': {
     rulesTitle: 'Archive Note',
-    sealedTitle: 'Sealed Family Letter',
-    sealedBody: 'Record each weekly value in the archive log, then assemble the final family designation before opening the sealed letter.',
+    sealedTitle: 'Sealed Final Leaf',
+    sealedBody: 'Record each weekly value in the archive log, then assemble the full designation before opening the final leaf.',
     gaugeTitle: 'Archive Log',
-    gaugeLabel: 'Family Designation',
+    gaugeLabel: 'Complete Designation',
     assemblyTitle: 'Archive Assembly',
-    assemblySubtitle: 'Transfer each archived value into the final ladder. Open the sealed letter only after the designation is complete.',
-    finalLabel: 'Family Designation',
-    lockedEndingTitle: 'Sealed Family Letter',
-    lockedEndingBody: 'This final letter remains sealed until the archive’s designation is fully assembled.',
-    backColophon: 'Archived at home, annotated by hand, resolved through careful return.'
+    assemblySubtitle: 'Transfer each archived value into the final ladder. Open the final leaf only after the designation is complete.',
+    finalLabel: 'Final Designation',
+    lockedEndingTitle: 'Sealed Final Leaf',
+    lockedEndingBody: 'This last leaf remains sealed until the archive’s designation is fully assembled.',
+    backColophon: 'Kept without a catalogue, annotated by hand, resolved through careful return.'
   },
   'technical-manual': {
     rulesTitle: 'Procedure Briefing',
