@@ -1665,6 +1665,20 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
     errors = errors.concat(cadenceConformanceFloorErrors(weekObj,
       expectedOptions.weekNumber || expectedOptions.currentWeekNumber,
       expectedOptions.playSpine));
+
+    // ── The book-scope half of the same question: was the promise kept? ──
+    // D199's arm above is week-scoped and attributes an edge to a week by
+    // reading `W<n>` out of its `from`. A book-level edge (`banked → clock:X`)
+    // carries no week and was checked by nobody, at any seat. Fires at the LAST
+    // week only, over every week this run has banked — see the floor's header
+    // for why that is the first seat that can see its evidence. No weekCount and
+    // no priorWeeks on the options means no check, the same law as above.
+    errors = errors.concat(weeklessEdgeRedemptionFloorErrors(weekObj,
+      expectedOptions.weekNumber || expectedOptions.currentWeekNumber, {
+        weekCount: expectedOptions.weekCount,
+        priorWeeks: expectedOptions.priorWeeks,
+        playSpine: expectedOptions.playSpine
+      }));
   }
 
   if (!Array.isArray(weekObj.sessions) || weekObj.sessions.length === 0) {
@@ -3246,6 +3260,131 @@ export function clockReachabilityWarnings(weekObj, weekNumber, playSpine, gameRu
   return collectClockReachabilityFindings(weekObj, weekNumber, playSpine, gameRulebook)
     .filter(function (f) { return f.reportOnly; })
     .map(function (f) { return f.message; });
+}
+
+/**
+ * weeklessEdgeRedemptionFloorErrors(weekObj, weekNumber, options) -> [message]
+ *
+ * ── THE PROMISE, REDEEMED (the adversarial forge's HOLE 1, 2026-08-20) ──────
+ *
+ * `surfaceRefResolves()` runs a PROMISE RULE at the spine seat: when nothing of
+ * a kind is authored yet, `clock:Ghost Meridian` is an intention and is
+ * accepted, because a spine declared before any content exists must be
+ * declarable. That rule is right, and nothing anywhere ever asked whether the
+ * promise was KEPT.
+ *
+ * The arm above (D199) asks the week-scoped half — a clock THIS WEEK feeds is a
+ * clock THIS WEEK prints — and it attributes an edge to a week by reading `W<n>`
+ * out of the `from` id. An edge out of a BOOK-LEVEL singleton (`banked`,
+ * `boss`, `assembly`) carries no week, so that arm skips it, correctly, and
+ * NOTHING ELSE PICKED IT UP: on the bench stub 9 of 23 edges are
+ * `banked → clock:X`, which is the dominant shape in the corpus, and run 3
+ * shipped four `map:Garden Terrace` edges to a map printed in no week with
+ * report-class warnings as the only trace.
+ *
+ * THE DEMAND (author ruling, 2026-08-20): a weekless edge's endpoint must exist
+ * SOMEWHERE in the book — the same standard the week-scoped arm already meets,
+ * widened from week scope to book scope.
+ *
+ * ── THE SEAT IS A CORRECTION, AND IT IS THE D200-3b LAW ─────────────────────
+ *
+ * The ruling as briefed named the ECONOMY-GRAPH seat, "where the whole graph is
+ * first visible". The whole graph is indeed first visible there — and the union
+ * of all weeks' surfaces is not: `economyGraph` runs BEFORE the first week on
+ * both pipelines (API_STAGE_ORDER_BY_PIPELINE, index.html), and
+ * `validateEconomyGraphStage` is handed `priorGraph` and `weekCount` and no week
+ * payload at all. A floor there could only ask its question against an empty
+ * inventory, which is a gate that cannot see its evidence reporting a pass —
+ * exactly the defect the disclosure law was written for. The DEMAND is
+ * unchanged; only the seat moved, to the first seat at which the evidence
+ * exists.
+ *
+ * THE LAST WEEK'S GATE, then, and blocking there:
+ *   · every week is authored by the time the last one is judged, so the union is
+ *     complete and a finding cannot be a false miss;
+ *   · the last week can REPAIR it — a book-level edge names no week, so printing
+ *     the surface in this week satisfies it, which is a local, delta-shaped fix
+ *     of exactly the kind the week seat is good at;
+ *   · it is a generation-stage gate, so it blocks (the assembled reader does
+ *     not — api-generator.js logs and delivers) and it is eligible for the
+ *     two-halves registry the assembled gate is excluded from.
+ *
+ * WHICH KINDS, and the absences are the argument. `clock`, `companion` and `map`
+ * are the kinds a WEEK prints under a name of its own choosing — the same set
+ * `CADENCE_NAMED_SURFACE_KINDS` reasons its way to, for the same reason.
+ * `fragment`, `seal` and `ending` are named surfaces too and are deliberately
+ * NOT here: they are written by the fragments and endings stages, which run
+ * AFTER the last week, so the last week's gate cannot see their evidence and
+ * demanding them would break the same law in the other direction.
+ *
+ * WHICH EDGES. Only edges with NO week-shaped endpoint on either side. That is a
+ * clean partition against D199's arm rather than an overlap: an edge that names
+ * a week is owned by that week's gate and reported there, and reporting the same
+ * absent surface twice would spend two errors of a retry's budget on one fix.
+ *
+ * NO EVIDENCE, NO CHECK (the D144 ungated-caller idiom, three times over): no
+ * spine, no `weekCount`, or a caller that is not the last week ⇒ silent. The
+ * sealed corpus predates the spine and is untouched.
+ */
+var BOOK_SCOPE_REDEEMABLE_KINDS = { clock: 1, companion: 1, map: 1 };
+
+function refIsWeekShaped(parsed) {
+  return !!(parsed && parsed.valid && parsed.id
+    && /^w\s*\d+/i.test(String(parsed.id).trim()));
+}
+
+export function weeklessEdgeRedemptionFloorErrors(weekObj, weekNumber, options) {
+  var errors = [];
+  var opts = options || {};
+  var wk = Number(weekNumber);
+  var total = Number(opts.weekCount);
+  if (!weekObj || typeof weekObj !== 'object' || !wk) return errors;
+  // The last week ONLY: before it, a surface absent so far may still arrive.
+  if (!(total > 0) || wk !== total) return errors;
+  var spine = opts.playSpine;
+  var graph = (spine && Array.isArray(spine.economyGraph)) ? spine.economyGraph : null;
+  if (!graph || !graph.length) return errors;
+
+  // THE BOOK'S OWN INVENTORY, from the one home (D93/D204): every week this run
+  // has banked, plus the week now under judgement.
+  var priorWeeks = Array.isArray(opts.priorWeeks) ? opts.priorWeeks : [];
+  var allWeeks = priorWeeks.concat([weekObj]).map(function (w, i) {
+    if (w && typeof w === 'object' && !(Number(w.weekNumber) > 0)) {
+      return Object.assign({}, w, { weekNumber: i + 1 });
+    }
+    return w;
+  });
+  var index = buildSurfaceIndex({ weeks: allWeeks });
+
+  var reported = {};
+  graph.forEach(function (edge, ei) {
+    if (!edge || typeof edge !== 'object') return;
+    var from = parseSurfaceRef(edge.from);
+    var to = parseSurfaceRef(edge.to);
+    // Owned by D199's week-scoped arm — see the header's partition note.
+    if (refIsWeekShaped(from) || refIsWeekShaped(to)) return;
+    [{ side: 'from', parsed: from }, { side: 'to', parsed: to }].forEach(function (end) {
+      var p = end.parsed;
+      if (!p.valid || !p.id) return;                      // singletons carry no id
+      if (!BOOK_SCOPE_REDEEMABLE_KINDS[p.kind]) return;
+      var key = toSlugWords(p.id);
+      if (!key) return;
+      var bucket = index.kinds[p.kind];
+      if (bucket && bucket[key]) return;
+      var dedupe = p.kind + ':' + key;
+      if (reported[dedupe]) return;
+      reported[dedupe] = true;
+      errors.push('Week ' + wk + ' → `playSpine.economyGraph[' + ei + '].' + end.side + '` names `'
+        + p.kind + ':' + p.id + '` and no week in this book prints a ' + p.kind + ' by that name. '
+        + 'That edge starts or ends at a surface the player will never see, so the loop it '
+        + 'describes is an economy the reader is told about and can never touch. This edge names '
+        + 'no week, so ANY week can satisfy it — this is the last week, and therefore the last '
+        + 'chance: print `' + p.id + '` in this week under exactly that name (a clock in '
+        + '`gameplayClocks`, a companion in `fieldOps.companionComponents`, a map in '
+        + '`fieldOps.mapState`), or the book ships with a promise it never keeps.');
+    });
+  });
+  return errors;
 }
 
 /**
