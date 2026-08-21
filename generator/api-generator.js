@@ -5129,6 +5129,7 @@ function normalizeGameRulebookShape(result) {
   console.warn('[LiftRPG] Game rulebook stage returned a bare document — rewrapping');
   var wrapped = {};
   KEYS.forEach(function (k) { if (result[k] !== undefined) wrapped[k] = result[k]; });
+  if (result.artifactDesign !== undefined) wrapped.artifactDesign = result.artifactDesign;
   if (Array.isArray(result.unprintableWants)) wrapped.unprintableWants = result.unprintableWants;
   return { gameRulebook: wrapped };
 }
@@ -5456,6 +5457,7 @@ async function runApiPipeline(options) {
     budgetEnforce: useGeminiBudget,
     trialMode: !!(options.trialMode || settings.trialMode),
     divergenceSeed: divergenceSeed,
+    seedAssignments: seedAssignments,
     repairDirective: repairDirectiveFor('gameRulebook'),
     progress: progress,
     getStageIndex: function () { return stageNum; },
@@ -5474,7 +5476,9 @@ async function runApiPipeline(options) {
       return builders.gameRulebook(workout, brief, {
         retryMode: retryState.attempt > 0,
         weekCount: weekCount,
-        divergenceSeed: divergenceSeed
+        divergenceSeed: divergenceSeed,
+        seedAssignments: seedAssignments,
+        identityAxes: identityAxesForStage('gameRulebook')
       });
     }
   });
@@ -7114,7 +7118,12 @@ async function runGameRulebookStage(settings, config) {
     unknownKeyScopes: [
       { from: 'gameRulebook', schemaPath: 'meta.gameRulebook', label: 'meta.gameRulebook' }
     ],
-    validate: function (result) { return validateGameRulebookStage(result); },
+    validate: function (result) {
+      return validateGameRulebookStage(result, {
+        generationFloors: true,
+        seedAssignments: config.seedAssignments
+      });
+    },
     buildPrompt: function (retryState) {
       return config.buildPrompt(retryState);
     }
@@ -7610,6 +7619,7 @@ async function runSkeletonFleshPipeline(options) {
     trialMode: trialMode,
     telemetryCollector: sfTelemetry,
     divergenceSeed: divergenceSeed,
+    seedAssignments: seedAssignments,
     repairDirective: sfRepairDirectiveFor('gameRulebook'),
     progress: progress,
     getStageIndex: function () { return stageNum; },
@@ -7626,7 +7636,9 @@ async function runSkeletonFleshPipeline(options) {
       return builders.gameRulebook(workout, brief, {
         retryMode: retryState.attempt > 0,
         weekCount: weekCount,
-        divergenceSeed: divergenceSeed
+        divergenceSeed: divergenceSeed,
+        seedAssignments: seedAssignments,
+        identityAxes: identityAxesForStage('gameRulebook')
       });
     }
   });

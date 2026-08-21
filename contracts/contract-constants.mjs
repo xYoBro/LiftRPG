@@ -2293,6 +2293,23 @@ export var VALID_CONVERGENCE_PATTERNS = [
   'sequential-assembly', 'reordering', 'red-herring', 'dual-source'
 ];
 
+// ── Artifact-design contract (2026-08-20) ──────────────────────────────────
+// The governing conceit answers "what does this world keep, move, transform,
+// or make the player handle?" It is deliberately mostly non-archival: records
+// and names remain a choice, not the invisible house default.
+//
+// This is a seed menu, not a renderer claim. The current convergence renderer
+// still opens a lexical password; a future non-lexical convergence mechanism
+// must be designed at that seam, not smuggled in as another value here.
+export var VALID_GOVERNING_CONCEITS = [
+  'specimens', 'routes', 'machines', 'meals', 'songs', 'debts',
+  'weather', 'waters', 'light', 'names-and-records'
+];
+
+export var VALID_ARTIFACT_COMMITMENT_KINDS = [
+  'map', 'physical-form', 'gameplay-element'
+];
+
 // ── DR-33: THE DECLARED CONVENTION (author ruling, 2026-08-18) ──────────────
 // THE RULING: "a password's last step may be a declared convention; undeclared
 // non-derivation is a defect."
@@ -3083,6 +3100,15 @@ export var VALID_HOME_PULLS = ['story', 'game', 'investigation', 'mixed'];
 //                 the stage rejects for every real run, which is a ruling and
 //                 not a flag flip. Do not add a flag to this table without one.
 export var IDENTITY_AXES = [
+  // ── THE RULEBOOK'S DESIGN RUDDER (2026-08-20) ───────────────────────────
+  // The rulebook is the first paid design seat on both pipelines. The conceit
+  // therefore lands HERE, before a shell can turn a generic world into a
+  // retrospective justification. A brief may still earn a different choice,
+  // but the departure is recorded in the canonical rulebook contract itself.
+  { id: 'governingConceit', label: 'the governing conceit (what this world makes the player handle)',
+    path: 'gameRulebook.artifactDesign.governingConceit.id',
+    menu: VALID_GOVERNING_CONCEITS, kind: 'scalar', answerRequired: true,
+    evidencePath: 'gameRulebook.artifactDesign.governingConceit.rationale', stages: ['gameRulebook'] },
   // ── THE FIVE MANDATORY ANSWERS (author ruling, 2026-08-13 — D152) ─────────
   // D151's anti-vacuity sweep proved these five could be STRIPPED from an
   // otherwise-obedient shell with no gate response — the harvest dodge on core
@@ -3872,7 +3898,13 @@ export var RULEBOOK_REF_FIELDS = [
   { path: ['winCondition', 'requires'], list: true },
   { path: ['coreVerbs', 'verbs', '[]', 'on'], list: false },
   { path: ['passwordPath', 'elements'], list: true },
-  { path: ['sessionShape', 'ritual', 'on'], list: false }
+  { path: ['sessionShape', 'ritual', 'on'], list: false },
+  // The canonical artifact-design contract is an early rulebook record, not
+  // flavour prose. Its source and downstream refs must therefore travel with
+  // every legal name amendment or the rulebook would name one surface while
+  // the later spine is taught another.
+  { path: ['artifactDesign', 'commitments', '[]', 'surface'], list: false },
+  { path: ['artifactDesign', 'commitments', '[]', 'downstreamRefs'], list: true }
 ];
 
 // The rulebook's prose fields — the second half of a rename. A ref rewritten in

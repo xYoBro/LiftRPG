@@ -165,6 +165,8 @@ import {
   GAME_RULEBOOK_ANSWERS,
   GAME_RULEBOOK_VERBS_MIN,
   GAME_RULEBOOK_VERBS_MAX,
+  VALID_GOVERNING_CONCEITS,
+  VALID_ARTIFACT_COMMITMENT_KINDS,
   // W1 — the plain-stakes band. Imported for the reason every number above it
   // is: SCHEMA_SINGLE_WEEK states these two integers to the model as literals,
   // and a private copy here would fail weeks for a band the model was told
@@ -4746,6 +4748,11 @@ function validateShellStage(shell, expectedOptions, stageKey) {
       (shell.meta || {}).playSpine,
       WHERE
     ));
+    errors = errors.concat(collectArtifactDesignSpineParityErrors(
+      (expectedOptions || {}).gameRulebook,
+      (shell.meta || {}).playSpine,
+      WHERE
+    ));
 
     // ── The earliest-stage pre-flight (D143) ──
     // The spine is authored HERE, and so is the family it must be wired for.
@@ -5990,6 +5997,85 @@ export function validateEconomyGraphStage(result, options) {
  * missing object, because everything below it would then report the same fact
  * eight times.
  */
+export function artifactDesignStageFloorErrors(rulebook) {
+  var S = 'Game Rulebook → gameRulebook.artifactDesign';
+  var design = (rulebook || {}).artifactDesign;
+  if (!design || typeof design !== 'object' || Array.isArray(design)) {
+    return [S + ' is missing — decide the governing conceit before the world exists, so every later seat builds one artifact instead of decorating a generic book'];
+  }
+  var errors = [];
+  var conceit = design.governingConceit;
+  if (!conceit || typeof conceit !== 'object' || Array.isArray(conceit)) {
+    errors.push(S + '.governingConceit is missing — name what this world makes the player handle');
+  } else {
+    var id = String(conceit.id || '').trim();
+    if (VALID_GOVERNING_CONCEITS.indexOf(id) === -1) {
+      errors.push(S + '.governingConceit.id "' + id + '" is not in the declared menu: '
+        + VALID_GOVERNING_CONCEITS.join(', '));
+    }
+    ['statement', 'rationale'].forEach(function (key) {
+      if (!String(conceit[key] || '').trim()) {
+        errors.push(S + '.governingConceit.' + key + ' is empty — the conceit needs both a concrete claim and why this book earned it');
+      }
+    });
+    if (['brief', 'seed'].indexOf(String(conceit.source || '').trim()) === -1) {
+      errors.push(S + '.governingConceit.source must be `brief` or `seed`');
+    }
+  }
+
+  var commitments = Array.isArray(design.commitments) ? design.commitments : [];
+  if (commitments.length < 5 || commitments.length > 7) {
+    errors.push(S + '.commitments has ' + commitments.length + ' row(s); this contract owes 5-7: one map, 2-3 physical forms, and 2-3 gameplay elements');
+  }
+  var counts = { map: 0, 'physical-form': 0, 'gameplay-element': 0 };
+  commitments.forEach(function (row, index) {
+    var at = S + '.commitments[' + index + ']';
+    if (!row || typeof row !== 'object' || Array.isArray(row)) {
+      errors.push(at + ' is not an object');
+      return;
+    }
+    var kind = String(row.kind || '').trim();
+    if (VALID_ARTIFACT_COMMITMENT_KINDS.indexOf(kind) === -1) {
+      errors.push(at + '.kind "' + kind + '" is not in the declared commitment menu');
+    } else {
+      counts[kind] += 1;
+    }
+    var surface = String(row.surface || '').trim();
+    if (!parseSurfaceRef(surface).valid) {
+      errors.push(at + '.surface "' + surface + '" is not a surface ref — write `kind:id` or a singleton such as `boss`');
+    } else if (kind === 'map' && parseSurfaceRef(surface).kind !== 'map') {
+      errors.push(at + '.surface must be a `map:` surface when kind is `map`');
+    }
+    ['action', 'consequence'].forEach(function (key) {
+      if (!String(row[key] || '').trim()) {
+        errors.push(at + '.' + key + ' is empty — a commitment needs the reader action and the change it causes');
+      }
+    });
+    var downstream = Array.isArray(row.downstreamRefs) ? row.downstreamRefs : [];
+    if (!downstream.length) {
+      errors.push(at + '.downstreamRefs is empty — name the later surface this commitment must reach');
+    }
+    downstream.forEach(function (ref, ri) {
+      if (!parseSurfaceRef(String(ref || '').trim()).valid) {
+        errors.push(at + '.downstreamRefs[' + ri + '] "' + String(ref || '') + '" is not a surface ref');
+      }
+    });
+    if (kind === 'physical-form') {
+      var family = String(row.formFamily || '').trim();
+      if (!ATOM_FORM_FAMILIES.some(function (entry) { return entry.id === family; })) {
+        errors.push(at + '.formFamily "' + family + '" is not an atom form family');
+      }
+    }
+  });
+  if (counts.map !== 1) errors.push(S + '.commitments owes exactly one `map` row, found ' + counts.map);
+  ['physical-form', 'gameplay-element'].forEach(function (kind) {
+    if (counts[kind] < 2 || counts[kind] > 3) {
+      errors.push(S + '.commitments owes 2-3 `' + kind + '` rows, found ' + counts[kind]);
+    }
+  });
+  return errors;
+}
+
 export function validateGameRulebookStage(result, options) {
   var S = 'Game Rulebook → ';
   if (!result || typeof result !== 'object' || Array.isArray(result)) {
@@ -6193,6 +6279,14 @@ export function validateGameRulebookStage(result, options) {
       + ' what the graph is checked against');
   }
 
+  // The persisted artifact schema leaves this field optional for sealed,
+  // hand-authored fixtures. A live generation has a retry seat, so policy is
+  // strict there and only there.
+  if (options && options.generationFloors) {
+    errors = errors.concat(artifactDesignStageFloorErrors(rulebook));
+    errors = errors.concat(seedObedienceFloorErrors(result, 'Game Rulebook', 'gameRulebook', options.seedAssignments));
+  }
+
   if (options && options.collect) return errors;
   return errors.length ? errors.join('; ') : '';
 }
@@ -6328,6 +6422,64 @@ export function collectRulebookSpineParityErrors(rulebook, spine, stageLabel) {
     }
   });
 
+  return errors;
+}
+
+/**
+ * collectArtifactDesignSpineParityErrors(rulebook, spine, stageLabel)
+ *
+ * The contract's structural reader. The rulebook can declare actions and
+ * consequences before pages exist; the spine is the first seat that can prove
+ * those declarations form an actual chain. It intentionally verifies only the
+ * evidence a machine owns: named surfaces and declared consequence edges. A
+ * sentence that is aesthetically essential is still judged on paper, not by a
+ * substring matcher pretending to understand the book.
+ */
+export function collectArtifactDesignSpineParityErrors(rulebook, spine, stageLabel) {
+  var design = ((rulebook || {}).artifactDesign) || null;
+  if (!design || !Array.isArray(design.commitments) || !spine || typeof spine !== 'object') return [];
+  var S = (stageLabel || 'Skeleton') + ' → ';
+  var nodes = {};
+  var note = function (ref) {
+    var raw = String(ref || '').trim();
+    if (raw) nodes[raw.toLowerCase()] = raw;
+  };
+  (Array.isArray(spine.economyGraph) ? spine.economyGraph : []).forEach(function (edge) {
+    note((edge || {}).from); note((edge || {}).to);
+  });
+  (Array.isArray(spine.consequenceEdges) ? spine.consequenceEdges : []).forEach(function (edge) {
+    note((edge || {}).source); note((edge || {}).answeredBy);
+  });
+  var hasNode = function (ref) {
+    return Object.prototype.hasOwnProperty.call(nodes, String(ref || '').trim().toLowerCase());
+  };
+  var consequenceEdges = Array.isArray(spine.consequenceEdges) ? spine.consequenceEdges : [];
+  var errors = [];
+  design.commitments.forEach(function (row, index) {
+    if (!row || typeof row !== 'object') return;
+    var surface = String(row.surface || '').trim();
+    if (surface && !hasNode(surface)) {
+      errors.push(S + 'artifact-design commitment `' + surface
+        + '` names a surface no spine edge carries. Build the surface into the game before content is written; a commitment outside the graph is decoration the player cannot reach');
+    }
+    (Array.isArray(row.downstreamRefs) ? row.downstreamRefs : []).forEach(function (target) {
+      var downstream = String(target || '').trim();
+      if (!downstream) return;
+      if (!hasNode(downstream)) {
+        errors.push(S + 'artifact-design commitment `' + surface + '` reaches `' + downstream
+          + '`, but no spine edge carries that downstream surface. A declared consequence must reach a real later surface');
+        return;
+      }
+      var linked = consequenceEdges.some(function (edge) {
+        return String((edge || {}).source || '').trim().toLowerCase() === surface.toLowerCase()
+          && String((edge || {}).answeredBy || '').trim().toLowerCase() === downstream.toLowerCase();
+      });
+      if (!linked) {
+        errors.push(S + 'artifact-design commitment `' + surface + '` reaches `' + downstream
+          + '`, but no `playSpine.consequenceEdges` row links them. The action has a declared consequence only when the spine names what answers it');
+      }
+    });
+  });
   return errors;
 }
 
@@ -10905,6 +11057,11 @@ export function validateSkeletonStage(result, weekCount, options) {
     // rulebook (the wizard, the manual surface, a hand-built replay) gets no
     // parity check rather than a fabricated one.
     floorErrors = floorErrors.concat(collectRulebookSpineParityErrors(
+      (options || {}).gameRulebook,
+      (result.meta || {}).playSpine,
+      'Skeleton'
+    ));
+    floorErrors = floorErrors.concat(collectArtifactDesignSpineParityErrors(
       (options || {}).gameRulebook,
       (result.meta || {}).playSpine,
       'Skeleton'

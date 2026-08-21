@@ -1554,6 +1554,26 @@
     '  system cannot print. Say it plainly rather than substituting something printable and',
     '  calling it the same thing.',
     '',
+    '## artifactDesign (object) — the canonical design contract, required',
+    'This is the one place the governing conceit is authored. Later stages receive it as a GIVEN',
+    'and build it; they do not rename, replace, or add a second conceit.',
+    '- `governingConceit` (object): `{ id, statement, source, rationale }`.',
+    '  - `id` is one of `specimens`, `routes`, `machines`, `meals`, `songs`, `debts`, `weather`,',
+    '    `waters`, `light`, `names-and-records`. Take the assigned value unless the brief earns a',
+    '    different one; `source` is `seed` or `brief`, and `rationale` says why in this book.',
+    '  - `statement` says, in one concrete sentence, what this world keeps, moves, transforms, or',
+    '    makes the player handle. It is not a genre label and not a mood word.',
+    '- `commitments` (array, exactly 5-7 objects): the few things whose removal would make this a',
+    '  different artifact, not an inventory of every decoration.',
+    '  - Exactly one `kind: "map"`, 2-3 `kind: "physical-form"`, and 2-3',
+    '    `kind: "gameplay-element"`.',
+    '  - Every row has `{ kind, surface, action, consequence, downstreamRefs }`. `surface` and',
+    '    every item in `downstreamRefs` use the existing `kind:id` surface-ref grammar. `action`',
+    '    says what the reader physically does there; `consequence` says what changes because of it.',
+    '  - A `physical-form` row also has `formFamily`, one of `sessionCard`, `oracleTable`,',
+    '    `fragmentDoc`, or `ledgerSpread`. Name a form because it serves this commitment, never',
+    '    because paper needs decoration.',
+    '',
     '## Length is a BAND — a floor as well as a ceiling',
     '- At least 120 words each: `winCondition.answer`, `economy.answer`, `passwordPath.answer`,',
     '  `sessionShape.answer`. These four fail silently when they are thin.',
@@ -1651,10 +1671,41 @@
           teachingOrder: {
             type: 'object', properties: { answer: { type: 'string' } }, required: ['answer']
           },
+          artifactDesign: {
+            type: 'object',
+            properties: {
+              governingConceit: {
+                type: 'object',
+                properties: {
+                  id: { enum: ['specimens', 'routes', 'machines', 'meals', 'songs', 'debts', 'weather', 'waters', 'light', 'names-and-records'] },
+                  statement: { type: 'string' },
+                  source: { enum: ['brief', 'seed'] },
+                  rationale: { type: 'string' }
+                },
+                required: ['id', 'statement', 'source', 'rationale']
+              },
+              commitments: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    kind: { enum: ['map', 'physical-form', 'gameplay-element'] },
+                    surface: { type: 'string' },
+                    formFamily: { enum: ['sessionCard', 'oracleTable', 'fragmentDoc', 'ledgerSpread'] },
+                    action: { type: 'string' },
+                    consequence: { type: 'string' },
+                    downstreamRefs: { type: 'array', items: { type: 'string' } }
+                  },
+                  required: ['kind', 'surface', 'action', 'consequence', 'downstreamRefs']
+                }
+              }
+            },
+            required: ['governingConceit', 'commitments']
+          },
           unprintableWants: { type: 'array', items: { type: 'string' } }
         },
         required: ['winCondition', 'coreVerbs', 'economy', 'passwordPath',
-          'sessionShape', 'weekShape', 'whatGoesBadly', 'teachingOrder']
+          'sessionShape', 'weekShape', 'whatGoesBadly', 'teachingOrder', 'artifactDesign']
       }
     },
     required: ['gameRulebook']
@@ -4091,6 +4142,34 @@
       'and these rules disagree, the rules win.',
       ''
     ];
+    // The early design contract is canonical. It is deliberately rendered by
+    // this shared hand-off, rather than copied into a later artifact-intent
+    // prompt, so every downstream author receives the same decision and no
+    // stage gets an invitation to invent a second premise for the book.
+    var artifactDesign = rulebook.artifactDesign;
+    if (artifactDesign && typeof artifactDesign === 'object') {
+      var conceit = artifactDesign.governingConceit || {};
+      var commitments = Array.isArray(artifactDesign.commitments) ? artifactDesign.commitments : [];
+      lines = lines.concat([
+        '### ARTIFACT-DESIGN CONTRACT (canonical — build it; do not re-author it)',
+        '',
+        '- Governing conceit: ' + (conceit.statement || conceit.id || 'unspecified'),
+        '- Why it belongs here: ' + (conceit.rationale || 'unspecified'),
+        '- Every commitment below is load-bearing: the surface must exist, carry the named action,',
+        '  make the named consequence possible, and reach its listed later surface. Do not turn it',
+        '  into decorative furniture or replace it with an easier generic equivalent.',
+        ''
+      ]);
+      commitments.forEach(function (row, index) {
+        if (!row || typeof row !== 'object') return;
+        lines.push((index + 1) + '. [' + (row.kind || 'commitment') + '] `'
+          + (row.surface || '?') + '` — action: ' + (row.action || '?')
+          + '; consequence: ' + (row.consequence || '?')
+          + '; reaches: ' + ((row.downstreamRefs || []).join(', ') || '?')
+          + (row.formFamily ? '; form: ' + row.formFamily : '') + '.');
+      });
+      lines.push('');
+    }
     // THE PROSE SEATS' OWN DEMAND. Stated once, here, because it is only
     // answerable where a rulebook exists (see the D128 note in the header).
     if (opts.prose) {

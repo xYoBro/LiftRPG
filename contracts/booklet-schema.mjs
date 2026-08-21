@@ -91,7 +91,9 @@ import {
   VALID_LEITMOTIF_GESTURES,
   VALID_FORM_PLANS,
   ATOM_FORM_FAMILIES,
-  VALID_EDGE_CADENCES
+  VALID_EDGE_CADENCES,
+  VALID_GOVERNING_CONCEITS,
+  VALID_ARTIFACT_COMMITMENT_KINDS
 } from './contract-constants.mjs';
 
 var G = SPATIAL_GUARDRAILS;
@@ -151,6 +153,48 @@ var artifactIntentReading = {
     _x: xt
   }
 };
+
+// The canonical rulebook contract's one strict structural shape. Later stages
+// receive the record through formatGameRulebookGiven(); they do not persist a
+// second copy under artifactIntent, because a second schema home would invite a
+// later author to overwrite the premise it was meant to build.
+function artifactDesignSchema() {
+  var commitment = {
+    type: 'object',
+    required: ['kind', 'surface', 'action', 'consequence', 'downstreamRefs'],
+    additionalProperties: false,
+    properties: {
+      kind: { enum: VALID_ARTIFACT_COMMITMENT_KINDS },
+      surface: nonEmptyString,
+      formFamily: { enum: ATOM_FORM_FAMILIES.map(function (family) { return family.id; }) },
+      action: nonEmptyString,
+      consequence: nonEmptyString,
+      downstreamRefs: { type: 'array', minItems: 1, items: nonEmptyString },
+      _x: xt
+    }
+  };
+  return {
+    type: 'object',
+    required: ['governingConceit', 'commitments'],
+    additionalProperties: false,
+    properties: {
+      governingConceit: {
+        type: 'object',
+        required: ['id', 'statement', 'source', 'rationale'],
+        additionalProperties: false,
+        properties: {
+          id: { enum: VALID_GOVERNING_CONCEITS },
+          statement: nonEmptyString,
+          source: { enum: ['brief', 'seed'] },
+          rationale: nonEmptyString,
+          _x: xt
+        }
+      },
+      commitments: { type: 'array', minItems: 5, maxItems: 7, items: commitment },
+      _x: xt
+    }
+  };
+}
 
 var artifactIntent = {
   type: 'object',
@@ -901,6 +945,7 @@ var gameRulebook = {
     weekShape: rulebookProseAnswer,
     whatGoesBadly: rulebookProseAnswer,
     teachingOrder: rulebookProseAnswer,
+    artifactDesign: artifactDesignSchema(),
     // What the brief wanted that this system cannot print. The honest-when-
     // lacking law at the design level: §4.0 says a rulebook that wanted an
     // implement the arsenal lacks SAYS SO, the gap is recorded rather than
