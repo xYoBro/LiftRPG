@@ -2491,6 +2491,7 @@
       '',
       '## Hard Constraints',
       '- Exactly ' + weekCount + ' weeks. Final week MUST be boss week (isBossWeek: true).',
+      '- Every week needs guaranteedMarksPerSession: one integer >= 0 for the marks every completed session guarantees, independent of dice, branches, bonuses, and optional actions.',
       '- Password word length = ' + (weekCount - 1) + ' letters (one componentValue per non-boss week).',
       '- Each non-boss componentValue must be an integer 1-26 (A1Z26 encoding).',
       '- The boss week\'s componentValue is null.',
@@ -3231,6 +3232,7 @@
       '## Stage Rules',
       '- Use exactly ' + weekCount + ' weeks; mark the final week as boss and the midpoint week as the binary choice week.',
       '- Every week must include sessionCount and fragmentIds. fragmentIds are the exact document IDs that week sessions/oracles will reference.',
+      '- Every week must include guaranteedMarksPerSession as an integer >= 0: the minimum marks printed by every completed session, independent of dice, branches, bonuses, and optional actions.',
       '- Every non-boss week must ultimately yield exactly one weekly component value: a single integer 1-26 for standard A1Z26 decode. weeklyComponentMeaning explains that number in-fiction; it must not turn into a composite reading list or prose excerpt.',
       '- Every non-boss week must declare a concrete cipherType, and no two consecutive non-boss weeks may use the same cipherType.',
       // DERIVED, never restated. cipherVarietyFloor is the one home of this

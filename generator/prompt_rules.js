@@ -689,6 +689,9 @@
     '  phrase, never a description, never a token you invented that sounds right. If you want',
     '  to explain the choice, `artifactIntent.selectionReason` is the field that takes',
     '  sentences; these four do not.',
+    '- `playSpine.surfaceCadences` (array, REQUIRED): exactly one row for every named printable',
+    '  `clock:`, `map:`, and `companion:` surface in `playSpine.economyGraph`. Each row is',
+    '  `{ surface, mode, introWeek?, closesAtWeek? }`; cadence belongs here, never on an edge.',
     '  `componentDialect` is REQUIRED and is a CLOSED enum: "segments" | "beads" | "gauge" | "tally".',
     '  It is the instrument this book counts in — how every clock, track and tick strip is DRAWN.',
     '  segments: a pie or bar cut into wedges. beads: a counted string. gauge: a dial reading.',
@@ -771,6 +774,8 @@
     '- `isDeload` (boolean): tonal flag for deload weeks',
     '- `isBinaryChoiceWeek` (boolean): true for the week containing the binary choice',
     '- `sessionCount` (integer): 3-6 sessions for this week',
+    '- `guaranteedMarksPerSession` (integer >= 0): the minimum marks printed by every completed',
+    '  session, independent of dice, branches, bonuses, and optional actions.',
     '- `fragmentIds` (string[]): IDs of fragments referenced in this week\'s sessions/oracles',
     '- `overflowFragmentId` (string|null): ID of overflow document if sessionCount > 3',
     '- `oracleMode` (string): "fragment"|"consequence"|"mixed"',
@@ -885,7 +890,7 @@
     weekPlan: [
       { weekNumber: 1, title: '', arcBeat: '', epigraphText: '', epigraphAttribution: '',
         mapType: '', cipherType: '', componentValue: 1, isBossWeek: false, isDeload: false,
-        isBinaryChoiceWeek: false, sessionCount: 5, fragmentIds: ['F.01'],
+        isBinaryChoiceWeek: false, sessionCount: 5, guaranteedMarksPerSession: 0, fragmentIds: ['F.01'],
         overflowFragmentId: null, oracleMode: '', companionTypes: [], clockNames: [], hasInterlude: false }
     ],
     fragmentRegistry: [
@@ -1151,6 +1156,16 @@
       'decisionLedger', 'tensionBudget', 'difficultyCurve', 'gateStructure']
   };
   window.STRUCTURED_SCHEMA_PLAY_SPINE = STRUCTURED_PLAY_SPINE;
+  // S+F has no separate Economy Pacing seat. It shares every play-spine
+  // property with the standard compiler, but its one planning call must also
+  // author the canonical cadence ledger. Overlay the required list rather than
+  // mutating the shared schema, which would make the earlier standard shell
+  // promise an annotation it does not own yet.
+  var STRUCTURED_SF_PLAY_SPINE = {
+    type: 'object',
+    properties: STRUCTURED_PLAY_SPINE.properties,
+    required: STRUCTURED_PLAY_SPINE.required.concat(['surfaceCadences'])
+  };
   // The same window hop, for the same reason: api-generator.js cannot import
   // from this file, so the ONE arrangement literal reaches the shell transport
   // through the window rather than by being written twice.
@@ -1359,7 +1374,7 @@
             },
             required: ['briefMode', 'fidelityMode', 'arcFamily', 'mechanicGrammarFamily', 'documentEcology', 'exclusions', 'homePull', 'convergencePattern', 'endingMode', 'reading', 'selectionReason', '_x']
           },
-          playSpine: STRUCTURED_PLAY_SPINE,
+          playSpine: STRUCTURED_SF_PLAY_SPINE,
           // The arrangement grammar, on the transport at BOTH seats. The shell
           // gets the same object through withArrangement() in api-generator.js;
           // this is the S+F half. Prose-demanded and gate-enforced but
@@ -1402,13 +1417,14 @@
             cipherType: { type: 'string' },
             componentValue: {}, isBossWeek: { type: 'boolean' }, isDeload: { type: 'boolean' },
             isBinaryChoiceWeek: { type: 'boolean' }, sessionCount: { type: 'integer' },
+            guaranteedMarksPerSession: { type: 'integer', minimum: 0 },
             fragmentIds: { type: 'array', items: { type: 'string' } },
             overflowFragmentId: {}, oracleMode: { type: 'string', enum: ['fragment', 'consequence', 'mixed'] },
             companionTypes: { type: 'array', items: { type: 'string' } },
             clockNames: { type: 'array', items: { type: 'string' } },
             hasInterlude: { type: 'boolean' }
           },
-          required: ['weekNumber', 'title', 'arcBeat', 'mapType', 'cipherType', 'isBossWeek', 'sessionCount', 'fragmentIds']
+          required: ['weekNumber', 'title', 'arcBeat', 'mapType', 'cipherType', 'isBossWeek', 'sessionCount', 'guaranteedMarksPerSession', 'fragmentIds']
         }
       },
       fragmentRegistry: {
@@ -6485,6 +6501,7 @@
         isBossWeek: false,
         isBinaryChoiceWeek: false,
         sessionCount: 3,
+        guaranteedMarksPerSession: 0,
         fragmentIds: ['F.01'],
         overflowFragmentId: null,
         sessionBeatTypes: []

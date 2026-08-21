@@ -5960,67 +5960,11 @@ export function validateEconomyGraphStage(result, options) {
   // model was handed, not a guessed inventory. Old checkpoints bypass this
   // branch and retain their read-only edge-cadence fallback.
   if (opts.requireCanonicalCadence) {
-    var surfaceCadences = result.surfaceCadences;
-    var expectedCadences = namedCadenceSurfaceRefs(prior || graph);
-    var seenCadences = {};
-    if (!Array.isArray(surfaceCadences)) {
-      errors.push(S + 'surfaceCadences is missing or not an array. Return exactly one cadence row for '
-        + 'every named clock, map, and companion the given graph touches; cadence belongs to that '
-        + 'surface, never to an edge.');
-    } else {
-      surfaceCadences.forEach(function (row, i) {
-        if (!row || typeof row !== 'object' || Array.isArray(row)) {
-          errors.push(S + 'surfaceCadences[' + i + '] is not an object');
-          return;
-        }
-        var parsed = parseSurfaceRef(row.surface);
-        if (!parsed.valid || !parsed.id || CADENCE_NAMED_SURFACE_KINDS.indexOf(parsed.kind) === -1
-          || /^w\s*\d+/i.test(String(parsed.id).trim())) {
-          errors.push(S + 'surfaceCadences[' + i + '].surface "' + String(row.surface || '') + '" is not a '
-            + 'named clock, map, or companion from the graph. Copy one exact non-week-shaped surface ref.');
-          return;
-        }
-        var cadenceKey = parsed.kind + ':' + toSlugWords(parsed.id);
-        if (seenCadences[cadenceKey]) {
-          errors.push(S + 'surfaceCadences names `' + parsed.kind + ':' + parsed.id + '` more than once. '
-            + 'One surface has one cadence row; merge its schedule before you return it.');
-          return;
-        }
-        seenCadences[cadenceKey] = true;
-        if (!expectedCadences[cadenceKey]) {
-          errors.push(S + 'surfaceCadences names `' + parsed.kind + ':' + parsed.id + '`, which is not a '
-            + 'named printable surface in the graph you were given. Do not invent a schedule.');
-        }
-        var rowMode = String(row.mode || '').trim();
-        if (VALID_EDGE_CADENCES.indexOf(rowMode) === -1) {
-          errors.push(S + 'surfaceCadences row for `' + parsed.kind + ':' + parsed.id + '` declares mode "'
-            + rowMode + '", which is not one of: ' + VALID_EDGE_CADENCES.join(', ') + '.');
-          return;
-        }
-        var rowOwed = EDGE_CADENCE_REQUIRED_FIELDS[rowMode];
-        var rowOwedValue = rowOwed === 'introWeek' ? row.introWeek : row.closesAtWeek;
-        if (rowOwed && !(Number(rowOwedValue) > 0)) {
-          errors.push(S + 'surfaceCadences row for `' + parsed.kind + ':' + parsed.id + '` declares `mode: "'
-            + rowMode + '"` and does not carry `' + rowOwed + '`. That schedule names no weeks.');
-        }
-        if (Number(opts.weekCount) > 0 && Number(row.introWeek) > Number(opts.weekCount)) {
-          errors.push(S + 'surfaceCadences row for `' + parsed.kind + ':' + parsed.id + '` declares `introWeek: '
-            + row.introWeek + '`, past this book\'s ' + opts.weekCount + ' weeks.');
-        }
-      });
-      Object.keys(expectedCadences).forEach(function (key) {
-        if (seenCadences[key]) return;
-        var ep = expectedCadences[key];
-        errors.push(S + 'surfaceCadences is missing the row for `' + ep.kind + ':' + ep.id + '`. '
-          + 'Every named printable surface in the given graph needs exactly one schedule.');
-      });
-      graph.forEach(function (edge) {
-        if (!edge || typeof edge !== 'object' || edge.cadence === undefined) return;
-        errors.push(S + 'the edge `' + String(edge.from || '?') + ' → ' + String(edge.to || '?')
-          + '` still carries `cadence`. Move that declaration to its one `surfaceCadences` row; '
-          + 'edge-level cadence would recreate two competing schedule homes.');
-      });
-    }
+    errors = errors.concat(canonicalSurfaceCadenceErrors(graph, result.surfaceCadences, {
+      prefix: S,
+      expectedGraph: prior || graph,
+      weekCount: opts.weekCount
+    }));
   }
 
   // ── The cadence-shape arms (strict when present, the manifestPointer idiom) ─
@@ -6114,6 +6058,80 @@ export function validateEconomyGraphStage(result, options) {
  * missing object, because everything below it would then report the same fact
  * eight times.
  */
+// One cadence authority check, used by both seats that can own it. Kept as a
+// function expression immediately after Economy Pacing so the existing demand
+// census still attributes these refusal sites to that paid owner while the S+F
+// validator calls the exact same predicate.
+var canonicalSurfaceCadenceErrors = function (graph, surfaceCadences, options) {
+  var opts = options || {};
+  var S = opts.prefix || '';
+  var expectedCadences = namedCadenceSurfaceRefs(opts.expectedGraph || graph);
+  var seenCadences = {};
+  var errors = [];
+
+  if (!Array.isArray(surfaceCadences)) {
+    errors.push(S + 'surfaceCadences is missing or not an array. Return exactly one cadence row for '
+      + 'every named clock, map, and companion the given graph touches; cadence belongs to that '
+      + 'surface, never to an edge.');
+    return errors;
+  }
+
+  surfaceCadences.forEach(function (row, i) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) {
+      errors.push(S + 'surfaceCadences[' + i + '] is not an object; duplicate cadence authority can only be compared between object rows');
+      return;
+    }
+    var parsed = parseSurfaceRef(row.surface);
+    if (!parsed.valid || !parsed.id || CADENCE_NAMED_SURFACE_KINDS.indexOf(parsed.kind) === -1
+      || /^w\s*\d+/i.test(String(parsed.id).trim())) {
+      errors.push(S + 'surfaceCadences[' + i + '].surface "' + String(row.surface || '') + '" is not a '
+        + 'named clock, map, or companion from the graph. Copy one exact non-week-shaped surface ref.');
+      return;
+    }
+    var cadenceKey = parsed.kind + ':' + toSlugWords(parsed.id);
+    if (seenCadences[cadenceKey]) {
+      errors.push(S + 'surfaceCadences names `' + parsed.kind + ':' + parsed.id + '` more than once. '
+        + 'One surface has one cadence row; merge its schedule before you return it.');
+      return;
+    }
+    seenCadences[cadenceKey] = true;
+    if (!expectedCadences[cadenceKey]) {
+      errors.push(S + 'surfaceCadences names `' + parsed.kind + ':' + parsed.id + '`, which is not a '
+        + 'named printable surface in the graph you were given. Do not invent a schedule.');
+    }
+    var rowMode = String(row.mode || '').trim();
+    if (VALID_EDGE_CADENCES.indexOf(rowMode) === -1) {
+      errors.push(S + 'surfaceCadences row for `' + parsed.kind + ':' + parsed.id + '` declares mode "'
+        + rowMode + '", which is not one of: ' + VALID_EDGE_CADENCES.join(', ') + '.');
+      return;
+    }
+    var rowOwed = EDGE_CADENCE_REQUIRED_FIELDS[rowMode];
+    var rowOwedValue = rowOwed === 'introWeek' ? row.introWeek : row.closesAtWeek;
+    if (rowOwed && !(Number(rowOwedValue) > 0)) {
+      errors.push(S + 'surfaceCadences row for `' + parsed.kind + ':' + parsed.id + '` declares `mode: "'
+        + rowMode + '"` and does not carry `' + rowOwed + '`. That schedule names no weeks.');
+    }
+    if (Number(opts.weekCount) > 0 && Number(row.introWeek) > Number(opts.weekCount)) {
+      errors.push(S + 'surfaceCadences row for `' + parsed.kind + ':' + parsed.id + '` declares `introWeek: '
+        + row.introWeek + '`, past this book\'s ' + opts.weekCount + ' weeks.');
+    }
+  });
+
+  Object.keys(expectedCadences).forEach(function (key) {
+    if (seenCadences[key]) return;
+    var ep = expectedCadences[key];
+    errors.push(S + 'surfaceCadences is missing the row for `' + ep.kind + ':' + ep.id + '`. '
+      + 'Every named printable surface in the given graph needs exactly one schedule.');
+  });
+  (Array.isArray(graph) ? graph : []).forEach(function (edge) {
+    if (!edge || typeof edge !== 'object' || edge.cadence === undefined) return;
+    errors.push(S + 'the edge `' + String(edge.from || '?') + ' → ' + String(edge.to || '?')
+      + '` still carries `cadence`. Move that declaration to its one `surfaceCadences` row; '
+      + 'edge-level cadence would recreate two competing schedule homes.');
+  });
+  return errors;
+};
+
 export function artifactDesignStageFloorErrors(rulebook) {
   var S = 'Game Rulebook → gameRulebook.artifactDesign';
   var design = (rulebook || {}).artifactDesign;
@@ -10277,6 +10295,11 @@ export function validateLayerBibleStage(result) {
   return '';
 }
 
+function guaranteedMarksPerSessionError(value, label) {
+  if (Number.isInteger(value) && value >= 0) return '';
+  return label + '.guaranteedMarksPerSession: missing or invalid; expected one integer >= 0 for the marks every completed session guarantees';
+}
+
 export function validateCampaignPlanStage(result, options) {
   if (!result) return 'Campaign Plan → missing required sections (null result).';
   var errors = [];
@@ -10342,6 +10365,8 @@ export function validateCampaignPlanStage(result, options) {
       if (!w.sessionCount || w.sessionCount < 1) {
         errors.push(label + ': missing sessionCount');
       }
+      var guaranteedMarksError = guaranteedMarksPerSessionError(w.guaranteedMarksPerSession, label);
+      if (guaranteedMarksError) errors.push(guaranteedMarksError);
       if (!w.isBossWeek && !String(w.cipherType || '').trim()) {
         errors.push(label + ': cipherType missing for non-boss week');
       }
@@ -10827,6 +10852,19 @@ export function validateSkeletonStage(result, weekCount, options) {
     console.warn('Skeleton → meta.artifactIdentity: missing or incomplete (advisory)');
   }
 
+  // S+F has no Economy Pacing call, so its one compiler seat owns the same
+  // exact cadence ledger the standard pipeline authors later. This is strict
+  // for every new skeleton, independent of the optional generation floors.
+  var sfPlaySpine = meta.playSpine;
+  if (sfPlaySpine && Array.isArray(sfPlaySpine.economyGraph)) {
+    var cadenceErrors = canonicalSurfaceCadenceErrors(
+      sfPlaySpine.economyGraph,
+      sfPlaySpine.surfaceCadences,
+      { prefix: 'Skeleton → meta.playSpine.', weekCount: weekCount }
+    );
+    if (cadenceErrors.length) return cadenceErrors.join('; ');
+  }
+
   // ── artifactIntent (Layer 3 planning contract) ──
   var VALID_BRIEF_MODES = { explicit: 1, sparse: 1, empty: 1, mashup: 1, 'reference-led': 1, 'personal-subject': 1 };
   var VALID_FIDELITY_MODES = { literal: 1, interpretive: 1, compositional: 1 };
@@ -11040,6 +11078,11 @@ export function validateSkeletonStage(result, weekCount, options) {
     if (!w.title) return 'Skeleton → weekPlan[' + i + '].title: missing';
     if (!w.mapType) return 'Skeleton → weekPlan[' + i + '].mapType: missing';
     if (!w.sessionCount || w.sessionCount < 1) return 'Skeleton → weekPlan[' + i + '].sessionCount: missing or invalid';
+    var guaranteedMarksError = guaranteedMarksPerSessionError(
+      w.guaranteedMarksPerSession,
+      'Skeleton → weekPlan[' + i + ']'
+    );
+    if (guaranteedMarksError) return guaranteedMarksError;
   }
 
   // ── fragmentRegistry ──

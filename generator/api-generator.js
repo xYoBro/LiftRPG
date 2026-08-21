@@ -530,11 +530,12 @@ var STRUCTURED_SCHEMA_CAMPAIGN = {
           isBossWeek: { type: 'boolean' },
           isBinaryChoiceWeek: { type: 'boolean' },
           sessionCount: { type: 'integer' },
+          guaranteedMarksPerSession: { type: 'integer', minimum: 0 },
           fragmentIds: { type: 'array', items: { type: 'string' } },
           overflowFragmentId: { type: 'string' },
           sessionBeatTypes: { type: 'array', items: { type: 'string' } }
         },
-        required: ['weekNumber', 'arcBeat', 'stateSnapshot', 'cipherType', 'mapReuse', 'stateChange', 'newGateOrUnlock', 'isBossWeek', 'isBinaryChoiceWeek', 'sessionCount', 'fragmentIds', 'sessionBeatTypes']
+        required: ['weekNumber', 'arcBeat', 'stateSnapshot', 'cipherType', 'mapReuse', 'stateChange', 'newGateOrUnlock', 'isBossWeek', 'isBinaryChoiceWeek', 'sessionCount', 'guaranteedMarksPerSession', 'fragmentIds', 'sessionBeatTypes']
       }
     },
     bossPlan: {
@@ -1379,6 +1380,9 @@ function buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState,
   if (/overflowregistry|overflowfragmentid/.test(lastErrorLower)) {
     retryHints.push('- Recheck overflow ownership: every week with sessionCount > 3 needs overflowFragmentId plus a matching overflowRegistry entry with weekNumber and canonical F.30+ IDs.');
   }
+  if (/guaranteedmarkspersession/.test(lastErrorLower)) {
+    retryHints.push('- Recheck guaranteedMarksPerSession: every week needs one integer >= 0 naming the marks every completed session prints without dice, branches, bonuses, or optional actions.');
+  }
   return [
     '# API Stage 2 — Story Plan (Compact Retry)',
     '',
@@ -1387,13 +1391,14 @@ function buildCompactCampaignRetryPrompt(workout, brief, layerBible, retryState,
     '{"topology":{},"weeks":[],"bossPlan":{},"fragmentRegistry":[],"overflowRegistry":[]}',
     '',
     'Compact week template (repeat for each week, filling every field):',
-    '{"weekNumber":1,"arcBeat":"","npcBeat":"","stateSnapshot":"","playerGains":"","zoneFocus":"","cipherType":"","mapReuse":"full","stateChange":"","newGateOrUnlock":"","weeklyComponentMeaning":"","oraclePressure":"","fragmentFunction":"","governingProcedure":"","companionChange":"","isBossWeek":false,"isBinaryChoiceWeek":false,"sessionCount":3,"fragmentIds":["F.01"],"overflowFragmentId":"F.30","sessionBeatTypes":[]}',
+    '{"weekNumber":1,"arcBeat":"","npcBeat":"","stateSnapshot":"","playerGains":"","zoneFocus":"","cipherType":"","mapReuse":"full","stateChange":"","newGateOrUnlock":"","weeklyComponentMeaning":"","oraclePressure":"","fragmentFunction":"","governingProcedure":"","companionChange":"","isBossWeek":false,"isBinaryChoiceWeek":false,"sessionCount":3,"guaranteedMarksPerSession":0,"fragmentIds":["F.01"],"overflowFragmentId":"F.30","sessionBeatTypes":[]}',
     '',
     '## Hard Requirements',
     '- Use exactly ' + weekCount + ' weeks.',
     '- Week ' + midpoint + ' must be the binary choice week.',
     '- Week ' + weekCount + ' must be the boss week.',
-    '- Every week needs: weekNumber, arcBeat, npcBeat, stateSnapshot, playerGains, zoneFocus, mapReuse, stateChange, newGateOrUnlock, weeklyComponentMeaning, oraclePressure, fragmentFunction, governingProcedure, companionChange, isBossWeek, isBinaryChoiceWeek, sessionCount, fragmentIds, sessionBeatTypes.',
+    '- Every week needs: weekNumber, arcBeat, npcBeat, stateSnapshot, playerGains, zoneFocus, mapReuse, stateChange, newGateOrUnlock, weeklyComponentMeaning, oraclePressure, fragmentFunction, governingProcedure, companionChange, isBossWeek, isBinaryChoiceWeek, sessionCount, guaranteedMarksPerSession, fragmentIds, sessionBeatTypes.',
+    '- guaranteedMarksPerSession is an integer >= 0: the minimum marks printed by every completed session without dice, branches, bonuses, or optional actions.',
     '- weeklyComponentMeaning must describe one derivable integer 1-26 for each non-boss week. Do not treat it as a composite reading bundle, paragraph, or ledger excerpt.',
     '- Include a concrete cipherType for every non-boss week and do not repeat cipherType in consecutive non-boss weeks.',
     '- mapReuse cannot mean "no change": every non-boss week must declare a visibly new stateChange or unlock relative to the prior week.',
@@ -9467,6 +9472,7 @@ window.LiftRPGAPI = {
     runApiPipeline: runApiPipeline,
     runSkeletonFleshPipeline: runSkeletonFleshPipeline,
     structuredSchemas: {
+      campaign: STRUCTURED_SCHEMA_CAMPAIGN,
       shell: STRUCTURED_SCHEMA_SHELL,
       // ── THE SHELL SPLIT's four slices, and the partition's own reader ────
       // Exported because the harness has to be able to ask the question the
