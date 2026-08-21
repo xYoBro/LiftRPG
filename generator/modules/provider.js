@@ -1739,6 +1739,34 @@ function buildNetworkError(err) {
   return networkError;
 }
 
+// EOF is not success. A proxy can drop a stream after valid-looking JSON and
+// before the provider's terminal frame; downstream validation cannot tell that
+// partial object from an intentionally complete answer.
+function buildPartialStreamError(spec, streamed) {
+  var receivedChars = (streamed && typeof streamed.streamChars === 'number')
+    ? streamed.streamChars
+    : String((streamed && streamed.text) || '').length;
+  var err = new Error(
+    (spec.label || 'Provider') + ' stream ended before its completion frame. '
+    + 'The partial response was discarded and may be retried safely.'
+  );
+  err.errorType = 'partial_stream';
+  err.retryable = true;
+  err.provider = spec.provider || String(spec.label || 'provider').toLowerCase();
+  err.model = String((spec.payload && spec.payload.model) || '');
+  err.operation = spec.operation || 'generation';
+  err.receivedChars = receivedChars;
+  return err;
+}
+
+function buildMalformedResponseError(message, details) {
+  var err = new Error(message);
+  err.errorType = 'malformed_response';
+  err.retryable = true;
+  if (details && details.finishReason) err.finishReason = details.finishReason;
+  return err;
+}
+
 // Splits an SSE byte stream into `data:` payload lines and hands each to
 // onFrame. Shared by every streaming format — the frame FORMAT is universal
 // (text/event-stream); only the payload SCHEMA differs per provider.
@@ -1782,7 +1810,9 @@ function parseSseJson(raw, label) {
   try {
     return JSON.parse(raw);
   } catch (parseErr) {
-    console.warn('[LiftRPG] Skipping unparseable ' + label + ' SSE frame:', raw.slice(0, 200));
+    // Do not print the frame: it may contain generated private content. The
+    // caller counts the malformed frame and rejects the whole response.
+    console.warn('[LiftRPG] Received an unparseable ' + label + ' SSE frame.');
     return null;
   }
 }
@@ -1836,6 +1866,20 @@ async function runStreamingRequest(spec) {
 
     guard.touch();   // headers landed — switch connect window -> idle window
     var streamed = await spec.consume(resp, guard.touch, emitTick);
+    if (!streamed || streamed.complete !== true) {
+      throw buildPartialStreamError(spec, streamed);
+    }
+    if (streamed.malformedFrames > 0) {
+      var malformedStream = buildMalformedResponseError(
+        (spec.label || 'Provider') + ' stream contained an invalid event frame. '
+        + 'The response was discarded and may be retried safely.'
+      );
+      malformedStream.provider = spec.provider || String(spec.label || 'provider').toLowerCase();
+      malformedStream.model = String((spec.payload && spec.payload.model) || '');
+      malformedStream.operation = spec.operation || 'generation';
+      malformedStream.malformedFrames = streamed.malformedFrames;
+      throw malformedStream;
+    }
     // One final, unthrottled tick from the one place every format passes
     // through — so the closing number is the true total for every transport,
     // present and future, without each consumer remembering to do it.
@@ -1886,6 +1930,7 @@ async function readOpenAICompatStream(response, onActivity, onTick) {
   var usage = null;
   var streamError = null;
   var sawDone = false;
+  var malformedFrames = 0;
 
   await readSseFrames(response, function () {
     if (onActivity) onActivity();
@@ -1896,7 +1941,7 @@ async function readOpenAICompatStream(response, onActivity, onTick) {
       return false;   // stop reading
     }
     var payload = parseSseJson(raw, 'OpenAI-compatible');
-    if (!payload) return true;
+    if (!payload) { malformedFrames += 1; return true; }
 
     if (payload.error) {
       streamError = new Error('API error: ' + (payload.error.message || payload.error.type || 'stream error'));
@@ -1930,7 +1975,8 @@ async function readOpenAICompatStream(response, onActivity, onTick) {
     usage: usage,
     finishReasonRaw: finishReasonRaw,
     model: streamedModel,
-    complete: sawDone
+    complete: sawDone,
+    malformedFrames: malformedFrames
   };
 }
 
@@ -1987,6 +2033,7 @@ async function readAnthropicStream(response, onActivity, onTick) {
   var streamedModel = '';
   var streamError = null;
   var sawMessageStop = false;
+  var malformedFrames = 0;
 
   function handleEvent(payload) {
     var type = payload && payload.type;
@@ -2073,6 +2120,7 @@ async function readAnthropicStream(response, onActivity, onTick) {
   }, function (raw) {
     var payload = parseSseJson(raw, 'Anthropic');
     if (payload) handleEvent(payload);
+    else malformedFrames += 1;
   });
 
   if (streamError) throw streamError;
@@ -2083,6 +2131,7 @@ async function readAnthropicStream(response, onActivity, onTick) {
     stopReason: stopReason,
     model: streamedModel,
     complete: sawMessageStop,
+    malformedFrames: malformedFrames,
     streamChars: streamedChars(),
     toolUse: firstToolIndex === -1 ? null : {
       name: toolBlocks[firstToolIndex].name,
@@ -2113,6 +2162,8 @@ export async function callAnthropic(apiKey, model, prompt, maxTokens, timeoutMs,
 
   var streamed = await runStreamingRequest({
     label: 'Anthropic',
+    provider: 'anthropic',
+    operation: 'freeform',
     errorPrefix: 'Anthropic API error: ',
     url: ANTHROPIC_MESSAGES_URL,
     headers: buildAnthropicHeaders(apiKey),
@@ -2204,6 +2255,8 @@ export async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens
   async function attempt(includeUsage) {
     return runStreamingRequest({
       label: 'API',
+      provider: detectOpenAICompatProvider(baseUrl),
+      operation: 'freeform',
       errorPrefix: 'API error: ',
       url: url,
       headers: headers,
@@ -2294,7 +2347,10 @@ export async function callOpenAICompat(apiKey, baseUrl, model, prompt, maxTokens
  */
 /**
  * @typedef {Object} TransportCapabilities
- * @property {boolean} streaming        Adapter consumes an incremental stream.
+ * @property {boolean} streaming        Freeform calls consume an incremental stream.
+ * @property {boolean} structuredStreaming Structured calls consume an incremental
+ *           stream. Kept separate because OpenAI-compatible schema calls are
+ *           one-shot while Anthropic forced-tool calls stream.
  * @property {'reliable'|'optional'|'none'} usageInStream
  *           reliable — usage always present; optional — may be absent and the
  *           run must degrade to unknown tokens; none — never reported.
@@ -2355,10 +2411,22 @@ export function listTransportFormats() {
   return Object.keys(TRANSPORT_REGISTRY);
 }
 
-// Unknown/blank format resolves to the OpenAI-compatible adapter — the correct
-// default for any custom endpoint the user points at with a base URL.
+// A blank format keeps the historical OpenAI-compatible default for custom
+// endpoints. An explicit unknown format is contradictory configuration and
+// must fail before a request is sent rather than silently changing protocols.
 export function resolveTransport(settings) {
-  return getTransport(settings && settings.format) || getTransport(DEFAULT_TRANSPORT_FORMAT);
+  var requested = String((settings && settings.format) || '').trim().toLowerCase();
+  if (!requested) return getTransport(DEFAULT_TRANSPORT_FORMAT);
+  var adapter = getTransport(requested);
+  if (adapter) return adapter;
+  var err = new Error(
+    'Unsupported transport format "' + requested + '". Supported formats: '
+    + listTransportFormats().join(', ') + '.'
+  );
+  err.errorType = 'configuration';
+  err.configurationField = 'format';
+  err.retryable = false;
+  throw err;
 }
 
 registerTransport({
@@ -2366,6 +2434,7 @@ registerTransport({
   label: 'Anthropic Messages',
   capabilities: {
     streaming: true,
+    structuredStreaming: true,
     usageInStream: 'reliable',
     // Forced tool use, not response_format — a CAPABILITY of this transport,
     // reached through its own adapter entry. Nothing downstream learns that the
@@ -2402,6 +2471,7 @@ registerTransport({
   label: 'OpenAI-compatible chat completions',
   capabilities: {
     streaming: true,
+    structuredStreaming: false,
     // Third-party and local servers frequently omit usage from streams.
     usageInStream: 'optional',
     structuredOutput: true,
@@ -2436,6 +2506,7 @@ registerTransport({
   label: 'Google Gemini (OpenAI-compatible endpoint)',
   capabilities: {
     streaming: true,
+    structuredStreaming: false,
     usageInStream: 'optional',
     structuredOutput: true,
     systemPromptCaching: false,
@@ -2595,6 +2666,8 @@ export async function callAnthropicStructured(apiKey, model, prompt, schema, max
 
   var streamed = await runStreamingRequest({
     label: 'Anthropic',
+    provider: 'anthropic',
+    operation: 'structured',
     errorPrefix: 'Anthropic API error: ',
     url: ANTHROPIC_MESSAGES_URL,
     headers: buildAnthropicHeaders(apiKey),
@@ -2632,14 +2705,14 @@ export async function callAnthropicStructured(apiKey, model, prompt, schema, max
   if (!streamed.toolUse) {
     // Forced tool_choice and no tool_use block means the endpoint did not honor
     // the force (a proxy that strips `tools`, a model that rejects forcing).
-    // The wording is load-bearing: shouldFallbackFromStructured() reads it, so
-    // this degrades to freeform + repair rather than killing the run — the same
-    // treatment the compat path gives an unexpected structured response shape.
-    var shapeError = new Error(
+    // A missing block is malformed response data, not proof that the endpoint
+    // lacks structured output. Keep the semantic request intact and let the
+    // stage ladder retry it; only an explicit capability refusal may degrade.
+    var shapeError = buildMalformedResponseError(
       'Unexpected structured response shape: no tool_use block for ' + stageName
-      + (streamed.stopReason ? ' (stop_reason: ' + streamed.stopReason + ')' : '') + '.'
+      + (streamed.stopReason ? ' (stop_reason: ' + streamed.stopReason + ')' : '') + '.',
+      { finishReason: meta.finishReason }
     );
-    shapeError.finishReason = meta.finishReason;
     throw shapeError;
   }
 
@@ -2721,10 +2794,39 @@ export async function callOpenAICompatStructured(apiKey, baseUrl, model, prompt,
     throw err;
   }
 
-  var body = await resp.json();
+  var successText = '';
+  try { successText = await resp.text(); } catch (readSuccessErr) {
+    var unreadable = buildMalformedResponseError(
+      'The provider returned HTTP 200, but its structured response body could not be read.'
+    );
+    unreadable.status = resp.status;
+    unreadable.provider = detectOpenAICompatProvider(baseUrl);
+    unreadable.model = model;
+    throw unreadable;
+  }
+  var body;
+  try {
+    body = JSON.parse(successText);
+  } catch (parseSuccessErr) {
+    var malformed = buildMalformedResponseError(
+      'The provider returned HTTP 200 with an invalid structured response envelope.'
+    );
+    malformed.status = resp.status;
+    malformed.provider = detectOpenAICompatProvider(baseUrl);
+    malformed.model = model;
+    malformed.receivedChars = successText.length;
+    throw malformed;
+  }
 
-  if (!body.choices || !body.choices[0] || !body.choices[0].message) {
-    throw new Error('Unexpected structured response shape. Check the console.');
+  if (!body || typeof body !== 'object'
+    || !body.choices || !body.choices[0] || !body.choices[0].message) {
+    var missingMessage = buildMalformedResponseError(
+      'Unexpected structured response shape: the provider returned no assistant message.'
+    );
+    missingMessage.status = resp.status;
+    missingMessage.provider = detectOpenAICompatProvider(baseUrl);
+    missingMessage.model = (body && body.model) || model;
+    throw missingMessage;
   }
 
   var message = body.choices[0].message;
@@ -2812,7 +2914,7 @@ export async function callProviderStructured(settings, prompt, schema, maxTokens
   // is why a structured stage on that path no longer reports "nothing back yet"
   // for its whole duration.
   if (typeof (options && options.onStreamTick) === 'function'
-    && adapter.capabilities && adapter.capabilities.streaming) {
+    && adapter.capabilities && adapter.capabilities.structuredStreaming) {
     structuredOpts.onStreamTick = options.onStreamTick;
   }
   var runSignalForStage = resolveRunSignal(settings, options);

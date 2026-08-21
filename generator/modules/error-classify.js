@@ -151,9 +151,7 @@ export function isLikelySchemaFailure(err) {
 export function shouldFallbackFromStructured(err) {
   var message = (err && err.message) || '';
   return !!(err && err.structuredUnsupported)
-    || isStructuredOutputUnsupportedMessage((err && err.message) || '')
-    || String(message).toLowerCase().indexOf('unexpected structured response shape') !== -1
-    || (isLikelyJsonFailure(err) && !isLikelyTruncationError(err));
+    || isStructuredOutputUnsupportedMessage(message);
 }
 
 export function isLikelyTimeoutError(err) {
