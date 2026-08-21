@@ -10678,10 +10678,19 @@ export function validateFragmentsStage(result, expectedRegistry, options) {
       // already address it.
       var message = 'Over budget: ' + b.message;
       budgetErrors.push(message);
+      // Most callers bank the same `{ fragments: [...] }` object this gate
+      // reads. Single-fragment recovery is the deliberate exception: it wraps
+      // its bare fragment only to reuse this gate, then banks the bare object.
+      // The caller supplies that payload's prefix, so the gate publishes a
+      // coordinate the merge can actually write rather than spending a repair
+      // call on an envelope that ceases to exist after validation.
+      var targetParts = Array.isArray((options || {}).deltaPathPrefix)
+        ? (options || {}).deltaPathPrefix.concat(b.path.slice(2))
+        : b.path.slice();
       budgetTargets.push({
         message: message,
-        pathParts: b.path.slice(),
-        path: formatFieldPath(b.path),
+        pathParts: targetParts,
+        path: formatFieldPath(targetParts),
         cap: b.cap,
         length: b.length,
         requirement: b.message

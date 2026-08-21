@@ -4452,7 +4452,11 @@ async function generateSingleFragmentAdaptive(settings, builders, config) {
       return validateFragmentsStage({ fragments: result ? [result] : [] },
         registryEntry ? [registryEntry] : [],
         { generationFloors: true, brief: config.brief || '',
-          componentInputs: config.componentValues || undefined });   // W3-ARM fragment-single · W7-ARM seal-single
+          componentInputs: config.componentValues || undefined,
+          // The gate sees a wrapper, but this stage banks `result` itself. Its
+          // delta coordinates must therefore address the bare fragment so a
+          // pure budget breach takes the field-only repair, never a paid reroll.
+          deltaPathPrefix: [] });   // W3-ARM fragment-single · W7-ARM seal-single
     },
     buildPrompt: function (retryState) {
       return builders.singleFragment(
