@@ -2821,7 +2821,7 @@ function flattenSkeletonFragments(fragmentOutputs, fragmentRegistry) {
       for (var k = 0; k < item.fragments.length; k++) {
         if (item.fragments[k]) flat.push(item.fragments[k]);
       }
-    } else if (item.id || item.title || item.content || item.body || item.documentType) {
+    } else if (item.id || item.title || item.content || item.body || item.bodyText || item.documentType) {
       // Bare fragment object
       flat.push(item);
     }
@@ -2857,10 +2857,15 @@ function flattenSkeletonFragments(fragmentOutputs, fragmentRegistry) {
       frag.id = regEntry.id;
     }
 
-    // Ensure body text is at the top level for the renderer
-    if (!frag.body && frag.content && typeof frag.content === 'string') {
-      frag.body = frag.content;
+    // The assembled schema and renderer own `content`; provider aliases do not
+    // cross this seam. Preserve an authored content string, otherwise prefer
+    // the canonical legacy body before the older bodyText alias.
+    if (typeof frag.content !== 'string' || !frag.content) {
+      if (typeof frag.body === 'string') frag.content = frag.body;
+      else if (typeof frag.bodyText === 'string') frag.content = frag.bodyText;
     }
+    delete frag.body;
+    delete frag.bodyText;
   }
 
   return flat;
@@ -2940,8 +2945,7 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
       narrativeVoice:           meta.narrativeVoice || {},
       literaryRegister:         meta.literaryRegister || {},
       structuralShape:          meta.structuralShape || {},
-      artifactIdentity:         normalizedArtifactIdentity,
-      storyAnchor:              meta.storyAnchor || ''
+      artifactIdentity:         normalizedArtifactIdentity
     },
     cover: skeleton.cover || {},
     rulesSpread: (rulesOutput && rulesOutput.rulesSpread) ? rulesOutput.rulesSpread : {},

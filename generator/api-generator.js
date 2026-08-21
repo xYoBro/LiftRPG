@@ -258,7 +258,8 @@ import {
   getCheckpointSpendToDate,
   getShelvedCheckpoint,
   clearShelvedCheckpoint,
-  computeRunFingerprint
+  computeRunFingerprint,
+  pruneCheckpointStage
 } from './modules/checkpoint.js';
 
 import {
@@ -4654,6 +4655,453 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
 var LAST_API_BOOKLET_STORAGE_KEY = 'liftrpg_last_api_booklet';
 var LAST_API_BOOKLET_META_STORAGE_KEY = 'liftrpg_last_api_booklet_meta';
 
+function copyFindingList(value) {
+  return Array.isArray(value) ? value.slice() : [];
+}
+
+/**
+ * The four independent production facts, normalized in one place.  Referee
+ * evidence is carried by reference: this function classifies an outcome but
+ * never edits a finding's identity, path, message, or evidence payload.
+ */
+function deriveProductionOutcome(facts) {
+  facts = facts || {};
+  var runInput = facts.run || {};
+  var mechanicalInput = facts.mechanical || {};
+  var editorialInput = facts.editorial || {};
+  var receiptInput = facts.receipt || {};
+  var mechanicalErrors = copyFindingList(mechanicalInput.errors);
+  var editorialFindings = copyFindingList(editorialInput.findings);
+  var receiptFindings = copyFindingList(receiptInput.blockingFindings);
+  var operationalFindings = copyFindingList(facts.operationalFindings);
+
+  var mechanicalStatus = mechanicalInput.status === 'valid' || mechanicalInput.status === 'invalid'
+    ? mechanicalInput.status
+    : 'not_run';
+  if (mechanicalErrors.length) mechanicalStatus = 'invalid';
+
+  var runStatus = runInput.status === 'complete' ? 'complete' : 'interrupted';
+  if (runStatus === 'complete' && mechanicalStatus === 'not_run') runStatus = 'interrupted';
+
+  var editorialStatus = editorialInput.status;
+  if (editorialStatus === 'disabled' || editorialStatus === 'unavailable' || editorialStatus === 'failed') {
+    editorialStatus = editorialInput.status === 'failed' ? 'needs_review' : 'not_run';
+  }
+  if (editorialStatus !== 'pass' && editorialStatus !== 'needs_review') editorialStatus = 'not_run';
+  if (mechanicalStatus === 'invalid') editorialStatus = 'not_run';
+  if (receiptFindings.length) editorialStatus = 'needs_review';
+  editorialFindings = editorialFindings.concat(receiptFindings);
+
+  var proof = receiptInput.proof === 'closed' || receiptInput.proof === 'pending'
+    ? receiptInput.proof
+    : 'not_run';
+  var hasEngineDefect = operationalFindings.some(function (entry) {
+    return entry && entry.class === 'engine_invariant';
+  });
+  var releaseStatus = 'blocked';
+  var releaseLabel = hasEngineDefect ? 'engine_defect' : 'interrupted_draft';
+
+  if (!hasEngineDefect && runStatus === 'complete') {
+    if (mechanicalStatus === 'invalid') {
+      releaseLabel = 'invalid_draft';
+    } else if (editorialStatus === 'not_run' || editorialStatus === 'needs_review') {
+      releaseStatus = 'pending_review';
+      releaseLabel = 'needs_editorial_review';
+    } else if (receiptFindings.length) {
+      releaseStatus = 'pending_review';
+      releaseLabel = 'needs_editorial_review';
+    } else if (proof !== 'closed' || receiptInput.persisted !== true) {
+      releaseStatus = 'pending_review';
+      releaseLabel = 'awaiting_render_review';
+    } else {
+      releaseStatus = 'candidate';
+      releaseLabel = 'valid_candidate';
+    }
+  }
+
+  return {
+    run: { status: runStatus, reason: runInput.reason || '' },
+    mechanical: { status: mechanicalStatus, errors: mechanicalErrors },
+    editorial: {
+      status: editorialStatus,
+      findings: editorialFindings,
+      repairable: editorialInput.repairable === true
+    },
+    release: { status: releaseStatus, label: releaseLabel, proof: proof, authority: 'human' },
+    operationalFindings: operationalFindings
+  };
+}
+
+function checkpointDispositionForOutcome(outcome) {
+  return {
+    retain: !(outcome && outcome.release && outcome.release.label === 'valid_candidate'
+      && outcome.release.proof === 'closed')
+  };
+}
+
+function productionOutcomePresentation(outcome, options) {
+  outcome = outcome || deriveProductionOutcome({});
+  options = options || {};
+  var label = outcome.release.label;
+  var action = 'Retry from checkpoint';
+  if (label === 'invalid_draft') action = 'Open invalid draft';
+  else if (label === 'needs_editorial_review') {
+    action = outcome.editorial.status === 'not_run'
+      ? 'Resume generation'
+      : 'Open artifact for review';
+  } else if (label === 'awaiting_render_review') action = 'Render and inspect';
+  else if (label === 'valid_candidate') action = 'Open candidate';
+  var disposition = checkpointDispositionForOutcome(outcome);
+  if (disposition.retain && !options.checkpointPresent
+      && (action === 'Retry from checkpoint' || action === 'Resume generation')) {
+    action = 'Start again';
+  }
+  return {
+    badge: label,
+    action: action,
+    errorCount: outcome.mechanical.errors.length,
+    findingCount: outcome.editorial.findings.length + outcome.operationalFindings.length,
+    receiptState: outcome.release.proof,
+    checkpointState: disposition.retain
+      ? (options.checkpointPresent ? 'retained' : 'absent')
+      : 'cleared',
+    eventText: label === 'valid_candidate'
+      ? 'Valid candidate is ready for author paper read.'
+      : 'Artifact delivered as ' + label + '.'
+  };
+}
+
+async function finalizeProductionOutcome(booklet, facts, options) {
+  options = options || {};
+  var outcome = deriveProductionOutcome(facts);
+  var disposition = checkpointDispositionForOutcome(outcome);
+  if (booklet && typeof booklet === 'object') {
+    if (!booklet._x || typeof booklet._x !== 'object') booklet._x = {};
+    booklet._x._pipelineState = outcome;
+    persistLastBooklet(booklet, { source: options.pipeline || '' });
+  }
+  emitPipelineEvent(options.onProgress, Number(options.stageIndex || 0), Number(options.totalStages || 0),
+    productionOutcomePresentation(outcome, options).eventText, {
+      phase: 'production_outcome',
+      pipeline: options.pipeline || '',
+      outcome: outcome
+    });
+  if (!disposition.retain) clearCheckpoint();
+  if (options.terminalError) throw options.terminalError;
+  if (options.returnBooklet && booklet) return booklet;
+  return outcome;
+}
+
+function interruptedProductionFacts(error, booklet, validationResult, observedFacts) {
+  var stopped = isUserAbortError(error);
+  var prior = observedFacts || {};
+  var priorOperational = copyFindingList(prior.operationalFindings);
+  return {
+    run: { status: 'interrupted', reason: stopped ? 'stopped' : 'engine_invariant' },
+    mechanical: prior.mechanical || (validationResult
+      ? { status: validationResult.errors.length ? 'invalid' : 'valid', errors: validationResult.errors }
+      : { status: 'not_run', errors: [] }),
+    editorial: prior.editorial || { status: 'not_run', findings: [] },
+    receipt: prior.receipt || { proof: booklet ? 'pending' : 'not_run' },
+    operationalFindings: stopped ? priorOperational : priorOperational.concat([{
+      id: 'pipeline-engine-invariant', artifactRevisionId: null,
+      source: 'render', class: 'engine_invariant', severity: 'error',
+      code: 'pipeline_engine_invariant', path: null,
+      message: String((error && error.message) || error), evidence: {}
+    }])
+  };
+}
+
+function validatorErrors(result) {
+  if (!result) return [];
+  if (Array.isArray(result)) return result;
+  if (Array.isArray(result.errors)) return result.errors;
+  if (result.valid === false) return result.errors || ['invalid'];
+  if (typeof result === 'string') return result ? [result] : [];
+  return [];
+}
+
+function isFindingEvidence(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return [
+    'id', 'artifactRevisionId', 'source', 'class', 'severity',
+    'code', 'path', 'message', 'evidence'
+  ].every(function (field) {
+    return Object.prototype.hasOwnProperty.call(value, field);
+  });
+}
+
+/**
+ * The assembled validator predates FindingEvidence and still returns strings.
+ * Adapt them once at the paid-production boundary; evidence that already has
+ * the canonical shape passes through unchanged so this seam never rewrites a
+ * referee's identity or message.
+ */
+function adaptValidatorErrorsToFindingEvidence(errors, booklet) {
+  var revisionId = artifactRevisionIdFor(booklet);
+  return copyFindingList(errors).map(function (entry, index) {
+    if (isFindingEvidence(entry)) return entry;
+    var message = String(entry);
+    return {
+      id: 'validator:' + revisionId + ':' + (index + 1),
+      artifactRevisionId: revisionId,
+      source: 'validator',
+      class: 'law',
+      severity: 'error',
+      code: 'assembled_validator_error',
+      path: null,
+      message: message,
+      evidence: { validatorIndex: index }
+    };
+  });
+}
+
+function artifactRevisionIdFor(booklet, options) {
+  return String((options || {}).artifactRevisionId
+    || (((booklet || {}).meta || {}).artifactRevisionId)
+    || 'unversioned');
+}
+
+/**
+ * Convert the critic's score report into referee evidence.  The report is a
+ * verdict envelope, not evidence by itself: each failed dimension becomes one
+ * complete, stable FindingEvidence record tied to the artifact revision the
+ * critic read.
+ */
+function adaptCriticReportToFindingEvidence(report, options) {
+  if (!report || typeof report !== 'object') return [];
+  var threshold = Number(report.threshold || 0);
+  var scores = report.finalScores || {};
+  var revisionId = artifactRevisionIdFor(null, options);
+  var rounds = Array.isArray(report.rounds) ? report.rounds : [];
+  var findings = Object.keys(scores).filter(function (dimension) {
+    return Number(scores[dimension]) < threshold;
+  }).map(function (dimension) {
+    var score = Number(scores[dimension]);
+    var round = null;
+    for (var i = rounds.length - 1; i >= 0; i--) {
+      if (rounds[i] && rounds[i].scores
+          && Object.prototype.hasOwnProperty.call(rounds[i].scores, dimension)) {
+        round = rounds[i];
+        break;
+      }
+    }
+    round = round || {};
+    return {
+      id: 'critic:' + revisionId + ':' + dimension,
+      artifactRevisionId: revisionId,
+      source: 'critic',
+      class: 'quality',
+      severity: 'warning',
+      code: 'critic_threshold_shortfall',
+      path: null,
+      message: 'Critic ' + dimension + ' scored ' + score + ' below ' + threshold + '.',
+      evidence: {
+        dimension: dimension,
+        score: score,
+        threshold: threshold,
+        round: Number(round.round || rounds.length || 0),
+        summary: String(round.summary || ''),
+        revised: copyFindingList(round.revised),
+        rejected: copyFindingList(round.rejected)
+      }
+    };
+  });
+  if (report.error !== undefined && report.error !== null && String(report.error)) {
+    findings.push({
+      id: 'critic:' + revisionId + ':loop-error',
+      artifactRevisionId: revisionId,
+      source: 'critic',
+      class: 'quality',
+      severity: 'warning',
+      code: 'critic_loop_error',
+      path: null,
+      message: String(report.error),
+      evidence: { completedRounds: rounds.length }
+    });
+  }
+  return findings;
+}
+
+/**
+ * The paid boundary after assembly.  Mechanical validity is decided before
+ * any editorial call.  An artifact that exists is snapshotted before that
+ * call, so critic, revision, page, or process failure cannot erase the user's
+ * paid work.
+ */
+async function completeAssembledProduction(booklet, options) {
+  options = options || {};
+  var validateMechanical = options.validateMechanical;
+  var mechanicalResult = typeof validateMechanical === 'function'
+    ? await validateMechanical(booklet, options.mechanicalContext || { generationFloors: true })
+    : { valid: false, errors: ['Assembled validator is unavailable'] };
+  var mechanicalErrors = adaptValidatorErrorsToFindingEvidence(
+    validatorErrors(mechanicalResult), booklet
+  );
+
+  var preliminaryFacts = {
+    run: { status: 'complete' },
+    mechanical: {
+      status: mechanicalErrors.length ? 'invalid' : 'valid',
+      errors: mechanicalErrors
+    },
+    editorial: { status: 'not_run', findings: [] },
+    receipt: options.receipt || { proof: 'not_run' }
+  };
+  if (booklet && typeof booklet === 'object') {
+    if (!booklet._x || typeof booklet._x !== 'object') booklet._x = {};
+    booklet._x._pipelineState = deriveProductionOutcome(preliminaryFacts);
+    persistLastBooklet(booklet, { source: options.pipeline || '' });
+  }
+
+  var editorialReport = null;
+  var editorialFacts = { status: 'not_run', findings: [] };
+  if (booklet && mechanicalErrors.length === 0 && typeof options.runEditorial === 'function') {
+    var args = Array.isArray(options.editorialArgs)
+      ? options.editorialArgs
+      : [booklet];
+    editorialReport = await options.runEditorial.apply(null, args);
+    if (editorialReport) {
+      var adaptEditorial = typeof options.adaptEditorial === 'function'
+        ? options.adaptEditorial
+        : adaptCriticReportToFindingEvidence;
+      var findings = await adaptEditorial(editorialReport, {
+        artifactRevisionId: artifactRevisionIdFor(booklet)
+      });
+      editorialFacts = {
+        status: editorialReport.finished === true ? 'pass' : 'needs_review',
+        findings: copyFindingList(findings),
+        repairable: editorialReport.finished !== true
+      };
+    }
+  }
+
+  var facts = {
+    run: { status: 'complete' },
+    mechanical: {
+      status: mechanicalErrors.length ? 'invalid' : 'valid',
+      errors: mechanicalErrors
+    },
+    editorial: editorialFacts,
+    receipt: options.receipt || { proof: 'not_run' }
+  };
+  if (booklet && typeof booklet === 'object') {
+    booklet._x._pipelineState = deriveProductionOutcome(facts);
+    persistLastBooklet(booklet, { source: options.pipeline || '' });
+  }
+  return {
+    booklet: booklet || null,
+    facts: facts,
+    outcome: deriveProductionOutcome(facts),
+    mechanicalResult: mechanicalResult,
+    editorialReport: editorialReport
+  };
+}
+
+async function completeStandardAssembledBranch(booklet, options) {
+  options = options || {};
+  var call = {
+    completeBoundary: completeAssembledProduction,
+    validateMechanical: validateAssembledBooklet,
+    runEditorial: runCriticLoop,
+    adaptEditorial: adaptCriticReportToFindingEvidence
+  };
+  if (typeof options.onCompleteAssembledCall === 'function') {
+    options.onCompleteAssembledCall(call);
+  }
+  return completeAssembledProduction(booklet, {
+    pipeline: 'standard',
+    validateMechanical: call.validateMechanical,
+    mechanicalContext: { generationFloors: true },
+    runEditorial: call.runEditorial,
+    editorialArgs: [options.settings || { criticLoop: false }, booklet,
+      options.brief || '', options.editorialContext || {}],
+    adaptEditorial: call.adaptEditorial,
+    receipt: options.receipt || { proof: 'not_run' }
+  });
+}
+
+async function completeSkeletonFleshAssembledBranch(booklet, options) {
+  options = options || {};
+  var call = {
+    completeBoundary: completeAssembledProduction,
+    validateMechanical: validateAssembledBooklet,
+    runEditorial: runCriticLoop,
+    adaptEditorial: adaptCriticReportToFindingEvidence
+  };
+  if (typeof options.onCompleteAssembledCall === 'function') {
+    options.onCompleteAssembledCall(call);
+  }
+  return completeAssembledProduction(booklet, {
+    pipeline: 'skeleton-flesh',
+    validateMechanical: call.validateMechanical,
+    mechanicalContext: { generationFloors: true },
+    runEditorial: call.runEditorial,
+    editorialArgs: [options.settings || { criticLoop: false }, booklet,
+      options.brief || '', options.editorialContext || {}],
+    adaptEditorial: call.adaptEditorial,
+    receipt: options.receipt || { proof: 'not_run' }
+  });
+}
+
+function assembledProductionContracts() {
+  return [
+    {
+      pipeline: 'standard', terminalOwner: 'runApiPipeline', terminal: runApiPipeline,
+      completionBranchOwner: 'completeStandardAssembledBranch',
+      executeCompletionProbe: completeStandardAssembledBranch
+    },
+    {
+      pipeline: 'skeleton-flesh', terminalOwner: 'runSkeletonFleshPipeline', terminal: runSkeletonFleshPipeline,
+      completionBranchOwner: 'completeSkeletonFleshAssembledBranch',
+      executeCompletionProbe: completeSkeletonFleshAssembledBranch
+    }
+  ];
+}
+
+async function restoreCheckpointedStage(options) {
+  options = options || {};
+  var errors = validatorErrors(await options.validate(options.payload, options.context || {}));
+  if (!errors.length) {
+    return {
+      accepted: true,
+      payload: options.payload,
+      completionSource: 'checkpoint',
+      checkpoint: options.checkpoint || getCheckpoint(),
+      errors: []
+    };
+  }
+  var checkpoint = pruneCheckpointStage(options.stageKey, options.checkpoint || getCheckpoint());
+  return {
+    accepted: false,
+    payload: null,
+    errors: errors,
+    checkpoint: checkpoint
+  };
+}
+
+function validateRulesStage(result) {
+  if (!result || !result.rulesSpread) return 'Rules: missing rulesSpread';
+  if (!result.rulesSpread.leftPage) return 'Rules: missing rulesSpread.leftPage';
+  return '';
+}
+
+function validateEndingsStage(result, context) {
+  var endings = Array.isArray(result) ? result : (result && result.endings ? result.endings : null);
+  if (!endings || !endings.length) return 'Endings: missing or empty endings array';
+  var expected = Number((context || {}).expectedCount || 1);
+  if (endings.length < expected) return 'Endings: expected ' + expected + ' variants but got ' + endings.length;
+  for (var i = 0; i < endings.length; i++) {
+    if (!endings[i] || (!endings[i].content && !endings[i].body)) return 'Ending: missing content';
+  }
+  if (context && context.weekChunkOutputs && context.fragmentsOutput) {
+    var continuityErrors = validateEndingsContinuity({ endings: endings }, context);
+    if (continuityErrors.length) return continuityErrors;
+  }
+  return '';
+}
+
+
 function persistLastBooklet(booklet, meta) {
   if (!booklet || typeof booklet !== 'object') return;
 
@@ -5236,6 +5684,12 @@ function emitAssemblyNormalizationNotes(onProgress, booklet, stageIndex, totalSt
 }
 
 async function runApiPipeline(options) {
+  var terminalBooklet = null;
+  var terminalFacts = null;
+  var terminalError = null;
+  var validationResult = null;
+  var criticReport = null;
+  try {
   if (typeof window.beginLiftRpgPromptRun === 'function') window.beginLiftRpgPromptRun();
 
   var settings = options.settings || {};
@@ -5295,7 +5749,22 @@ async function runApiPipeline(options) {
     pipeline: pipelineLabel
   });
   var checkpoint = resumeState.checkpoint;
+  resumeState.checkpoint = checkpoint;
+  resumeState.restoredStages = checkpoint && checkpoint.stages ? Object.keys(checkpoint.stages) : [];
+  resumeState.resumed = resumeState.restoredStages.length;
   var resumed = resumeState.resumed;
+
+  async function restoreStandardCheckpointedStage(stageKey, payload, validate, context) {
+    var restored = await restoreCheckpointedStage({
+      stageKey: stageKey,
+      payload: payload,
+      validate: validate,
+      context: context || {},
+      checkpoint: checkpoint
+    });
+    checkpoint = restored.checkpoint;
+    return restored;
+  }
 
   // ── Cross-stage repair: drop the owning stage from the bank (D143) ────
   // The router already pruned storage; this is the in-process half, and it is
@@ -5454,6 +5923,9 @@ async function runApiPipeline(options) {
   // Before the codex, before the plan, before anything. See
   // runGameRulebookStage for why FIRST is the ruling and not a convenience.
   var rulebookState = await runGameRulebookStage(settings, {
+    pipeline: 'standard',
+    weekCount: weekCount,
+    restoreCached: restoreStandardCheckpointedStage,
     cached: (checkpoint && checkpoint.stages && checkpoint.stages.gameRulebook) || null,
     checkpoint: checkpoint,
     onProgress: onProgress,
@@ -5495,7 +5967,11 @@ async function runApiPipeline(options) {
 
   var layerBible;
   if (checkpoint && checkpoint.stages && checkpoint.stages.layerBible) {
-    layerBible = checkpoint.stages.layerBible;
+    var restoredLayerBible = await restoreStandardCheckpointedStage('layerBible',
+      checkpoint.stages.layerBible, validateLayerBibleStage, {});
+    layerBible = restoredLayerBible.accepted ? restoredLayerBible.payload : null;
+  }
+  if (layerBible) {
     stageNum++;
     console.log('[LiftRPG] Resumed: Layer Codex (cached)');
     emitPipelineEvent(onProgress, stageNum, totalStages, 'Layer codex restored from checkpoint.', {
@@ -5525,7 +6001,20 @@ async function runApiPipeline(options) {
 
   var campaignPlan;
   if (checkpoint && checkpoint.stages && checkpoint.stages.campaignPlan) {
-    campaignPlan = checkpoint.stages.campaignPlan;
+    var cachedCampaignPlan = checkpoint.stages.campaignPlan;
+    var restoredCampaignPlan = await restoreStandardCheckpointedStage('campaignPlan',
+      cachedCampaignPlan, function (payload, context) {
+        return validateCampaignPlanStage(payload, context);
+      }, {
+        requestedWeekCount: weekCount,
+        plannedWeeks: cachedCampaignPlan.weeks || [],
+        gameRulebook: gameRulebook,
+        generationFloors: true,
+        seedAssignments: seedAssignments
+      });
+    campaignPlan = restoredCampaignPlan.accepted ? restoredCampaignPlan.payload : null;
+  }
+  if (campaignPlan) {
     stageNum++;
     console.log('[LiftRPG] Resumed: Story Plan (cached)');
     emitPipelineEvent(onProgress, stageNum, totalStages, 'Story plan restored from checkpoint.', {
@@ -5690,6 +6179,15 @@ async function runApiPipeline(options) {
    */
   async function runShellSubStage(spec) {
     if (checkpoint && checkpoint.stages && checkpoint.stages[spec.stageKey]) {
+      var cachedShellStage = checkpoint.stages[spec.stageKey];
+      var restoredShellStage = await restoreStandardCheckpointedStage(spec.stageKey,
+        cachedShellStage, function (payload) { return spec.validate(payload); },
+        shellSubStageExpectations({ mergedShell: spec.mergedShellForRestore(cachedShellStage) }));
+      if (!restoredShellStage.accepted) {
+        cachedShellStage = null;
+      }
+    }
+    if (cachedShellStage) {
       stageNum++;
       console.log('[LiftRPG] Resumed: ' + spec.stageName + ' (cached)');
       emitPipelineEvent(onProgress, stageNum, totalStages, spec.stageName + ' restored from checkpoint.', {
@@ -5698,7 +6196,7 @@ async function runApiPipeline(options) {
         stageName: spec.stageName,
         completionSource: 'checkpoint'
       });
-      return checkpoint.stages[spec.stageKey];
+      return cachedShellStage;
     }
     progress(spec.stageKey, spec.startMessage);
     var out = await runJsonStage(settings, {
@@ -5828,6 +6326,7 @@ async function runApiPipeline(options) {
     validate: function (result) {
       return validateShellIdentitySchema(mergeShellParts(result), shellSubStageExpectations());
     },
+    mergedShellForRestore: function (result) { return mergeShellParts(result); },
     buildPrompt: function (retryState) {
       return builders.shellIdentity(brief, layerBible, campaignPlan,
         shellBuilderOptions(retryState, { identityAxes: identityAxesForStage('shellIdentity') }));
@@ -5933,6 +6432,7 @@ async function runApiPipeline(options) {
       return validateShellRulesSchema(mergeShellParts(shellIdentityStage, result),
         shellSubStageExpectations());
     },
+    mergedShellForRestore: function (result) { return mergeShellParts(shellIdentityStage, result); },
     buildPrompt: function (retryState) {
       // NO identityAxes: shellRules authors no axis (IDENTITY_AXES says so),
       // so it is handed no assignments and told no assignment law. D149's trap
@@ -5968,6 +6468,7 @@ async function runApiPipeline(options) {
       return validateShellThemeSchema(mergeShellParts(shellIdentityStage, result),
         shellSubStageExpectations());
     },
+    mergedShellForRestore: function (result) { return mergeShellParts(shellIdentityStage, result); },
     buildPrompt: function (retryState) {
       return builders.shellTheme(brief, layerBible, campaignPlan,
         shellBuilderOptions(retryState, {
@@ -5993,6 +6494,7 @@ async function runApiPipeline(options) {
       return validateShellSpineSchema(mergeShellParts(shellIdentityStage, result),
         shellSubStageExpectations());
     },
+    mergedShellForRestore: function (result) { return mergeShellParts(shellIdentityStage, result); },
     buildPrompt: function (retryState) {
       // NO `identityAxes`: this seat authors none (IDENTITY_AXES). The two
       // spine-shaped axes are answered at the IDENTITY seat, which writes their
@@ -6079,7 +6581,11 @@ async function runApiPipeline(options) {
 
   var knowingOutput;
   if (checkpoint && checkpoint.stages && checkpoint.stages.knowing) {
-    knowingOutput = checkpoint.stages.knowing;
+    var restoredKnowing = await restoreStandardCheckpointedStage('knowing',
+      checkpoint.stages.knowing, validateKnowingStage, { shell: shell });
+    knowingOutput = restoredKnowing.accepted ? restoredKnowing.payload : null;
+  }
+  if (knowingOutput) {
     stageNum++;
     console.log('[LiftRPG] Resumed: World Detail (cached)');
     emitPipelineEvent(onProgress, stageNum, totalStages, 'World detail restored from checkpoint.', {
@@ -6137,6 +6643,7 @@ async function runApiPipeline(options) {
       return next;
     });
   var economyState = await runEconomyGraphStage(settings, {
+    restoreCached: restoreStandardCheckpointedStage,
     cached: (checkpoint && checkpoint.stages && checkpoint.stages.economyGraph) || null,
     checkpoint: checkpoint,
     onProgress: onProgress,
@@ -6210,23 +6717,6 @@ async function runApiPipeline(options) {
   for (var w = 1; w <= weekCount; w++) {
     var isBossWeek = w === weekCount;
     var weekCacheKey = 'week_' + w;
-
-    if (checkpoint && checkpoint.stages && checkpoint.stages[weekCacheKey]) {
-      var cachedWeek = checkpoint.stages[weekCacheKey];
-      finalWeeks.push(cachedWeek);
-      if (!cachedWeek.isBossWeek && cachedWeek.weeklyComponent && cachedWeek.weeklyComponent.value) {
-        allComponentValues.push(cachedWeek.weeklyComponent.value);
-      }
-      stageNum++;
-      console.log('[LiftRPG] Resumed: Week ' + w + ' (cached)');
-      emitPipelineEvent(onProgress, stageNum, totalStages, 'Week ' + w + ' restored from checkpoint.', {
-        phase: 'complete',
-        stageKey: 'weeks',
-        stageName: 'Week ' + w,
-        completionSource: 'checkpoint'
-      });
-      continue;
-    }
 
     var continuityPacket = buildChunkContinuity(finalWeeks);
     var campaignWeekPlan = (campaignPlan.weeks || []).filter(function (pw) {
@@ -6317,6 +6807,49 @@ async function runApiPipeline(options) {
     // model is taught cannot drift from the values it is checked against.
     var weekIdentityGiven = deriveWeekIdentityGiven(weekFloorOptions, isBossWeek);
 
+    function validateCurrentStandardWeek(result) {
+      if (!result) return 'Week generation returned empty result. Model may have returned a shell instead of a week object.';
+      if (!result.title) return 'Week object missing "title" field. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
+      if (!result.sessions) return 'Week object missing "sessions" array. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
+      var schemaValidation = validateWeekSchema(result, isBossWeek, Object.assign({
+        componentInputs: isBossWeek ? allComponentValues : undefined,
+        approvedFragmentIds: campaignWeekPlan ? (campaignWeekPlan.fragmentIds || []) : [],
+        currentWeekNumber: w,
+        previousWeek: !isBossWeek && finalWeeks.length ? finalWeeks[finalWeeks.length - 1] : null
+      }, weekFloorOptions));
+      if (schemaValidation && schemaValidation.valid === false) return schemaValidation;
+      var continuityErrors = validateWeekChunkContinuity(
+        { weeks: [Object.assign({}, result, { weekNumber: w, isBossWeek: isBossWeek })] },
+        {
+          shell: shell,
+          campaignPlan: campaignPlan,
+          priorWeekChunkOutputs: finalWeeks.length ? [{ weeks: finalWeeks }] : []
+        }
+      );
+      return continuityErrors.length
+        ? { valid: false, errors: continuityErrors }
+        : schemaValidation;
+    }
+
+    if (checkpoint && checkpoint.stages && checkpoint.stages[weekCacheKey]) {
+      var restoredWeek = await restoreStandardCheckpointedStage(weekCacheKey,
+        checkpoint.stages[weekCacheKey], validateCurrentStandardWeek, weekFloorOptions);
+      if (restoredWeek.accepted) {
+        var cachedWeek = restoredWeek.payload;
+        finalWeeks.push(cachedWeek);
+        if (!cachedWeek.isBossWeek && cachedWeek.weeklyComponent && cachedWeek.weeklyComponent.value) {
+          allComponentValues.push(cachedWeek.weeklyComponent.value);
+        }
+        stageNum++;
+        console.log('[LiftRPG] Resumed: Week ' + w + ' (cached)');
+        emitPipelineEvent(onProgress, stageNum, totalStages, 'Week ' + w + ' restored from checkpoint.', {
+          phase: 'complete', stageKey: 'weeks', stageName: 'Week ' + w,
+          completionSource: 'checkpoint'
+        });
+        continue;
+      }
+    }
+
     progress('weeks', 'Writing Week ' + w + (isBossWeek ? ' (Boss)' : '') + '\u2026');
     var weekObject = await runJsonStage(settings, {
       stageKey: 'weeks',
@@ -6363,33 +6896,7 @@ async function runApiPipeline(options) {
         });
       },
       validate: function (result) {
-        if (!result) return 'Week generation returned empty result. Model may have returned a shell instead of a week object.';
-        if (!result.title) return 'Week object missing "title" field. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
-        if (!result.sessions) return 'Week object missing "sessions" array. Got keys: ' + Object.keys(result).slice(0, 5).join(', ');
-        var schemaValidation = validateWeekSchema(result, isBossWeek, Object.assign({
-          componentInputs: isBossWeek ? allComponentValues : undefined,
-          approvedFragmentIds: campaignWeekPlan ? (campaignWeekPlan.fragmentIds || []) : [],
-          currentWeekNumber: w,
-          previousWeek: !isBossWeek && finalWeeks.length ? finalWeeks[finalWeeks.length - 1] : null
-        }, weekFloorOptions));
-        if (schemaValidation && schemaValidation.valid === false) {
-          return schemaValidation;
-        }
-        var continuityErrors = validateWeekChunkContinuity(
-          { weeks: [Object.assign({}, result, { weekNumber: w, isBossWeek: isBossWeek })] },
-          {
-            shell: shell,
-            campaignPlan: campaignPlan,
-            priorWeekChunkOutputs: finalWeeks.length ? [{ weeks: finalWeeks }] : []
-          }
-        );
-        if (continuityErrors.length > 0) {
-          // Conform to the documented convention rather than leaning on the
-          // array arm above: both halves of D157 land, so this gate is right
-          // by its own shape AND survives a future refactor of the helper.
-          return { valid: false, errors: continuityErrors };
-        }
-        return schemaValidation;
+        return validateCurrentStandardWeek(result);
       },
       buildPrompt: function (retryState) {
         return builders.singleWeekFinal(
@@ -6482,25 +6989,35 @@ async function runApiPipeline(options) {
     var batch = fragmentBatches[fb];
     var fragCacheKey = 'fragBatch_' + fb;
     var batchLabel = 'Fragments batch ' + (fb + 1) + '/' + totalBatches;
-
-    if (checkpoint && checkpoint.stages && checkpoint.stages[fragCacheKey]) {
-      var cachedFrags = checkpoint.stages[fragCacheKey];
-      (cachedFrags.fragments || []).forEach(function (f) { finalFragments.push(f); });
-      stageNum++;
-      console.log('[LiftRPG] Resumed: ' + batchLabel + ' (cached)');
-      emitPipelineEvent(onProgress, stageNum, totalStages, batchLabel + ' restored from checkpoint.', {
-        phase: 'complete',
-        stageKey: 'fragments',
-        stageName: batchLabel,
-        completionSource: 'checkpoint'
-      });
-      continue;
-    }
-
-    progress('fragments', 'Writing ' + batchLabel + ' (' + batch.registry.length + ' docs)\u2026');
     var batchWeekNums = {};
     batch.registry.forEach(function (entry) { if (entry.weekRef) batchWeekNums[entry.weekRef] = true; });
     var batchWeekSummaries = weekSummaries.filter(function (ws) { return batchWeekNums[ws.weekNumber]; });
+
+    if (checkpoint && checkpoint.stages && checkpoint.stages[fragCacheKey]) {
+      var restoredFragmentBatch = await restoreStandardCheckpointedStage(fragCacheKey,
+        checkpoint.stages[fragCacheKey], function (payload, context) {
+          return validateFragmentsStage(payload, context.registry, context);
+        }, {
+          registry: batch.registry,
+          generationFloors: true,
+          brief: brief,
+          componentInputs: allComponentValues.map(String),
+          weekSummaries: batchWeekSummaries.length ? batchWeekSummaries : weekSummaries
+        });
+      if (restoredFragmentBatch.accepted) {
+        var cachedFrags = restoredFragmentBatch.payload;
+        (cachedFrags.fragments || []).forEach(function (f) { finalFragments.push(f); });
+        stageNum++;
+        console.log('[LiftRPG] Resumed: ' + batchLabel + ' (cached)');
+        emitPipelineEvent(onProgress, stageNum, totalStages, batchLabel + ' restored from checkpoint.', {
+          phase: 'complete', stageKey: 'fragments', stageName: batchLabel,
+          completionSource: 'checkpoint'
+        });
+        continue;
+      }
+    }
+
+    progress('fragments', 'Writing ' + batchLabel + ' (' + batch.registry.length + ' docs)\u2026');
 
     var batchOutput = await generateFragmentBatchAdaptive(settings, builders, {
       layerBible: layerBible,
@@ -6556,13 +7073,22 @@ async function runApiPipeline(options) {
   // ── TARGETED UNIT GENERATION: ENDING ────────────────────────
   var finalEndings = [];
   if (checkpoint && checkpoint.stages && checkpoint.stages.endings) {
-    finalEndings = checkpoint.stages.endings;
+    var restoredStandardEndings = await restoreStandardCheckpointedStage('endings',
+      checkpoint.stages.endings, function (payload, context) {
+        return validateEndingsContinuity({ endings: payload }, context);
+      }, {
+        shell: shell,
+        campaignPlan: campaignPlan,
+        weekChunkOutputs: [{ weeks: finalWeeks }],
+        fragmentsOutput: assembledFragmentsOutput
+      });
+    if (restoredStandardEndings.accepted) finalEndings = restoredStandardEndings.payload;
+  }
+  if (finalEndings.length) {
     stageNum++;
     console.log('[LiftRPG] Resumed: Finale (cached)');
     emitPipelineEvent(onProgress, stageNum, totalStages, 'Finale restored from checkpoint.', {
-      phase: 'complete',
-      stageKey: 'endings',
-      stageName: 'Finale',
+      phase: 'complete', stageKey: 'endings', stageName: 'Finale',
       completionSource: 'checkpoint'
     });
   } else {
@@ -6693,7 +7219,8 @@ async function runApiPipeline(options) {
   // generationFloors: the API path, so the simulated player's soft-locks are
   // blocking-class errors (D111). See validateAssembledBooklet's header for the
   // severity split and why the corpus is untouched by it.
-  var validationResult = validateAssembledBooklet(booklet, { generationFloors: true });
+  terminalBooklet = booklet;
+  validationResult = validateAssembledBooklet(booklet, { generationFloors: true });
   writePipelineDebris(booklet, '_simReport', validationResult.sim);
   // §4.11's derived half, recorded as telemetry. NOT the blocking cadence
   // floor's evidence — that floor lives at the week gate and reads the single
@@ -6741,20 +7268,23 @@ async function runApiPipeline(options) {
     }));
   }
 
-  // Every paid generation stage is now banked and the booklet is assembled.
-  // The critic that follows makes more paid calls, so snapshot the recoverable
-  // booklet FIRST: if the run dies mid-critic, the user still has a complete,
-  // fully-paid-for book instead of only a checkpoint that has to be re-graded.
-  persistLastBooklet(booklet, {
-    source: options && options.pipelineLabel ? options.pipelineLabel : 'structured'
+  // ── PRE-EDITORIAL PRODUCTION BOUNDARY (D267 Wave 1) ─────────
+  // The boundary validates and snapshots before it can spend on the critic.
+  // Invalid mechanics therefore deliver an honest draft and make no
+  // conductor, critic, or revision call.
+  var completedProduction = await completeStandardAssembledBranch(booklet, {
+    settings: settings,
+    brief: brief,
+    editorialContext: {
+      rateLimiter: rateLimiter,
+      budgetEnforce: useGeminiBudget,
+      onProgress: onProgress
+    },
+    receipt: { proof: 'not_run' }
   });
-
-  // ── COMPOSITION CRITIC LOOP (D66) ───────────────────────────
-  var criticReport = await runCriticLoop(settings, booklet, brief, {
-    rateLimiter: rateLimiter,
-    budgetEnforce: useGeminiBudget,
-    onProgress: onProgress
-  });
+  validationResult = completedProduction.mechanicalResult;
+  criticReport = completedProduction.editorialReport;
+  terminalFacts = completedProduction.facts;
   if (criticReport && criticReport.revisedUnits > 0) {
     // Revisions changed prose — refresh the mechanical report to match.
     report = generateQualityReport(booklet);
@@ -6771,16 +7301,15 @@ async function runApiPipeline(options) {
     stageName: 'Quality Check',
     completionSource: 'local'
   });
-
-  persistLastBooklet(booklet, {
-    source: options && options.pipelineLabel ? options.pipelineLabel : 'structured'
+  } catch (error) {
+    terminalError = error;
+    terminalFacts = interruptedProductionFacts(error, terminalBooklet, validationResult, terminalFacts);
+  }
+  return finalizeProductionOutcome(terminalBooklet, terminalFacts, {
+    pipeline: 'standard', checkpointPresent: true, onProgress: options.onProgress,
+    stageIndex: totalStages, totalStages: totalStages,
+    terminalError: terminalError, returnBooklet: true
   });
-
-  // Pipeline succeeded — clear the checkpoint so next run starts fresh
-  clearCheckpoint();
-  console.log('[LiftRPG] Pipeline complete. Checkpoint cleared.');
-
-  return booklet;
 }
 
 
@@ -7099,6 +7628,17 @@ async function runCanonicalizeStage(settings, config) {
  */
 async function runGameRulebookStage(settings, config) {
   var cached = config.cached;
+  if (cached && typeof config.restoreCached === 'function') {
+    var restored = await config.restoreCached('gameRulebook', cached, function (payload, context) {
+      return validateGameRulebookStage(payload, context);
+    }, {
+      requestedWeekCount: config.weekCount,
+      generationFloors: true,
+      seedAssignments: config.seedAssignments
+    });
+    config.checkpoint = restored.checkpoint;
+    if (!restored.accepted) cached = null;
+  }
   if (cached) {
     config.emitRestored();
     return { rulebook: cached, checkpoint: config.checkpoint };
@@ -7178,6 +7718,17 @@ async function runGameRulebookStage(settings, config) {
  */
 async function runEconomyGraphStage(settings, config) {
   var cached = config.cached;
+  if (cached && typeof config.restoreCached === 'function') {
+    var restored = await config.restoreCached('economyGraph', cached, function (payload, context) {
+      return validateEconomyGraphStage(payload, context);
+    }, {
+      priorGraph: config.priorGraph,
+      weekCount: config.weekCount,
+      requireCanonicalCadence: true
+    });
+    config.checkpoint = restored.checkpoint;
+    if (!restored.accepted) cached = null;
+  }
   if (cached) {
     config.emitRestored();
     return { output: cached, checkpoint: config.checkpoint };
@@ -7497,6 +8048,12 @@ function assertSkeletonFleshBuilders(builders) {
 }
 
 async function runSkeletonFleshPipeline(options) {
+  var terminalBooklet = null;
+  var terminalFacts = null;
+  var terminalError = null;
+  var validationResult = null;
+  var sfCriticReport = null;
+  try {
   var settings      = options.settings;
   var workout       = options.workout;
   var brief         = options.brief;
@@ -7553,6 +8110,9 @@ async function runSkeletonFleshPipeline(options) {
     pipeline: 'skeleton-flesh'
   });
   var checkpoint = sfResumeState.checkpoint;
+  sfResumeState.checkpoint = checkpoint;
+  sfResumeState.restoredStages = checkpoint && checkpoint.stages ? Object.keys(checkpoint.stages) : [];
+  sfResumeState.resumed = sfResumeState.restoredStages.length;
   var isResume = sfResumeState.resumed > 0;
 
   // ── Cross-stage repair (D143), S+F's half ────────────────────────────
@@ -7606,6 +8166,21 @@ async function runSkeletonFleshPipeline(options) {
     return isResume && checkpoint && checkpoint.stages ? checkpoint.stages[key] : null;
   }
 
+  async function restoreSkeletonFleshCheckpointedStage(stageKey, payload, validate, context) {
+    var restored = await restoreCheckpointedStage({
+      stageKey: stageKey,
+      payload: payload,
+      validate: validate,
+      context: context || {},
+      checkpoint: checkpoint
+    });
+    checkpoint = restored.checkpoint;
+    if (!restored.accepted) {
+      isResume = !!(checkpoint && checkpoint.stages && Object.keys(checkpoint.stages).length);
+    }
+    return restored;
+  }
+
   // ── STAGE 0: canonicalize the program (§11 Wave 5) ──
   var sfCanonState = await runCanonicalizeStage(settings, buildCanonicalizeConfig({
     rawWorkout: rawWorkout,
@@ -7643,6 +8218,9 @@ async function runSkeletonFleshPipeline(options) {
   // The one thing that differs is which seat downstream is the spine's, and
   // that difference is why the parity floor takes its label as a parameter.
   var sfRulebookState = await runGameRulebookStage(settings, {
+    pipeline: 'skeleton-flesh',
+    weekCount: weekCount,
+    restoreCached: restoreSkeletonFleshCheckpointedStage,
     cached: cached('gameRulebook'),
     checkpoint: checkpoint,
     onProgress: onProgress,
@@ -7688,7 +8266,19 @@ async function runSkeletonFleshPipeline(options) {
 
   var skeleton;
   if (cached('skeleton')) {
-    skeleton = checkpoint.stages.skeleton;
+    var restoredSkeleton = await restoreSkeletonFleshCheckpointedStage('skeleton',
+      checkpoint.stages.skeleton, function (payload, context) {
+        return validateSkeletonStage(payload, context.requestedWeekCount, context);
+      }, {
+        requestedWeekCount: weekCount,
+        generationFloors: true,
+        brief: brief,
+        seedAssignments: seedAssignments,
+        gameRulebook: sfGameRulebook
+      });
+    skeleton = restoredSkeleton.accepted ? restoredSkeleton.payload : null;
+  }
+  if (skeleton) {
     console.log('[S+F] Resuming — skeleton loaded from checkpoint');
     progress('skeleton', 'Skeleton restored from checkpoint.');
     // completionSource is what tells the status surface this stage cost nothing.
@@ -7819,7 +8409,11 @@ async function runSkeletonFleshPipeline(options) {
 
   var knowingOutput;
   if (cached('knowing')) {
-    knowingOutput = checkpoint.stages.knowing;
+    var restoredSfKnowing = await restoreSkeletonFleshCheckpointedStage('knowing',
+      checkpoint.stages.knowing, validateKnowingStage, { skeleton: skeleton });
+    knowingOutput = restoredSfKnowing.accepted ? restoredSfKnowing.payload : null;
+  }
+  if (knowingOutput) {
     console.log('[S+F] Resuming — knowing loaded from checkpoint');
     progress('knowing', 'World detail restored from checkpoint.');
     emitPipelineEvent(onProgress, stageNum, totalStages, 'World detail restored from checkpoint.', {
@@ -7860,7 +8454,14 @@ async function runSkeletonFleshPipeline(options) {
 
   var rulesOutput;
   if (cached('rules')) {
-    rulesOutput = checkpoint.stages.rules;
+    var restoredRules = await restoreSkeletonFleshCheckpointedStage('rules',
+      checkpoint.stages.rules, validateRulesStage, {
+        skeleton: skeleton,
+        gameRulebook: sfGameRulebook
+      });
+    rulesOutput = restoredRules.accepted ? restoredRules.payload : null;
+  }
+  if (rulesOutput) {
     console.log('[S+F] Resuming — rules loaded from checkpoint');
     progress('rules', 'Rules spread restored from checkpoint.');
     emitPipelineEvent(onProgress, stageNum, totalStages, 'Rules spread restored from checkpoint.', {
@@ -7895,9 +8496,7 @@ async function runSkeletonFleshPipeline(options) {
         return builders.fleshRules(skeleton, { gameRulebook: sfGameRulebook });
       },
       validate: function (result) {
-        if (!result || !result.rulesSpread) return 'Rules: missing rulesSpread';
-        if (!result.rulesSpread.leftPage) return 'Rules: missing rulesSpread.leftPage';
-        return '';
+        return validateRulesStage(result);
       }
     });
     checkpoint = saveCheckpoint('rules', rulesOutput, checkpoint);
@@ -7931,27 +8530,6 @@ async function runSkeletonFleshPipeline(options) {
     var owesLudicSF = ludicWeeksSF.filter(function (row) {
       return Number(row.weekNumber) === Number(weekNum);
     })[0] || null;
-
-    if (cached(ckKey)) {
-      var cachedWeekSF = checkpoint.stages[ckKey];
-      weekOutputs.push(cachedWeekSF);
-      console.log('[S+F] Resuming — week ' + weekNum + ' loaded from checkpoint');
-      progress(ckKey, 'Week ' + weekNum + ' restored from checkpoint.');
-      emitPipelineEvent(onProgress, stageNum, totalStages, 'Week ' + weekNum + ' restored from checkpoint.', {
-        phase: 'complete', stageKey: ckKey, stageName: 'Week ' + weekNum,
-        completionSource: 'checkpoint'
-      });
-      if (!isBoss && cachedWeekSF.weeklyComponent && cachedWeekSF.weeklyComponent.value != null) {
-        allComponentValuesSF.push(cachedWeekSF.weeklyComponent.value);
-      }
-      weekSummariesSF.push({
-        weekNumber: weekNum,
-        title: cachedWeekSF.title || '',
-        arcBeat: weekPlan.arcBeat || '',
-        sessionCount: (cachedWeekSF.sessions || []).length
-      });
-      continue;
-    }
 
     // Extract this week's workout text
     var weekWorkout = null;
@@ -8006,6 +8584,45 @@ async function runSkeletonFleshPipeline(options) {
       gameRulebook: sfGameRulebook   // W3-ARM week-sf-rulebook
     };
     var sfWeekIdentityGiven = deriveWeekIdentityGiven(sfWeekFloorOptions, isBoss);
+
+    function validateCurrentSkeletonFleshWeek(result) {
+      if (!result || !result.title) return 'Week ' + weekNum + ': missing title';
+      if (!Array.isArray(result.sessions) || result.sessions.length === 0) {
+        return 'Week ' + weekNum + ': missing or empty sessions';
+      }
+      var vResult = validateWeekSchema(result, isBoss, sfWeekFloorOptions);
+      if (vResult && typeof vResult === 'object' && !vResult.valid) return vResult;
+      return '';
+    }
+
+    if (cached(ckKey)) {
+      var restoredWeekSF = await restoreSkeletonFleshCheckpointedStage(
+        ckKey,
+        checkpoint.stages[ckKey],
+        validateCurrentSkeletonFleshWeek,
+        sfWeekFloorOptions
+      );
+      if (restoredWeekSF.accepted) {
+        var cachedWeekSF = restoredWeekSF.payload;
+        weekOutputs.push(cachedWeekSF);
+        console.log('[S+F] Resuming — week ' + weekNum + ' loaded from checkpoint');
+        progress(ckKey, 'Week ' + weekNum + ' restored from checkpoint.');
+        emitPipelineEvent(onProgress, stageNum, totalStages, 'Week ' + weekNum + ' restored from checkpoint.', {
+          phase: 'complete', stageKey: ckKey, stageName: 'Week ' + weekNum,
+          completionSource: 'checkpoint'
+        });
+        if (!isBoss && cachedWeekSF.weeklyComponent && cachedWeekSF.weeklyComponent.value != null) {
+          allComponentValuesSF.push(cachedWeekSF.weeklyComponent.value);
+        }
+        weekSummariesSF.push({
+          weekNumber: weekNum,
+          title: cachedWeekSF.title || '',
+          arcBeat: weekPlan.arcBeat || '',
+          sessionCount: (cachedWeekSF.sessions || []).length
+        });
+        continue;
+      }
+    }
 
     var weekResult = await runJsonStage(settings, {
       stageKey:        ckKey,
@@ -8063,25 +8680,7 @@ async function runSkeletonFleshPipeline(options) {
         });
       },
       validate: function (result) {
-        if (!result || !result.title) return 'Week ' + weekNum + ': missing title';
-        if (!Array.isArray(result.sessions) || result.sessions.length === 0) {
-          return 'Week ' + weekNum + ': missing or empty sessions';
-        }
-        // The hoisted object above (D173) — one row, two readers: this gate and
-        // the identity GIVENS the prompt printed.
-        var vResult = validateWeekSchema(result, isBoss, sfWeekFloorOptions);
-        if (vResult && typeof vResult === 'object' && !vResult.valid) {
-          // The VERDICT OBJECT, not a joined string. extractErrorList treats a
-          // string as one error, so joining collapsed N defects with N
-          // different owners into a single unroutable blob whose only prefix is
-          // whichever error happened to sort first — and the router would then
-          // either miss the route entirely or quote a week's defects into the
-          // skeleton's prompt, which is D128's disease exactly. Returning the
-          // object is also what the multi-stage week gate already does, so the
-          // two pipelines now classify severity the same way (D19).
-          return vResult;
-        }
-        return '';
+        return validateCurrentSkeletonFleshWeek(result);
       }
     });
 
@@ -8138,16 +8737,41 @@ async function runSkeletonFleshPipeline(options) {
   // ════════════════════════════════════════════════════════════════════
 
   var allFragments = [];
+  var fragmentsRestoreContextSF = {
+    registry: fullFragRegistry,
+    generationFloors: true,
+    brief: brief || '',
+    componentInputs: allComponentValuesSF.map(String),
+    weekSummaries: weekSummariesSF.slice()
+  };
+  function validateCurrentSkeletonFleshFragments(payload, context) {
+    var result = Array.isArray(payload) ? { fragments: payload } : payload;
+    if (!result || !Array.isArray(result.fragments) || result.fragments.length === 0) {
+      return 'Fragments: missing or empty fragments array';
+    }
+    return validateFragmentsStage(result, context.registry, context);   // W3-ARM fragment-sf · W7-ARM seal-sf
+  }
+  var restoredFragmentsSF = false;
 
   if (cached('fragments')) {
-    allFragments = checkpoint.stages.fragments || [];
-    console.log('[S+F] Resuming — fragments loaded from checkpoint');
-    progress('fragments', 'Fragments restored from checkpoint.');
-    emitPipelineEvent(onProgress, stageNum, totalStages, 'Fragments restored from checkpoint.', {
-      phase: 'complete', stageKey: 'fragments', stageName: 'Fragments',
-      completionSource: 'checkpoint'
-    });
-  } else {
+    var restoredFragmentsResultSF = await restoreSkeletonFleshCheckpointedStage(
+      'fragments',
+      checkpoint.stages.fragments,
+      validateCurrentSkeletonFleshFragments,
+      fragmentsRestoreContextSF
+    );
+    if (restoredFragmentsResultSF.accepted) {
+      restoredFragmentsSF = true;
+      allFragments = restoredFragmentsResultSF.payload;
+      console.log('[S+F] Resuming — fragments loaded from checkpoint');
+      progress('fragments', 'Fragments restored from checkpoint.');
+      emitPipelineEvent(onProgress, stageNum, totalStages, 'Fragments restored from checkpoint.', {
+        phase: 'complete', stageKey: 'fragments', stageName: 'Fragments',
+        completionSource: 'checkpoint'
+      });
+    }
+  }
+  if (!restoredFragmentsSF) {
     progress('fragments', 'Writing all fragments\u2026');
 
     var fragResultSF = await runJsonStage(settings, {
@@ -8186,13 +8810,10 @@ async function runSkeletonFleshPipeline(options) {
         return Array.isArray(result) ? { fragments: result } : result;
       },
       validate: function (result) {
-        var fragsArray = result && Array.isArray(result.fragments) ? result.fragments : null;
-        if (!fragsArray || fragsArray.length === 0) {
+        if (!result || !Array.isArray(result.fragments) || result.fragments.length === 0) {
           return 'Fragments: missing or empty fragments array';
         }
-        return validateFragmentsStage(result, fullFragRegistry,
-          { generationFloors: true, brief: brief || '',
-            componentInputs: allComponentValuesSF.map(String) });   // W3-ARM fragment-sf · W7-ARM seal-sf
+        return validateFragmentsStage(result, fullFragRegistry, fragmentsRestoreContextSF);
       }
     });
 
@@ -8227,16 +8848,60 @@ async function runSkeletonFleshPipeline(options) {
 
   var allEndings = [];
   var finalWeekSummary = weekSummariesSF.length > 0 ? weekSummariesSF[weekSummariesSF.length - 1] : null;
+  var endingsRestoreContextSF = {
+    expectedCount: endingVariants.length,
+    shell: skeleton,
+    campaignPlan: skeleton,
+    weekChunkOutputs: [{ weeks: weekOutputs }],
+    fragmentsOutput: { fragments: allFragments }
+  };
+  function validateCurrentSkeletonFleshEndings(result, context) {
+    var endingsArray = Array.isArray(result) ? result : (result && result.endings ? result.endings : null);
+    var shapeError = validateEndingsStage(result, context);
+    if (shapeError) return shapeError;
+    var errors = [];
+    collectBudgetBreaches({ endings: endingsArray }).forEach(function (breach) {
+      errors.push('Over budget: ' + breach.message);
+    });
+    var settlementIndexSF = buildSurfaceIndex({
+      weeks: weekOutputs,
+      fragments: allFragments,
+      endings: endingsArray
+    });
+    var settlementModeSF = ((skeleton || {}).meta || {}).artifactIntent
+      ? (((skeleton || {}).meta || {}).artifactIntent || {}).endingMode
+      : ((skeleton || {}).artifactIntent || {}).endingMode;
+    endingsArray.forEach(function (ending, ei) {
+      endingSettlementFloorErrors(ending, 'Ending "' + ((ending || {}).variant || ei) + '"', {
+        endingMode: settlementModeSF,
+        surfaceIndex: settlementIndexSF
+      }).forEach(function (message) { errors.push(message); });
+    });
+    endingSettlementSetFloorErrors(endingsArray, 'Endings')
+      .forEach(function (message) { errors.push(message); });
+    return errors.length > 0 ? errors.join('; ') : '';
+  }
+  var restoredEndingsSF = false;
 
   if (cached('endings')) {
-    allEndings = checkpoint.stages.endings || [];
-    console.log('[S+F] Resuming — endings loaded from checkpoint');
-    progress('endings', 'Endings restored from checkpoint.');
-    emitPipelineEvent(onProgress, stageNum, totalStages, 'Endings restored from checkpoint.', {
-      phase: 'complete', stageKey: 'endings', stageName: 'Endings',
-      completionSource: 'checkpoint'
-    });
-  } else {
+    var restoredEndingsResultSF = await restoreSkeletonFleshCheckpointedStage(
+      'endings',
+      checkpoint.stages.endings,
+      validateCurrentSkeletonFleshEndings,
+      endingsRestoreContextSF
+    );
+    if (restoredEndingsResultSF.accepted) {
+      restoredEndingsSF = true;
+      allEndings = restoredEndingsResultSF.payload;
+      console.log('[S+F] Resuming — endings loaded from checkpoint');
+      progress('endings', 'Endings restored from checkpoint.');
+      emitPipelineEvent(onProgress, stageNum, totalStages, 'Endings restored from checkpoint.', {
+        phase: 'complete', stageKey: 'endings', stageName: 'Endings',
+        completionSource: 'checkpoint'
+      });
+    }
+  }
+  if (!restoredEndingsSF) {
     progress('endings', 'Writing all endings\u2026');
 
     var endingsResultSF = await runJsonStage(settings, {
@@ -8265,51 +8930,7 @@ async function runSkeletonFleshPipeline(options) {
           { gameRulebook: sfGameRulebook });
       },
       validate: function (result) {
-        var endingsArray = Array.isArray(result) ? result : (result && result.endings ? result.endings : null);
-        if (!endingsArray || endingsArray.length === 0) {
-          return 'Endings: missing or empty endings array';
-        }
-        var errors = [];
-        for (var ei = 0; ei < endingsArray.length; ei++) {
-          var ending = endingsArray[ei];
-          if (!ending) { errors.push('Ending [' + ei + ']: null'); continue; }
-          if (!ending.content && !ending.body) {
-            errors.push('Ending "' + (ending.variant || ei) + '": missing content');
-          }
-        }
-        if (endingsArray.length < endingVariants.length) {
-          errors.push('Endings: expected ' + endingVariants.length + ' variants but got ' + endingsArray.length);
-        }
-        // F6: the ending body cap costs a retry here. Book 1's endings ran ~3x
-        // budget, and an ending that long does not just cost pages — the
-        // renderer splits it across page breaks it was never composed for.
-        collectBudgetBreaches({ endings: endingsArray }).forEach(function (b) {
-          errors.push('Over budget: ' + b.message);
-        });
-
-        // THE SETTLEMENT FLOOR, ARMED (the settlement doctrine). This is the
-        // seat where WHICH-differentiation is actually decidable: the bundled
-        // builder returns every variant in one call, so the set arm can compare
-        // them. The multi-stage twin writes one ending per call and can only
-        // check the ending in front of it.
-        var settlementIndexSourceSF = {
-          weeks: weekOutputs,
-          fragments: allFragments,
-          endings: endingsArray
-        };
-        var settlementIndexSF = buildSurfaceIndex(settlementIndexSourceSF);
-        var settlementModeSF = ((skeleton || {}).meta || {}).artifactIntent
-          ? (((skeleton || {}).meta || {}).artifactIntent || {}).endingMode
-          : ((skeleton || {}).artifactIntent || {}).endingMode;
-        endingsArray.forEach(function (ending, ei) {
-          endingSettlementFloorErrors(ending, 'Ending "' + ((ending || {}).variant || ei) + '"', {
-            endingMode: settlementModeSF,
-            surfaceIndex: settlementIndexSF
-          }).forEach(function (message) { errors.push(message); });
-        });
-        endingSettlementSetFloorErrors(endingsArray, 'Endings')
-          .forEach(function (message) { errors.push(message); });
-        return errors.length > 0 ? errors.join('; ') : '';
+        return validateCurrentSkeletonFleshEndings(result, endingsRestoreContextSF);
       }
     });
 
@@ -8376,7 +8997,8 @@ async function runSkeletonFleshPipeline(options) {
   // generationFloors: this is the API path, so the simulated player's
   // soft-locks are blocking-class errors here (D111). The guided wizard and the
   // corpus call the same function without the flag and get warnings.
-  var validationResult = validateAssembledBooklet(booklet, { generationFloors: true });
+  terminalBooklet = booklet;
+  validationResult = validateAssembledBooklet(booklet, { generationFloors: true });
   writePipelineDebris(booklet, '_simReport', validationResult.sim);
   if (validationResult.errors && validationResult.errors.length > 0) {
     console.warn('[S+F] Assembly validation errors:', validationResult.errors);
@@ -8408,19 +9030,22 @@ async function runSkeletonFleshPipeline(options) {
     console.warn('[S+F] Artifact intent drift:', driftResult.diagnostics.length, 'issue(s)');
   }
 
-  // Snapshot before the critic spends more money (see the same guard in
-  // runApiPipeline): a run that dies mid-critic still leaves a complete,
-  // already-paid-for booklet the user can recover.
-  persistLastBooklet(booklet, { source: 'skeleton-flesh' });
-
-  // ── COMPOSITION CRITIC LOOP (D66) ───────────────────────────
-  var sfCriticReport = await runCriticLoop(settings, booklet, brief, {
-    rateLimiter: rateLimiter,
-    budgetEnforce: useGeminiBudget,
-    onProgress: onProgress,
-    telemetryCollector: sfTelemetry,
-    trialMode: trialMode
+  // ── PRE-EDITORIAL PRODUCTION BOUNDARY (D267 Wave 1) ─────────
+  var completedSFProduction = await completeSkeletonFleshAssembledBranch(booklet, {
+    settings: settings,
+    brief: brief,
+    editorialContext: {
+      rateLimiter: rateLimiter,
+      budgetEnforce: useGeminiBudget,
+      onProgress: onProgress,
+      telemetryCollector: sfTelemetry,
+      trialMode: trialMode
+    },
+    receipt: { proof: 'not_run' }
   });
+  validationResult = completedSFProduction.mechanicalResult;
+  sfCriticReport = completedSFProduction.editorialReport;
+  terminalFacts = completedSFProduction.facts;
   if (sfCriticReport && sfCriticReport.revisedUnits > 0) {
     report = generateQualityReport(booklet);
     qualityGate = buildQualityGate(report);
@@ -8464,10 +9089,15 @@ async function runSkeletonFleshPipeline(options) {
       totalCostUsd: totalCostUsd
     }
   });
-
-  persistLastBooklet(booklet, { source: 'skeleton-flesh' });
-  clearCheckpoint();
-  return booklet;
+  } catch (error) {
+    terminalError = error;
+    terminalFacts = interruptedProductionFacts(error, terminalBooklet, validationResult, terminalFacts);
+  }
+  return finalizeProductionOutcome(terminalBooklet, terminalFacts, {
+    pipeline: 'skeleton-flesh', checkpointPresent: true, onProgress: options.onProgress,
+    stageIndex: totalStages, totalStages: totalStages,
+    terminalError: terminalError, returnBooklet: true
+  });
 }
 
 async function generateSkeletonFlesh(settings, workout, brief, onProgress) {
@@ -8822,6 +9452,20 @@ window.LiftRPGAPI = {
   // another (D128 → W4a).
   readPipelineDebris: readPipelineDebris,
   manual: {
+    deriveProductionOutcome: deriveProductionOutcome,
+    productionOutcomePresentation: productionOutcomePresentation,
+    checkpointDispositionForOutcome: checkpointDispositionForOutcome,
+    finalizeProductionOutcome: finalizeProductionOutcome,
+    completeAssembledProduction: completeAssembledProduction,
+    adaptCriticReportToFindingEvidence: adaptCriticReportToFindingEvidence,
+    completeStandardAssembledBranch: completeStandardAssembledBranch,
+    completeSkeletonFleshAssembledBranch: completeSkeletonFleshAssembledBranch,
+    assembledProductionContracts: assembledProductionContracts,
+    restoreCheckpointedStage: restoreCheckpointedStage,
+    validateRulesStage: validateRulesStage,
+    validateEndingsStage: validateEndingsStage,
+    runApiPipeline: runApiPipeline,
+    runSkeletonFleshPipeline: runSkeletonFleshPipeline,
     structuredSchemas: {
       shell: STRUCTURED_SCHEMA_SHELL,
       // ── THE SHELL SPLIT's four slices, and the partition's own reader ────
@@ -8912,6 +9556,10 @@ window.LiftRPGAPI = {
     buildCompactCampaignRetryPrompt: buildCompactCampaignRetryPrompt,
     assembleSkeletonFleshBooklet: assembleSkeletonFleshBooklet,
     validateSkeletonStage: validateSkeletonStage,
+    validateGameRulebookStage: validateGameRulebookStage,
+    validateEconomyGraphStage: validateEconomyGraphStage,
+    validateFragmentsStage: validateFragmentsStage,
+    validateKnowingStage: validateKnowingStage,
     buildSkeletonFragmentBatches: buildSkeletonFragmentBatches,
     classifyValidationErrors: classifyValidationErrors,
     autoRepairWeek: autoRepairWeek,

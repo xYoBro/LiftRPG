@@ -3797,6 +3797,7 @@
             <span class="api-durability-badge-text">Saved progress is too large for durable storage, so it is being kept in this tab only. Closing or reloading this tab loses it — use Save Progress below to keep a copy on disk.</span>
           </div>
           <div class="api-run-notices" id="api-run-notices"></div>
+          <section class="wizard-state-card" id="api-production-outcome" hidden aria-live="polite"></section>
           <div class="api-run-overview">
             <div class="api-run-focus">
               <div class="api-run-focus-kicker" id="api-state-summary">Waiting For Settings</div>
@@ -6457,6 +6458,10 @@
         API_STAGE_ORDER.forEach(function (stage) {
           apiRunState.ledger[stage.key] = status;
         });
+      }
+
+      function markMechanicallyValidApiStages() {
+        markAllApiStages('valid');
       }
 
       function resolveApiCompletionSource(detail, meta) {
@@ -10638,6 +10643,126 @@
         }).filter(Boolean);
       }
 
+      function productionCommandForAction(action) {
+        return {
+          'Retry from checkpoint': 'retry_from_checkpoint',
+          'Start again': 'start_again',
+          'Resume generation': 'resume_generation',
+          'Open invalid draft': 'open_invalid_draft',
+          'Open artifact for review': 'open_artifact_for_review',
+          'Render and inspect': 'render_and_inspect',
+          'Open candidate': 'open_candidate'
+        }[action] || '';
+      }
+
+      function latestProductionArtifact() {
+        if (api() && api().lastBooklet && typeof api().lastBooklet === 'object') {
+          return api().lastBooklet;
+        }
+        try {
+          var persisted = sessionStorage.getItem(LAST_API_BOOKLET_STORAGE_KEY);
+          return persisted ? JSON.parse(persisted) : null;
+        } catch (error) {
+          return null;
+        }
+      }
+
+      function openProductionArtifactInRenderer() {
+        var booklet = latestProductionArtifact();
+        if (!booklet) return false;
+        try {
+          sessionStorage.setItem('liftrpg_pending_json', JSON.stringify(booklet));
+          window.open('renderer/?source=session', '_blank');
+          return true;
+        } catch (error) {
+          return false;
+        }
+      }
+
+      function consumeProductionOutcomeAction(command) {
+        if (command === 'retry_from_checkpoint' || command === 'resume_generation'
+            || command === 'start_again') {
+          handleApiGenerate();
+          return true;
+        }
+        if (command === 'open_invalid_draft' || command === 'open_artifact_for_review'
+            || command === 'render_and_inspect' || command === 'open_candidate') {
+          return openProductionArtifactInRenderer();
+        }
+        return false;
+      }
+
+      function readProductionOutcomeForPanel(booklet) {
+        var carried = api() && typeof api().readPipelineDebris === 'function'
+          ? api().readPipelineDebris(booklet, '_pipelineState')
+          : null;
+        if (carried) return carried;
+        return {
+          run: { status: 'unknown', reason: 'legacy' },
+          mechanical: { status: 'unknown', errors: [] },
+          editorial: { status: 'unknown', findings: [], repairable: false },
+          release: { status: 'unknown', label: 'unknown_legacy_artifact', proof: 'not_run', authority: 'human' },
+          operationalFindings: [],
+          legacyNotice: 'Legacy artifact: production state is unknown.'
+        };
+      }
+      window.readProductionOutcomeForPanel = readProductionOutcomeForPanel;
+
+      function hasRetainedApiCheckpoint() {
+        var client = api();
+        if (!client || typeof client.getCheckpoint !== 'function'
+            || !client.checkpoint || typeof client.checkpoint.stages !== 'function') return false;
+        try {
+          return client.checkpoint.stages(client.getCheckpoint()) > 0;
+        } catch (error) {
+          return false;
+        }
+      }
+
+      function applyProductionOutcomeToRunPanel(outcome, options) {
+        var root = document.getElementById('api-production-outcome');
+        var manual = api() && api().manual;
+        if (!root || !manual || typeof manual.productionOutcomePresentation !== 'function') return;
+        var view = manual.productionOutcomePresentation(outcome, options || {});
+        var facts = [
+          ['run', outcome.run.status],
+          ['mechanical', outcome.mechanical.status],
+          ['editorial', outcome.editorial.status],
+          ['release', outcome.release.label]
+        ];
+        var messages = (outcome.mechanical.errors || [])
+          .concat(outcome.editorial.findings || [], outcome.operationalFindings || [])
+          .map(function (entry) { return entry && entry.message ? entry.message : ''; })
+          .filter(Boolean);
+        var command = productionCommandForAction(view.action);
+        root.hidden = false;
+        root.innerHTML =
+          '<div data-production-release-badge>' + escapeForHtml(view.badge) + '</div>' +
+          (outcome.legacyNotice ? '<p data-production-legacy>' + escapeForHtml(outcome.legacyNotice) + '</p>' : '') +
+          '<div>' + facts.map(function (row) {
+            return '<div data-production-fact="' + row[0] + '"><span>' + row[0] + '</span> ' +
+              '<strong data-production-value>' + escapeForHtml(row[1]) + '</strong></div>';
+          }).join('') + '</div>' +
+          '<div>errors <span data-production-error-count>' + view.errorCount + '</span></div>' +
+          '<div>findings <span data-production-finding-count>' + view.findingCount + '</span></div>' +
+          '<div>receipt <span data-production-receipt>' + escapeForHtml(view.receiptState) + '</span></div>' +
+          '<div>checkpoint <span data-production-checkpoint>' + escapeForHtml(view.checkpointState) + '</span></div>' +
+          (messages.length ? '<ul data-production-messages>' + messages.map(function (message) {
+            return '<li>' + escapeForHtml(message) + '</li>';
+          }).join('') + '</ul>' : '') +
+          '<button type="button" data-production-action data-production-command="' +
+            escapeForHtml(command) + '">' + escapeForHtml(view.action) + '</button>';
+        var action = root.querySelector('[data-production-action]');
+        if (action) action.addEventListener('click', function () {
+          consumeProductionOutcomeAction(action.getAttribute('data-production-command'), outcome);
+        });
+      }
+      window.applyProductionOutcomeToRunPanel = applyProductionOutcomeToRunPanel;
+
+      function renderProductionOutcome(outcome, options) {
+        applyProductionOutcomeToRunPanel(outcome, options);
+      }
+
       var _apiGenerateRunning = false;
       async function handleApiGenerate() {
         if (_apiGenerateRunning) {
@@ -10783,6 +10908,7 @@
           apiRunState.target = 'Initialize Pipeline';
           apiRunState.targetCaption = 'Preparing the staged generation run.';
           var methodName = applyPipelineStageOrder(apiMethodEl && apiMethodEl.value);
+          var latestProductionOutcome = null;
           pushApiLog('Starting ' + settings._providerLabel + ' · ' + settings.model + ' via ' + API_PIPELINE_METHODS[methodName] + ' ' + formatTimeoutLabel(settings.requestTimeoutMs) + '.');
           renderApiRunState();
           var booklet = await api()[methodName](settings, workout, briefEl.value.trim(), function (stageIndex, totalStages, message, meta) {
@@ -10796,6 +10922,13 @@
             if (meta.noticeLevel) {
               applyApiNotice(meta.noticeLevel, message, meta);
               renderApiRunState();
+              return;
+            }
+            if (meta.phase === 'production_outcome') {
+              latestProductionOutcome = meta.outcome;
+              applyProductionOutcomeToRunPanel(latestProductionOutcome, {
+                checkpointPresent: hasRetainedApiCheckpoint()
+              });
               return;
             }
             var stageKey = normalizeApiStageKey(meta.stageKey || inferApiStageKey(message));
@@ -11042,6 +11175,13 @@
             renderApiRunState();
           });
 
+          var productionOutcome = api().readPipelineDebris(booklet, '_pipelineState')
+            || readProductionOutcomeForPanel(booklet);
+          latestProductionOutcome = productionOutcome;
+          renderProductionOutcome(productionOutcome, {
+            checkpointPresent: hasRetainedApiCheckpoint()
+          });
+
           // ── DELIVERY IS UNCONDITIONAL ──────────────────────────────────
           // The pipeline returned a booklet the user has already paid for.
           // Claim it, save it, and put it on screen BEFORE any presentation
@@ -11069,15 +11209,15 @@
             if (apiRunState && apiRunState.status !== 'running') {
               deliverApiBooklet(booklet);
               apiRunState.status = 'success';
-              apiRunState.summary = 'Booklet Ready';
+              apiRunState.summary = 'Artifact Delivered';
               apiRunState.target = 'Open Or Download';
               apiRunState.targetCaption = 'You stopped this build, but the stage that was still running '
-                + 'had already finished. The booklet is complete and saved on this device — open or '
+                + 'had already stopped spending. The artifact is saved on this device — open or '
                 + 'download it below.';
               apiRunState.currentStageStartedAt = 0;
               apiRunState.stream = null;
-              pushApiLog('The build you stopped had already finished its last stage. '
-                + 'The booklet is complete and saved on this device.');
+              pushApiLog('The build you stopped produced an artifact before cancellation. '
+                + 'It is saved on this device with its production state.');
               try { renderApiRunState(); } catch (renderError) {
                 console.error('[LiftRPG] Run panel failed to render a superseded delivery:', renderError);
               }
@@ -11090,7 +11230,7 @@
           // artifact is already on the screen when they run.
           deliverApiBooklet(booklet);
           apiRunState.status = 'success';
-          apiRunState.summary = 'Booklet Ready';
+          apiRunState.summary = 'Artifact Delivered';
           apiRunState.target = 'Open Or Download';
           apiRunState.targetCaption = 'Send the generated booklet to the renderer or download the JSON.';
           apiRunState.currentStageStartedAt = 0;
@@ -11101,7 +11241,11 @@
           // of it (a quality-report shape we did not expect, a storage limit,
           // a pricing caption) costs a line of detail — never the booklet.
           try {
-            markAllApiStages('valid');
+            if (productionOutcome && productionOutcome.mechanical.status === 'valid') {
+              markMechanicallyValidApiStages();
+            } else if (productionOutcome && productionOutcome.mechanical.status === 'invalid') {
+              markAllApiStages('blocked');
+            }
             var qualityGate = readBookletDebris(booklet, '_qualityGate') || { passed: true, blockers: [] };
             var isQualityBlocked = !qualityGate.passed && qualityGate.blockers && qualityGate.blockers.length > 0;
             var blockerMessages = summarizeQualityGateBlockers(qualityGate.blockers, { limit: 2 });
@@ -11124,7 +11268,7 @@
                 { completionSource: 'local' }
               );
               apiRunState.status = 'success';
-              apiRunState.summary = 'Booklet Ready';
+              apiRunState.summary = 'Artifact Delivered';
               apiRunState.target = 'Open Or Download';
               apiRunState.targetCaption = 'Send the generated booklet to the renderer or download the JSON.';
             }
@@ -11159,7 +11303,7 @@
             pushApiLog(
               isQualityBlocked
                 ? 'Generation finished below the quality bar — the booklet is delivered with its review attached. Total usage: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.'
-                : 'Generation complete. Total usage: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.'
+                : 'Artifact delivered. Total usage: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.'
             );
             // The verdict gets its own line only when it fell short — a review
             // that met its bar is already said in the caption, and repeating a
@@ -11169,7 +11313,7 @@
               pushApiLog('The editorial review ended below its bar (' + criticReport.finalMin + '/'
                 + criticReport.threshold + ') after ' + criticRounds + ' round'
                 + (criticRounds === 1 ? '' : 's')
-                + '. The booklet is finished and yours — the critique is attached to it, and rebuilding costs another run.');
+                + '. The artifact is yours — the critique is attached to it, and rebuilding costs another run.');
             }
             if (isQualityBlocked) {
               pushApiLog('Quality blockers: ' + summarizeQualityGateBlockers(qualityGate.blockers).join(' · '));
@@ -11183,7 +11327,7 @@
             }
           } catch (presentationError) {
             console.warn('[LiftRPG] Post-delivery display step failed:', presentationError);
-            pushApiLog('Your booklet is ready and saved. Some run details could not be displayed: ' +
+            pushApiLog('Your artifact is saved. Some run details could not be displayed: ' +
               ((presentationError && presentationError.message) || presentationError));
           }
           // The one render that matters. If the panel's own painter fails,
@@ -11196,9 +11340,9 @@
           } catch (renderError) {
             console.error('[LiftRPG] Run panel failed to render after delivery:', renderError);
             deliverApiBooklet(apiRunState.booklet || booklet);
-            if (apiStateSummary) apiStateSummary.textContent = 'Booklet Ready';
+            if (apiStateSummary) apiStateSummary.textContent = 'Artifact Delivered';
             if (apiStateTargetCaption) {
-              apiStateTargetCaption.textContent = 'Your booklet finished and is saved on this device. ' +
+              apiStateTargetCaption.textContent = 'Your artifact is saved on this device. ' +
                 'Use the buttons above to open or download it.';
             }
           }
@@ -11278,6 +11422,11 @@
             apiRunState.costCaption = 'Usage before failure: ' + formatTokenSummary(apiRunState.usageTotals) + ' · ' + apiRunState.cost + ' estimated.';
           }
           pushApiLog(failureMessage);
+          if (latestProductionOutcome) {
+            renderProductionOutcome(latestProductionOutcome, {
+              checkpointPresent: hasRetainedApiCheckpoint()
+            });
+          }
           // Same rule on the failure path: a delivered booklet has buttons even
           // if the panel cannot paint the rest of the story.
           try {

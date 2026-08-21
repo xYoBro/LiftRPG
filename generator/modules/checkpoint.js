@@ -391,6 +391,19 @@ export function clearCheckpoint() {
   sessionSpend = zeroSpend();
 }
 
+// Remove one rejected cached stage while preserving every unaffected paid
+// sibling and the checkpoint's spend/identity envelope.  Restore validation
+// uses this instead of mutating an in-memory copy that storage could later
+// resurrect.
+export function pruneCheckpointStage(stage, checkpoint) {
+  var cp = checkpoint || loadCheckpoint();
+  if (!cp || !cp.stages || typeof cp.stages !== 'object') return cp;
+  if (Object.prototype.hasOwnProperty.call(cp.stages, stage)) delete cp.stages[stage];
+  cp.updatedAt = new Date().toISOString();
+  persist(cp);
+  return cp;
+}
+
 export function countResumedStages(checkpoint) {
   return stageCount(checkpoint);
 }
