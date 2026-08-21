@@ -3437,6 +3437,37 @@ function cadenceCheckableEndpoints(edge) {
   return out;
 }
 
+// The stage's canonical ledger is a list because its order is useful to a
+// human reading a run record, but its authority is one row per printable
+// surface. This projection lets every downstream reader keep working in the
+// established edge-shaped cadence vocabulary without copying cadence back onto
+// graph edges. Historic books have no ledger and deliberately fall through to
+// their edge declarations.
+function canonicalCadenceGraph(surfaceCadences) {
+  return (Array.isArray(surfaceCadences) ? surfaceCadences : []).map(function (row) {
+    return {
+      from: String((row || {}).surface || ''),
+      to: '',
+      cadence: {
+        mode: (row || {}).mode,
+        introWeek: (row || {}).introWeek
+      },
+      closesAtWeek: (row || {}).closesAtWeek,
+      _canonicalCadence: true
+    };
+  });
+}
+
+function namedCadenceSurfaceRefs(graph) {
+  var out = {};
+  (Array.isArray(graph) ? graph : []).forEach(function (edge) {
+    cadenceCheckableEndpoints(edge).forEach(function (ep) {
+      out[ep.kind + ':' + ep.key] = ep;
+    });
+  });
+  return out;
+}
+
 function weekPrintsSurface(surfaces, kind, key) {
   var bucket = surfaces.kinds[kind];
   return !!(bucket && bucket[key]);
@@ -3550,8 +3581,12 @@ export function cadenceConformanceFloorErrors(weekObj, weekNumber, playSpine) {
   var errors = [];
   var wk = Number(weekNumber);
   if (!weekObj || typeof weekObj !== 'object' || !wk) return errors;
-  var graph = (playSpine && Array.isArray(playSpine.economyGraph)) ? playSpine.economyGraph : null;
-  if (!graph) return errors;
+  var legacyGraph = (playSpine && Array.isArray(playSpine.economyGraph))
+    ? playSpine.economyGraph : null;
+  if (!legacyGraph) return errors;
+  var hasCanonicalCadences = !!(playSpine && Array.isArray(playSpine.surfaceCadences)
+    && playSpine.surfaceCadences.length);
+  var graph = hasCanonicalCadences ? canonicalCadenceGraph(playSpine.surfaceCadences) : legacyGraph;
 
   var surfaces = deriveWeekSurfaces(weekObj, wk);
 
@@ -3568,14 +3603,18 @@ export function cadenceConformanceFloorErrors(weekObj, weekNumber, playSpine) {
   // error.
   var isBossCadenceWeek = !!weekObj.isBossWeek;
   var conflictedKeys = {};
-  cadenceContradictionsForWeek(graph, wk, isBossCadenceWeek).forEach(function (c) {
-    conflictedKeys[c.kind + ':' + c.key] = true;
-    errors.push('Economy Graph → the graph owes and forbids `' + c.kind + ':' + c.id
-      + '` in week ' + wk + ' at once: ' + c.owe + ' requires it on the page, and '
-      + c.withhold + ' requires it absent. A week cannot print and not print one surface, '
-      + 'so no revision of this week can satisfy the graph — every edge touching this '
-      + 'surface must tell the same story about when it exists.');
-  });
+  // New runs have one cadence row per surface, so this contradiction has no
+  // representation. Keep the backstop only for historic edge-level checkpoints.
+  if (!hasCanonicalCadences) {
+    cadenceContradictionsForWeek(graph, wk, isBossCadenceWeek).forEach(function (c) {
+      conflictedKeys[c.kind + ':' + c.key] = true;
+      errors.push('Economy Graph → the graph owes and forbids `' + c.kind + ':' + c.id
+        + '` in week ' + wk + ' at once: ' + c.owe + ' requires it on the page, and '
+        + c.withhold + ' requires it absent. A week cannot print and not print one surface, '
+        + 'so no revision of this week can satisfy the graph — every edge touching this '
+        + 'surface must tell the same story about when it exists.');
+    });
+  }
 
   graph.forEach(function (edge) {
     if (!edge || typeof edge !== 'object') return;
@@ -3584,7 +3623,9 @@ export function cadenceConformanceFloorErrors(weekObj, weekNumber, playSpine) {
     var mode = String(cadence.mode || '').trim();
     if (VALID_EDGE_CADENCES.indexOf(mode) === -1) return;
 
-    var edgeLabel = '`' + String(edge.from || '?') + '` → `' + String(edge.to || '?') + '`';
+    var edgeLabel = edge._canonicalCadence
+      ? 'the canonical cadence row for `' + String(edge.from || '?') + '`'
+      : 'the economy-graph edge `' + String(edge.from || '?') + '` → `' + String(edge.to || '?') + '`';
 
     // ── The half-declaration arm (the manifestPointer idiom) ────────────────
     // A mode whose companion number is missing is a declaration that reads as a
@@ -3611,7 +3652,7 @@ export function cadenceConformanceFloorErrors(weekObj, weekNumber, playSpine) {
     if (owed) {
       var owedValue = owed === 'introWeek' ? cadence.introWeek : edge[owed];
       if (!(Number(owedValue) > 0)) {
-        errors.push('Economy Graph → the economy-graph edge ' + edgeLabel + ' declares '
+        errors.push('Economy Graph → ' + edgeLabel + ' declares '
           + '`cadence.mode: "' + mode + '"` and does not carry `' + owed + '`. That cadence is '
           + 'a promise about WHICH WEEKS the player touches this edge, and without `' + owed + '` '
           + 'it names no week — it reads as a declaration and checks as nothing. Give it '
@@ -3641,7 +3682,7 @@ export function cadenceConformanceFloorErrors(weekObj, weekNumber, playSpine) {
       if (mode === 'weekly') {
         if (bossExemptOwe || wk < introWeek || present) return;
         if (clockArmAlreadyOwns(edge, ep.kind, wk)) return;
-        errors.push('Week ' + wk + ' → the economy-graph edge ' + edgeLabel + ' is declared '
+        errors.push('Week ' + wk + ' → ' + edgeLabel + ' is declared '
           + '`cadence.mode: "weekly"`' + (introWeek > 1 ? ' from week ' + introWeek : '')
           + ', and this week does not print ' + named + '. Weekly is the book\'s own promise that '
           + 'the player touches this surface every week from ' + (introWeek > 1 ? 'week ' + introWeek : 'week 1')
@@ -3653,7 +3694,7 @@ export function cadenceConformanceFloorErrors(weekObj, weekNumber, playSpine) {
 
       if (mode === 'late') {
         if (wk < introWeek && present) {
-          errors.push('Week ' + wk + ' → the economy-graph edge ' + edgeLabel + ' is declared '
+          errors.push('Week ' + wk + ' → ' + edgeLabel + ' is declared '
             + '`cadence.mode: "late"` arriving in week ' + introWeek + ', and this week prints '
             + named + ' already. Late means the surface is DELIBERATELY absent until week '
             + introWeek + '; printing it earlier makes the declaration false. Either move the '
@@ -3663,7 +3704,7 @@ export function cadenceConformanceFloorErrors(weekObj, weekNumber, playSpine) {
         if (wk >= introWeek && !present) {
           if (bossExemptOwe) return;
           if (clockArmAlreadyOwns(edge, ep.kind, wk)) return;
-          errors.push('Week ' + wk + ' → the economy-graph edge ' + edgeLabel + ' is declared '
+          errors.push('Week ' + wk + ' → ' + edgeLabel + ' is declared '
             + '`cadence.mode: "late"` arriving in week ' + introWeek + ', and this week is at or '
             + 'past that and does not print ' + named + '. A late arrival still has to arrive. '
             + 'Print it under exactly the name the graph uses, or correct `introWeek`.');
@@ -3673,7 +3714,7 @@ export function cadenceConformanceFloorErrors(weekObj, weekNumber, playSpine) {
 
       if (mode === 'window') {
         if (closesAtWeek && wk > closesAtWeek && present) {
-          errors.push('Week ' + wk + ' → the economy-graph edge ' + edgeLabel + ' is declared '
+          errors.push('Week ' + wk + ' → ' + edgeLabel + ' is declared '
             + '`cadence.mode: "window"` closing at week ' + closesAtWeek + ', and this week still '
             + 'prints ' + named + '. A window that is still on the page after it closes is not a '
             + 'window — it is a deadline the player has no way to feel. Either stop printing the '
@@ -3707,8 +3748,11 @@ export function collectCadenceOnceFindings(booklet) {
   var findings = [];
   var doc = booklet || {};
   var spine = ((doc.meta || {}).playSpine) || null;
-  var graph = (spine && Array.isArray(spine.economyGraph)) ? spine.economyGraph : null;
-  if (!graph) return findings;
+  var legacyGraph = (spine && Array.isArray(spine.economyGraph)) ? spine.economyGraph : null;
+  if (!legacyGraph) return findings;
+  var hasCanonicalCadences = !!(Array.isArray((spine || {}).surfaceCadences)
+    && spine.surfaceCadences.length);
+  var graph = hasCanonicalCadences ? canonicalCadenceGraph(spine.surfaceCadences) : legacyGraph;
   var ledger = deriveWeeklySurfaceLedger(doc);
   if (!ledger.length) return findings;
 
@@ -3722,8 +3766,10 @@ export function collectCadenceOnceFindings(booklet) {
         return weekPrintsSurface(row, ep.kind, ep.key);
       });
       if (anywhere) return;
-      findings.push({ message: 'The economy-graph edge `' + String(edge.from || '?') + '` → `'
-        + String(edge.to || '?') + '` is declared `cadence.mode: "once"`, and `' + ep.kind + ':'
+      findings.push({ message: (edge._canonicalCadence ? 'The canonical cadence row for `'
+        + String(edge.from || '?') + '`' : 'The economy-graph edge `' + String(edge.from || '?')
+          + '` → `' + String(edge.to || '?') + '`') + ' is declared `cadence.mode: "once"`, and `'
+        + ep.kind + ':'
         + ep.id + '` is printed in no week of this book. A once-only affordance still has to be '
         + 'somewhere the player can reach it. Reported, not refused: this is measured after '
         + 'assembly, where nothing blocks.' });
@@ -5851,8 +5897,8 @@ function rulebookTaughtText(rulebook) {
  * single joined error string on failure, the shape runJsonStage expects.
  *
  * ANNOTATE ONLY — THE FLOOR THAT MAKES THE RULING REAL (author decision 4). The
- * stage may add cadence, price and branch to edges that exist; it may never add
- * or remove one. That is D136's revisionInventsKeys idiom scoped to this unit,
+ * stage may add price and branch to edges that exist, and one canonical cadence
+ * ledger beside them; it may never add or remove an edge. That is D136's revisionInventsKeys idiom scoped to this unit,
  * and it is checked as a SET COMPARISON on `from → to` pairs against the graph
  * the stage was handed, because "same length" is not the same claim: a model
  * that drops one edge and invents another passes a count and has silently
@@ -5904,6 +5950,77 @@ export function validateEconomyGraphStage(result, options) {
           + ' not add an edge — it paces the economy the rules declared, it does not extend it.');
       }
     });
+  }
+
+  // ── The canonical surface ledger (new live runs) ─────────────────────────
+  // Cadence was formerly repeated on every edge incident to a named surface.
+  // That makes contradictory schedules expressible and leaves a refusal as the
+  // only protection. New pipeline calls instead require one record for each
+  // named printable endpoint; the exact source set comes from the graph the
+  // model was handed, not a guessed inventory. Old checkpoints bypass this
+  // branch and retain their read-only edge-cadence fallback.
+  if (opts.requireCanonicalCadence) {
+    var surfaceCadences = result.surfaceCadences;
+    var expectedCadences = namedCadenceSurfaceRefs(prior || graph);
+    var seenCadences = {};
+    if (!Array.isArray(surfaceCadences)) {
+      errors.push(S + 'surfaceCadences is missing or not an array. Return exactly one cadence row for '
+        + 'every named clock, map, and companion the given graph touches; cadence belongs to that '
+        + 'surface, never to an edge.');
+    } else {
+      surfaceCadences.forEach(function (row, i) {
+        if (!row || typeof row !== 'object' || Array.isArray(row)) {
+          errors.push(S + 'surfaceCadences[' + i + '] is not an object');
+          return;
+        }
+        var parsed = parseSurfaceRef(row.surface);
+        if (!parsed.valid || !parsed.id || CADENCE_NAMED_SURFACE_KINDS.indexOf(parsed.kind) === -1
+          || /^w\s*\d+/i.test(String(parsed.id).trim())) {
+          errors.push(S + 'surfaceCadences[' + i + '].surface "' + String(row.surface || '') + '" is not a '
+            + 'named clock, map, or companion from the graph. Copy one exact non-week-shaped surface ref.');
+          return;
+        }
+        var cadenceKey = parsed.kind + ':' + toSlugWords(parsed.id);
+        if (seenCadences[cadenceKey]) {
+          errors.push(S + 'surfaceCadences names `' + parsed.kind + ':' + parsed.id + '` more than once. '
+            + 'One surface has one cadence row; merge its schedule before you return it.');
+          return;
+        }
+        seenCadences[cadenceKey] = true;
+        if (!expectedCadences[cadenceKey]) {
+          errors.push(S + 'surfaceCadences names `' + parsed.kind + ':' + parsed.id + '`, which is not a '
+            + 'named printable surface in the graph you were given. Do not invent a schedule.');
+        }
+        var rowMode = String(row.mode || '').trim();
+        if (VALID_EDGE_CADENCES.indexOf(rowMode) === -1) {
+          errors.push(S + 'surfaceCadences row for `' + parsed.kind + ':' + parsed.id + '` declares mode "'
+            + rowMode + '", which is not one of: ' + VALID_EDGE_CADENCES.join(', ') + '.');
+          return;
+        }
+        var rowOwed = EDGE_CADENCE_REQUIRED_FIELDS[rowMode];
+        var rowOwedValue = rowOwed === 'introWeek' ? row.introWeek : row.closesAtWeek;
+        if (rowOwed && !(Number(rowOwedValue) > 0)) {
+          errors.push(S + 'surfaceCadences row for `' + parsed.kind + ':' + parsed.id + '` declares `mode: "'
+            + rowMode + '"` and does not carry `' + rowOwed + '`. That schedule names no weeks.');
+        }
+        if (Number(opts.weekCount) > 0 && Number(row.introWeek) > Number(opts.weekCount)) {
+          errors.push(S + 'surfaceCadences row for `' + parsed.kind + ':' + parsed.id + '` declares `introWeek: '
+            + row.introWeek + '`, past this book\'s ' + opts.weekCount + ' weeks.');
+        }
+      });
+      Object.keys(expectedCadences).forEach(function (key) {
+        if (seenCadences[key]) return;
+        var ep = expectedCadences[key];
+        errors.push(S + 'surfaceCadences is missing the row for `' + ep.kind + ':' + ep.id + '`. '
+          + 'Every named printable surface in the given graph needs exactly one schedule.');
+      });
+      graph.forEach(function (edge) {
+        if (!edge || typeof edge !== 'object' || edge.cadence === undefined) return;
+        errors.push(S + 'the edge `' + String(edge.from || '?') + ' → ' + String(edge.to || '?')
+          + '` still carries `cadence`. Move that declaration to its one `surfaceCadences` row; '
+          + 'edge-level cadence would recreate two competing schedule homes.');
+      });
+    }
   }
 
   // ── The cadence-shape arms (strict when present, the manifestPointer idiom) ─

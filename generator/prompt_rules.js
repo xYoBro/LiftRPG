@@ -1026,6 +1026,23 @@
           required: ['from', 'to']
         }
       },
+      // The pacing stage writes this additive ledger after the shell has
+      // declared its graph. It is optional here so old / guided shell payloads
+      // remain legal, but a strict structured transport must know the field or
+      // it would strip the live stage's canonical schedule on merge.
+      surfaceCadences: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            surface: { type: 'string' },
+            mode: { type: 'string', enum: ['weekly', 'once', 'window', 'late'] },
+            introWeek: { type: 'integer' },
+            closesAtWeek: { type: 'integer' }
+          },
+          required: ['surface', 'mode']
+        }
+      },
       consequenceEdges: {
         type: 'array',
         items: {
@@ -1725,7 +1742,7 @@
   window.SCHEMA_ECONOMY_GRAPH = [
     '# Economy Graph Schema — the week axis',
     '',
-    'Return a single JSON object: `{ "economyGraph": [ ...edges... ] }`.',
+    'Return one JSON object with BOTH `{ "economyGraph": [ ...edges... ], "surfaceCadences": [ ... ] }`.',
     '',
     'You are given the graph this book already declared. Return THE SAME EDGES, in the same',
     'order, each one enriched. You may not add an edge and you may not remove one: the shape of',
@@ -1739,10 +1756,6 @@
     '- `branch` (string, optional) — which side of a fork carries this edge (`door:W3/A`).',
     '- `price` (integer ≥ 1, optional) — what this edge costs, IN MARKS.',
     '- `closesAtWeek` (integer ≥ 1, optional) — the last week this edge can be taken.',
-    '- `cadence` (object, optional but strongly wanted) — how often the player takes this edge.',
-    '  - `mode` (string): exactly one of `weekly`, `once`, `window`, `late`.',
-    '  - `introWeek` (integer ≥ 1): the week the edge\'s surface starts appearing. It names a',
-    '    week of THIS book — an `introWeek` past the last week is a surface that never arrives.',
     // D229: the closed-schema line the rulebook seat paid three runs to learn,
     // written here BEFORE this seat's first live run — its framing verb is
     // "enrich", its gate blocks invented siblings, and that pairing is the
@@ -1751,9 +1764,19 @@
     'annotate: a note, explanation, or compliance key of any name beside these fields fails',
     'the whole stage. The machine checks the promises itself — say the cadence, not why.',
     '',
+    '## The canonical surface cadence ledger — one row for every named clock, map, or companion',
+    'Return `surfaceCadences`: exactly one row for every named `clock:`, `map:`, and `companion:`',
+    'surface in the given graph (never `clock:W2`, `map:W3`, or another week-shaped ref). Copy',
+    'the surface name exactly. Each row is `{ surface, mode, introWeek?, closesAtWeek? }`.',
+    '- `mode` (string): exactly one of `weekly`, `once`, `window`, `late`.',
+    '- `introWeek` (integer ≥ 1): the week of THIS book when the surface starts appearing. An',
+    '  `introWeek` past the last week is a surface that never arrives.',
+    'Cadence is not an edge property: edges describe relationships, while this one ledger says',
+    'when a printed surface exists. Never put `cadence` on an edge.',
+    '',
     '## What each cadence PROMISES, and what is then checked against your pages',
-    'A cadence is not a label. It is a promise about which weeks print the surface this edge',
-    'names, and every week of this book is checked against it. Choose the one that is true.',
+    'A cadence is not a label. It is a promise about which weeks print the named surface, and',
+    'every week of this book is checked against it. Choose the one that is true.',
     '- `weekly` — the player touches this every week from `introWeek` (default week 1). Every',
     '  week from then on must print the surface, under exactly the name this edge uses.',
     '- `late` — the surface is DELIBERATELY absent until `introWeek`, and present from it.',
@@ -1770,12 +1793,10 @@
     'weeks and not others on no schedule, that is `once` or a `late` with the right week, not a',
     '`weekly` you hope nobody counts.',
     '',
-    'ONE SURFACE, ONE CADENCE STORY. Several edges may touch the same named surface, and every',
-    'one of them must agree on when that surface exists. `weekly` from week 1 on one edge and',
-    '`late` arriving week 6 on another is not two schedules — it is one surface ordered onto the',
-    'page and off the page in the same week, and no week can obey both. The graph is refused',
-    'whole for it, before any week is written. Before you answer, read your edges surface by',
-    'surface: if two disagree, the LATEST arrival is usually the true design — align the others.',
+    'ONE SURFACE, ONE CADENCE STORY. Several edges may touch the same named surface; write that',
+    'surface ONCE in `surfaceCadences`, not once per edge. `weekly` from week 1 and `late` in',
+    'week 6 are not two schedules — they order the same surface onto and off the page at once.',
+    'The ledger is checked against the exact surface set in the graph before any week is written.',
     '',
     'THE BOSS WEEK OWES ONLY CLOCKS. The final week prints the boss encounter, not the weekly',
     'loop furniture — a `weekly` or `late` promise on a `map:` or `companion:` surface binds',
@@ -1807,21 +1828,26 @@
             currency: { type: 'string' },
             branch: { type: 'string' },
             price: { type: 'integer' },
-            closesAtWeek: { type: 'integer' },
-            cadence: {
-              type: 'object',
-              properties: {
-                mode: { type: 'string', enum: ['weekly', 'once', 'window', 'late'] },
-                introWeek: { type: 'integer' }
-              },
-              required: ['mode']
-            }
+            closesAtWeek: { type: 'integer' }
           },
           required: ['from', 'to']
         }
+      },
+      surfaceCadences: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            surface: { type: 'string' },
+            mode: { type: 'string', enum: ['weekly', 'once', 'window', 'late'] },
+            introWeek: { type: 'integer' },
+            closesAtWeek: { type: 'integer' }
+          },
+          required: ['surface', 'mode']
+        }
       }
     },
-    required: ['economyGraph']
+    required: ['economyGraph', 'surfaceCadences']
   };
 
   // ── Canonical workout (§11 Wave 5) ───────────────────────────────────────
@@ -3888,7 +3914,7 @@
     '## Pace the economy you already designed',
     'This book\'s rules are written and its economy graph is declared. You are not designing a',
     'new economy and you are not adding to this one. You are answering one question about each',
-    'edge that already exists: HOW OFTEN does the player take it?',
+    'named printable surface the edges already touch: WHEN does the player see it?',
     '',
     'Return every edge you were given, in the order you were given them, with the same `from`',
     'and the same `to`. Adding an edge or dropping one is the one thing this stage may never do —',
@@ -3902,8 +3928,9 @@
     'printed in one week of six, with every check green, because nothing had ever compared what',
     'the machine says the week DOES against what the page gives the player to do it ON.',
     '',
-    'Your cadence is what closes that. It is checked, week by week, against the surfaces each',
-    'week actually prints. So the cadence you declare has to be the cadence the book will have.',
+    'Your `surfaceCadences` ledger is what closes that. It is checked, week by week, against the',
+    'surfaces each week actually prints. It has exactly one row per named clock, map, or',
+    'companion in the given graph, so one surface cannot accidentally receive two schedules.',
     '',
     '### Price and branch, while you are here',
     'Where an edge is a SPEND, give it a `price` in marks — marks, not the fiction\'s currency',
@@ -4396,6 +4423,18 @@
     var n = Number(weekNumber);
     if (!(n > 0)) return '';
     var graph = Array.isArray(spine.economyGraph) ? spine.economyGraph : [];
+    // New runs carry one schedule per named surface. Project it into the
+    // established reader shape here rather than copying it back onto every
+    // incident edge; historic books without the ledger retain edge cadence.
+    if (Array.isArray(spine.surfaceCadences) && spine.surfaceCadences.length) {
+      graph = spine.surfaceCadences.map(function (row) {
+        return {
+          from: String((row || {}).surface || ''),
+          cadence: { mode: (row || {}).mode, introWeek: (row || {}).introWeek },
+          closesAtWeek: (row || {}).closesAtWeek
+        };
+      });
+    }
     if (!graph.length) return '';
 
     // THE BOSS EXEMPTION (author-ratified 2026-08-20) — MIRROR of

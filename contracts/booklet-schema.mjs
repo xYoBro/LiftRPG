@@ -1091,9 +1091,9 @@ var spineEconomyGraph = {
       // spend floored at the last week. A declared window is what makes
       // hoarding cost something.
       closesAtWeek: { type: 'integer', minimum: 1 },
-      // ── `cadence` — the week-axis projection (§4.11) ──────────────────────
+      // ── Legacy edge cadence — the historic week-axis projection (§4.11) ──
       // The three fields above complete an edge at BOOK scope. This one is the
-      // only thing on the edge that says anything about WEEKS, and it exists
+      // only legacy thing on the edge that says anything about WEEKS, and it exists
       // because a graph can be perfectly closed while the pages are not: the
       // first delivered book's rules fed a clock "each week" and printed it in
       // one week of six, and every closure floor passed, correctly, because the
@@ -1108,7 +1108,7 @@ var spineEconomyGraph = {
       // conditional the SCHEMA's, so a half-declared cadence is refused before
       // any floor is consulted.
       //
-      // `window` owes `closesAtWeek` by the same argument, but that field is a
+      // `window` owed `closesAtWeek` by the same argument, but that field is a
       // SIBLING here (it predates this and is meaningful without a cadence), so
       // its conditional cannot live on this node. The week gate carries that arm
       // instead, reading EDGE_CADENCE_REQUIRED_FIELDS — one table, both checks.
@@ -1140,6 +1140,42 @@ var spineEconomyGraph = {
       _x: xt
     }
   }
+};
+
+// ── The canonical cadence ledger (§4.11, 2026-08-20) ───────────────────────
+// Cadence belongs to a PRINTED SURFACE, not to each graph edge that happens to
+// touch it. An edge remains the home of relationship data (price, branch and
+// reachability); this ledger is the sole source for when a named clock, map or
+// companion exists on a week page. Keeping cadence on every incident edge let a
+// model author `weekly` on one and `window` on another, an impossible book that
+// a later coherence floor could only reject. One row per surface makes that
+// contradictory shape unrepresentable in newly generated books.
+//
+// It is additive at the assembled-booklet boundary: historic books and banked
+// checkpoints retain their edge-level cadence, which readers treat as a
+// compatibility fallback. The Economy Pacing stage requires this ledger for
+// new live work.
+var spineSurfaceCadence = {
+  type: 'object',
+  required: ['surface', 'mode'],
+  additionalProperties: false,
+  properties: {
+    surface: nonEmptyString,
+    mode: { enum: VALID_EDGE_CADENCES },
+    introWeek: { type: 'integer', minimum: 1 },
+    closesAtWeek: { type: 'integer', minimum: 1 },
+    _x: xt
+  },
+  allOf: [
+    {
+      if: { properties: { mode: { const: 'late' } }, required: ['mode'] },
+      then: { required: ['mode', 'introWeek'] }
+    },
+    {
+      if: { properties: { mode: { const: 'window' } }, required: ['mode'] },
+      then: { required: ['mode', 'closesAtWeek'] }
+    }
+  ]
 };
 
 // ── The harvest declarations (W5a, tranche 1) ───────────────────────────────
@@ -1326,6 +1362,7 @@ var playSpine = {
     // dressing the reckoning economy up as one.
     honestGaps: { type: 'array', items: nonEmptyString },
     economyGraph: spineEconomyGraph,
+    surfaceCadences: { type: 'array', items: spineSurfaceCadence },
     consequenceEdges: spineConsequenceEdges,
     decisionLedger: spineDecisionLedger,
     tensionBudget: spineTensionBudget,

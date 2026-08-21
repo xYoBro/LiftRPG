@@ -6120,7 +6120,18 @@ async function runApiPipeline(options) {
   // and the gate — one array, shown and checked, so the no-invent floor can
   // never accuse the model of dropping an edge it was never shown (D149's
   // shown-and-checked idiom).
-  var declaredGraph = (((shell || {}).meta || {}).playSpine || {}).economyGraph || null;
+  // A checkpoint from before canonical surface cadence may carry schedules on
+  // its graph edges. Migrate that INPUT at the narrow pacing boundary, before
+  // it reaches a new model: relationships stay verbatim, obsolete duplicate
+  // schedule declarations do not become an instruction to copy. A cached old
+  // Economy Pacing output still takes the explicit compatibility fallback.
+  var declaredGraphSource = (((shell || {}).meta || {}).playSpine || {}).economyGraph;
+  var declaredGraph = (Array.isArray(declaredGraphSource) ? declaredGraphSource : [])
+    .map(function (edge) {
+      var next = Object.assign({}, edge || {});
+      delete next.cadence;
+      return next;
+    });
   var economyState = await runEconomyGraphStage(settings, {
     cached: (checkpoint && checkpoint.stages && checkpoint.stages.economyGraph) || null,
     checkpoint: checkpoint,
@@ -6161,7 +6172,7 @@ async function runApiPipeline(options) {
   // stage ran, so its checkpoint copy never holds the paced graph — re-applying
   // here is what makes resume and first-run produce the same book.
   var pacedGraph = applyEconomyGraph(shell, economyState.output, declaredGraph);
-  console.log('[LiftRPG] ' + describeEconomyGraph(pacedGraph));
+  console.log('[LiftRPG] ' + describeEconomyGraph(pacedGraph, economyState.output.surfaceCadences));
 
   var shellContext = extractShellContext(shell);
 
@@ -7190,7 +7201,9 @@ async function runEconomyGraphStage(settings, config) {
     // paid run.
     unknownKeyScopes: [
       { from: 'economyGraph', schemaPath: 'meta.playSpine.economyGraph',
-        label: 'meta.playSpine.economyGraph' }
+        label: 'meta.playSpine.economyGraph' },
+      { from: 'surfaceCadences', schemaPath: 'meta.playSpine.surfaceCadences',
+        label: 'meta.playSpine.surfaceCadences' }
     ],
     validate: function (result) {
       return validateEconomyGraphStage(result, {
@@ -7200,7 +7213,10 @@ async function runEconomyGraphStage(settings, config) {
         priorGraph: config.priorGraph,
         // Arms the introWeek ceiling AND the coherence sweep — without it the
         // satisfiability check has no week axis to walk (the D144 idiom).
-        weekCount: config.weekCount   // CAD6-ARM economy-cadence-coherence
+        weekCount: config.weekCount, // CAD6-ARM economy-cadence-coherence
+        // New runs author cadence at its true owner: one row per named surface.
+        // Historic checkpoints still resume through the edge-level fallback.
+        requireCanonicalCadence: true
       });
     },
     buildPrompt: function (retryState) {
@@ -7220,8 +7236,9 @@ async function runEconomyGraphStage(settings, config) {
  * whose economy-graph stage never ran is byte-identical to one built before this
  * existed (the demotion proof).
  *
- * IT REPLACES ONLY THE EDGE ARRAY, never the spine around it, and it refuses an
- * output whose edge SET differs from the one it was given. The stage gate
+ * IT REPLACES THE EDGE ARRAY AND ITS ADJACENT SURFACE LEDGER, never the spine
+ * around them, and it refuses an output whose edge SET differs from the one it
+ * was given. The stage gate
  * already checked that — this is the second lock, and it is here because this
  * function also runs on the RESUME path, where the banked output was validated
  * by a gate that ran in a different process against a graph this run has not
@@ -7246,24 +7263,35 @@ function applyEconomyGraph(target, output, priorGraph) {
     return null;
   }
   spine.economyGraph = graph;
+  // The schedule is deliberately adjacent to, not copied onto, graph edges:
+  // an edge is a relationship, while cadence is a property of a surface. The
+  // stage gate has already proved its exact source set. Absence is a historic
+  // checkpoint, whose edge-level cadence remains a read-only fallback.
+  if (Array.isArray(output.surfaceCadences)) spine.surfaceCadences = output.surfaceCadences;
   return graph;
 }
 
 // One-line run-log summary. The operator's question about this stage is "did it
 // actually pace anything", and a cadence tally answers it without printing the
 // graph back at them.
-function describeEconomyGraph(graph) {
+function describeEconomyGraph(graph, surfaceCadences) {
   if (!Array.isArray(graph) || !graph.length) return 'no economy pacing applied';
   var byMode = {};
   var priced = 0;
-  graph.forEach(function (edge) {
-    var mode = String((((edge || {}).cadence) || {}).mode || '').trim();
+  var canonical = Array.isArray(surfaceCadences) ? surfaceCadences : [];
+  (canonical.length ? canonical : graph).forEach(function (item) {
+    var mode = canonical.length
+      ? String((item || {}).mode || '').trim()
+      : String((((item || {}).cadence) || {}).mode || '').trim();
     if (mode) byMode[mode] = (byMode[mode] || 0) + 1;
+  });
+  graph.forEach(function (edge) {
     if (Number((edge || {}).price) > 0) priced++;
   });
   var modes = Object.keys(byMode).map(function (m) { return m + ' ' + byMode[m]; });
   var parts = [];
   parts.push(graph.length + ' edge(s)');
+  if (canonical.length) parts.push(canonical.length + ' canonical surface schedule(s)');
   parts.push(modes.length ? 'cadence: ' + modes.join(', ') : 'no cadence declared');
   if (priced) parts.push(priced + ' priced');
   return 'Economy pacing: ' + parts.join('; ') + '.';
