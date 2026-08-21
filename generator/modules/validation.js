@@ -6787,6 +6787,21 @@ export function collectSpineSkeletonFloorErrors(spine, skeleton, stageLabel, pla
     // renders them "boss:" — a string the model never wrote and cannot search
     // for. Print what the book says.
     var refLabel = function (node) { return node.id ? node.kind + ':' + node.id : node.kind; };
+    var nodeOrigins = {};
+    parsedEdges.forEach(function (edge) {
+      var fromKey = edge.from.kind + ':' + edge.from.id;
+      var toKey = edge.to.kind + ':' + edge.to.id;
+      // Prefer the edge's `from` seat: when a model rewires one optional route
+      // to an unfed node, this is the exact mutated field the retry can repair.
+      if (!nodeOrigins[fromKey] || nodeOrigins[fromKey].side !== 'from') {
+        nodeOrigins[fromKey] = { index: edge.i, side: 'from' };
+      }
+      if (!nodeOrigins[toKey]) nodeOrigins[toKey] = { index: edge.i, side: 'to' };
+    });
+    var originPath = function (key) {
+      var origin = nodeOrigins[key];
+      return origin ? 'playSpine.economyGraph[' + origin.index + '].' + origin.side : 'playSpine.economyGraph';
+    };
     var orphanSet = {};
     Object.keys(nodes).forEach(function (k) { if (!forward[k]) orphanSet[k] = 1; });
     var strandedBehind = {};
@@ -6803,7 +6818,7 @@ export function collectSpineSkeletonFloorErrors(spine, skeleton, stageLabel, pla
         if (strandedBehind[key]) {
           errors.push(S + 'playSpine.economyGraph: "' + label + '" is reachable from no source,'
             + ' because nothing feeds "' + refLabel(nodes[strandedBehind[key]]) + '" upstream of it.'
-            + ' Fix that one first — this node comes back with it');
+            + ' Fix that one first — this node comes back with it. Exact owner: ' + originPath(key));
           return;
         }
         var weekNo = surfaceRefWeek(node);
@@ -6811,7 +6826,7 @@ export function collectSpineSkeletonFloorErrors(spine, skeleton, stageLabel, pla
         errors.push(S + 'playSpine.economyGraph: "' + label + '" is reachable from no source —'
           + ' an orphan system the player can never feed. THIS IS THE ROOT: add one edge into it,'
           + ' `{ from: "' + feed + '", to: "' + label + '" }`, or whatever genuinely feeds it'
-          + ' (a source is markStrip: / session: / week:), or drop it');
+          + ' (a source is markStrip: / session: / week:), or drop it. Exact owner: ' + originPath(key));
       } else if (!backward[key]) {
         // A source that reaches no sink is a dead spend: value goes in and
         // nothing on the page ever shows it. Same singleton-safe label as the

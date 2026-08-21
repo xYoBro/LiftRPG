@@ -221,7 +221,12 @@ import {
 // The walker itself, for the critic's soft-finding channel. The gate reaches it
 // through validateAssembledBooklet; the critic needs it directly because it
 // re-measures each round after accepted revisions.
-import { simulateBook, simSoftFindings } from './modules/sim-player.js';
+import {
+  simulateBook,
+  simSoftFindings,
+  readArtifactContractView,
+  proveArtifactContract
+} from './modules/sim-player.js';
 
 // The third referee (FUSION §4 mechanism 6). Its pure half lives in its own
 // module for the same reason the walker's does: it is a distinct reading with
@@ -2567,14 +2572,14 @@ var REPAIR_STAGE_ORDER = [
   // (REPAIR_STAGE_LABEL_KEYS), so it arrives here already translated, and a row
   // for a stage no pipeline runs is a route that re-enters nothing.
   'workoutCanonical', 'canonicalize', 'gameRulebook', 'layerBible', 'campaignPlan',
-  'skeleton', 'shellIdentity', 'shellRules', 'shellTheme', 'shellSpine',
-  'knowing', 'economyGraph', 'rules', 'weeks', 'fragments', 'endings'
+  'skeleton', 'shellIdentity', 'shellSpine', 'economyGraph', 'knowing',
+  'shellRules', 'shellTheme', 'rules', 'weeks', 'fragments', 'endings'
 ];
 
 // The four seats one Booklet Setup became. One home, read by the repair sweep,
 // the rail wiring and the harness — a second hand-written list of these four is
 // the roster that drifts (D242's lesson at a smaller scale).
-var SHELL_SUB_STAGE_KEYS = ['shellIdentity', 'shellRules', 'shellTheme', 'shellSpine'];
+var SHELL_SUB_STAGE_KEYS = ['shellIdentity', 'shellSpine', 'shellRules', 'shellTheme'];
 
 /**
  * mergeShellParts(...parts) -> shell
@@ -2991,6 +2996,10 @@ function prefixStageError(stageName, err) {
 //      rather than re-rolled at the ceiling that just proved too small.
 function normalizeStageBudgetKey(stageKey) {
   var key = String(stageKey || '');
+  // Story Plan is the runtime name of the campaign seat. Its one budget
+  // authority remains the historical `campaign` row: resolve the alias at
+  // read time so edits to that row flow straight into the next paid call.
+  if (key === 'campaignPlan') return 'campaign';
   if (STAGE_BUDGETS[key]) return key;
   // Per-week checkpoint keys are 'week_1', 'week_2', ...; the multi-stage
   // pipeline calls its per-week stage 'weeks'. Both share the 'week' budget.
@@ -2998,6 +3007,29 @@ function normalizeStageBudgetKey(stageKey) {
   if (/^fragment/i.test(key)) return 'fragments';
   if (/^ending/i.test(key)) return 'endings';
   return '';
+}
+
+function artifactProofBarrierError(findings, fallbackOwner) {
+  var failures = (findings || []).map(function (row) {
+    var detail = ((row || {}).detail || {});
+    var owner = detail.ownerStage || row.ownerStage || fallbackOwner;
+    var ownerPath = detail.ownerPath || row.ownerPath || '';
+    var label = owner === 'economyGraph' ? 'Economy Graph'
+      : owner === 'shellSpine' ? 'Shell Spine' : 'Skeleton';
+    return label + ' → ' + ownerPath + ': '
+      + String(row.message || row.code || 'artifact proof failed');
+  });
+  var err = new Error(failures.join('; '));
+  // The proof is an unpaid barrier immediately before Knowing, not a new
+  // pipeline stage. D143 therefore routes from the existing Knowing seat back
+  // to the exact paid owner named by every finding.
+  err._stageKey = 'knowing';
+  err._blockingErrors = failures;
+  err.blockingCount = failures.length;
+  err.errorType = 'schema';
+  err.retryable = true;
+  err.repairRoute = describeRepairRoute(err, REPAIR_STAGE_NAMES.knowing);
+  return err;
 }
 
 function stageBudget(stageKey, userTimeoutMs) {
@@ -5064,6 +5096,56 @@ function assembledProductionContracts() {
   ];
 }
 
+// The real current validators guarding every owner the transient artifact
+// proof reads. This is an observable contract inventory for deterministic
+// restore tests; it creates no second validation implementation.
+function restoreStageContracts() {
+  return [
+    {
+      pipeline: 'standard', family: 'gameRulebook', stageKey: 'gameRulebook',
+      validatorOwner: 'validateGameRulebookStage', validator: validateGameRulebookStage,
+      validate: function (payload) { return validateGameRulebookStage(payload, { collect: true }); }
+    },
+    {
+      pipeline: 'standard', family: 'campaignPlan', stageKey: 'campaignPlan',
+      validatorOwner: 'validateCampaignPlanStage', validator: validateCampaignPlanStage,
+      validate: function (payload) { return validateCampaignPlanStage(payload, { generationFloors: false }); }
+    },
+    {
+      pipeline: 'standard', family: 'shellSpine', stageKey: 'shellSpine',
+      validatorOwner: 'validateShellSpineSchema', validator: validateShellSpineSchema,
+      validate: function (payload) {
+        var playSpine = (((payload || {}).meta || {}).playSpine || {});
+        var weekCount = Array.isArray(playSpine.tensionBudget) ? playSpine.tensionBudget.length : 0;
+        return validateShellSpineSchema(payload, { generationFloors: true, weekCount: weekCount });
+      }
+    },
+    {
+      pipeline: 'standard', family: 'economyGraph', stageKey: 'economyGraph',
+      validatorOwner: 'validateEconomyGraphStage', validator: validateEconomyGraphStage,
+      validate: function (payload) {
+        return validateEconomyGraphStage(payload, {
+          priorGraph: (payload || {}).economyGraph,
+          requireCanonicalCadence: true
+        });
+      }
+    },
+    {
+      pipeline: 'skeleton-flesh', family: 'gameRulebook', stageKey: 'gameRulebook',
+      validatorOwner: 'validateGameRulebookStage', validator: validateGameRulebookStage,
+      validate: function (payload) { return validateGameRulebookStage(payload, { collect: true }); }
+    },
+    {
+      pipeline: 'skeleton-flesh', family: 'skeleton', stageKey: 'skeleton',
+      validatorOwner: 'validateSkeletonStage', validator: validateSkeletonStage,
+      validate: function (payload) {
+        var weekPlan = Array.isArray((payload || {}).weekPlan) ? payload.weekPlan : [];
+        return validateSkeletonStage(payload, weekPlan.length, { generationFloors: false });
+      }
+    }
+  ];
+}
+
 async function restoreCheckpointedStage(options) {
   options = options || {};
   var errors = validatorErrors(await options.validate(options.payload, options.context || {}));
@@ -6024,14 +6106,14 @@ async function runApiPipeline(options) {
     console.log('[LiftRPG] Resumed: Story Plan (cached)');
     emitPipelineEvent(onProgress, stageNum, totalStages, 'Story plan restored from checkpoint.', {
       phase: 'complete',
-      stageKey: 'campaign',
+      stageKey: 'campaignPlan',
       stageName: 'Story Plan',
       completionSource: 'checkpoint'
     });
   } else {
-    progress('campaign', 'Planning story\u2026');
+    progress('campaignPlan', 'Planning story\u2026');
     campaignPlan = await runJsonStage(settings, {
-      stageKey: 'campaign',
+      stageKey: 'campaignPlan',
       stageName: 'Story Plan',
       stageIndex: stageNum,
       completeMessage: 'Story plan complete.',
@@ -6123,6 +6205,8 @@ async function runApiPipeline(options) {
   // structurally cannot carry fails every book. See mergeShellParts below.
   var shellIdentityStage, shellRulesStage, shellThemeStage, shellSpineStage;
   var shell;
+  var deferredShellSpecs = {};
+  var releaseDeferredShellStages = false;
 
   // ── THE PRE-SPLIT CHECKPOINT MIGRATION ────────────────────────────────
   // A checkpoint banked before this split carries one `stages.shell` holding
@@ -6183,6 +6267,14 @@ async function runApiPipeline(options) {
    * quietly stop emitting a `complete`, which is the UI lie D110 named.
    */
   async function runShellSubStage(spec) {
+    // Rules/cover and theme are printed-prose/design seats. Their specs are
+    // declared in the historical source position but execution is held until
+    // the banked spine and economy have passed the unpaid artifact proof.
+    if (!releaseDeferredShellStages
+        && (spec.stageKey === 'shellRules' || spec.stageKey === 'shellTheme')) {
+      deferredShellSpecs[spec.stageKey] = spec;
+      return null;
+    }
     if (checkpoint && checkpoint.stages && checkpoint.stages[spec.stageKey]) {
       var cachedShellStage = checkpoint.stages[spec.stageKey];
       var restoredShellStage = await restoreStandardCheckpointedStage(spec.stageKey,
@@ -6517,11 +6609,9 @@ async function runApiPipeline(options) {
   // new spine — and only the ones that ACTUALLY fail are dropped. A blanket
   // invalidation here would discard paid work for a defect it may not have.
   //
-  // ANY of the four triggers it, and that is deliberate rather than lazy: the
-  // week gate reads the spine, the currency and the grammar family, and those
-  // live at two different sub-stages. Scoping the sweep to `shellSpine` would
-  // leave weeks banked against a currency the identity repair just renamed.
-  if (repairPending && SHELL_SUB_STAGE_KEYS.indexOf(repairPending.to) !== -1) {
+  // Any of the four can trigger it. Identity/spine exist here and sweep now;
+  // deferred rules/theme sweep after both deferred owners have materialized.
+  function sweepWeeksAfterShellRepair() {
     var staleWeeks = sweepStaleBankedWeeks(checkpoint, {
       weekCount: weekCount,
       upstream: shell,
@@ -6529,7 +6619,6 @@ async function runApiPipeline(options) {
       spineStageLabel: shellStageLabel('shellSpine')
     });
     if (staleWeeks.length) {
-      staleWeeks.forEach(function (key) { delete checkpoint.stages[key]; });
       checkpoint = pruneCheckpointStages(checkpoint, staleWeeks);
       var sweptLine = 'Repair swept ' + staleWeeks.length + ' banked week(s) that no longer satisfy the'
         + ' corrected setup: ' + staleWeeks.join(', ') + '. Everything else stays banked.';
@@ -6538,6 +6627,9 @@ async function runApiPipeline(options) {
         phase: 'start', stageKey: repairPending.to, stageName: REPAIR_STAGE_NAMES[repairPending.to] || 'Booklet Setup', noticeLevel: 'warn'
       });
     }
+  }
+  if (repairPending && (repairPending.to === 'shellIdentity' || repairPending.to === 'shellSpine')) {
+    sweepWeeksAfterShellRepair();
   }
 
   // THE RULEBOOK REACHES THE ARTIFACT (D173). Stamped after the shell exists —
@@ -6573,7 +6665,7 @@ async function runApiPipeline(options) {
     }
   }
 
-  var identityContract = buildIdentityContract(shell, campaignPlan);
+  var identityContract;
 
   // ── THE KNOWING: process particulars (§11 Wave 1.5) ───────────
   // After the shell (which authors the roster and the recorded reading) and
@@ -6585,46 +6677,46 @@ async function runApiPipeline(options) {
   // authored after it is built. They are material, not a promise to keep.
 
   var knowingOutput;
-  if (checkpoint && checkpoint.stages && checkpoint.stages.knowing) {
-    var restoredKnowing = await restoreStandardCheckpointedStage('knowing',
-      checkpoint.stages.knowing, validateKnowingStage, { shell: shell });
-    knowingOutput = restoredKnowing.accepted ? restoredKnowing.payload : null;
+  var msParticulars;
+  async function runStandardKnowingStage() {
+    if (checkpoint && checkpoint.stages && checkpoint.stages.knowing) {
+      var restoredKnowing = await restoreStandardCheckpointedStage('knowing',
+        checkpoint.stages.knowing, validateKnowingStage, { shell: shell });
+      knowingOutput = restoredKnowing.accepted ? restoredKnowing.payload : null;
+    }
+    if (knowingOutput) {
+      stageNum++;
+      console.log('[LiftRPG] Resumed: World Detail (cached)');
+      emitPipelineEvent(onProgress, stageNum, totalStages, 'World detail restored from checkpoint.', {
+        phase: 'complete',
+        stageKey: 'knowing',
+        stageName: 'World Detail',
+        completionSource: 'checkpoint'
+      });
+    } else {
+      progress('knowing', 'Working out how this world runs…');
+      knowingOutput = await runJsonStage(settings, {
+        stageKey: 'knowing',
+        stageName: 'World Detail',
+        stageIndex: stageNum,
+        completeMessage: 'World detail complete.',
+        onProgress: onProgress,
+        getTotalStages: function () { return totalStages; },
+        schema: window.STRUCTURED_SCHEMA_KNOWING || null,
+        maxAttempts: 2,
+        rateLimiter: rateLimiter,
+        budgetEnforce: useGeminiBudget,
+        normalizeResult: normalizeKnowingShape,
+        validate: function (result) { return validateKnowingStage(result); },
+        buildPrompt: function (retryState) {
+          return builders.knowing(shell, brief, { retryMode: retryState.attempt > 0 });
+        }
+      });
+      checkpoint = saveCheckpoint('knowing', knowingOutput, checkpoint);
+    }
+    msParticulars = applyProcessParticulars(shell, knowingOutput);
+    console.log('[LiftRPG] ' + describeProcessParticulars(msParticulars));
   }
-  if (knowingOutput) {
-    stageNum++;
-    console.log('[LiftRPG] Resumed: World Detail (cached)');
-    emitPipelineEvent(onProgress, stageNum, totalStages, 'World detail restored from checkpoint.', {
-      phase: 'complete',
-      stageKey: 'knowing',
-      stageName: 'World Detail',
-      completionSource: 'checkpoint'
-    });
-  } else {
-    progress('knowing', 'Working out how this world runs…');
-    knowingOutput = await runJsonStage(settings, {
-      stageKey: 'knowing',
-      stageName: 'World Detail',
-      stageIndex: stageNum,
-      completeMessage: 'World detail complete.',
-      onProgress: onProgress,
-      getTotalStages: function () { return totalStages; },
-      schema: window.STRUCTURED_SCHEMA_KNOWING || null,
-      maxAttempts: 2,
-      rateLimiter: rateLimiter,
-      budgetEnforce: useGeminiBudget,
-      normalizeResult: normalizeKnowingShape,
-      validate: function (result) {
-        return validateKnowingStage(result);
-      },
-      buildPrompt: function (retryState) {
-        return builders.knowing(shell, brief, { retryMode: retryState.attempt > 0 });
-      }
-    });
-    checkpoint = saveCheckpoint('knowing', knowingOutput, checkpoint);
-  }
-
-  var msParticulars = applyProcessParticulars(shell, knowingOutput);
-  console.log('[LiftRPG] ' + describeProcessParticulars(msParticulars));
 
   // ── THE ECONOMY GRAPH'S WEEK AXIS (§4.11) ────────────────────────────
   // Between the compiler seat and the first week, which is the only window
@@ -6689,6 +6781,63 @@ async function runApiPipeline(options) {
   // here is what makes resume and first-run produce the same book.
   var pacedGraph = applyEconomyGraph(shell, economyState.output, declaredGraph);
   console.log('[LiftRPG] ' + describeEconomyGraph(pacedGraph, economyState.output.surfaceCadences));
+
+  // ── THE UNPAID PRE-PROSE PROOF (D267 Wave 2) ─────────────────────────
+  // A transient view over already-banked facts; never a stage, budget row,
+  // checkpoint key, provider call, or telemetry row. Restored owners reached
+  // their real current validators above before this view is recomputed.
+  var artifactRead = readArtifactContractView(checkpoint, {
+    pipeline: 'standard',
+    effectiveRulebook: gameRulebook,
+    appliedAmendments: rulebookAmendment.applied
+  });
+  var artifactProof = artifactRead.view ? proveArtifactContract(artifactRead.view) : {
+    hard: [], soft: [], semanticDigest: ''
+  };
+  var artifactBlockingCodes = (artifactRead.blocking || []).map(function (row) { return row.code; });
+  var artifactHardCodes = (artifactProof.hard || []).map(function (row) { return row.code; });
+  emitPipelineEvent(onProgress, stageNum, totalStages,
+    artifactBlockingCodes.length || artifactHardCodes.length
+      ? 'Artifact proof found blocking game obligations.'
+      : 'Artifact proof closed before printed prose.', {
+      phase: 'artifact_proof',
+      semanticDigest: artifactProof.semanticDigest || (artifactRead.view && artifactRead.view.semanticDigest) || '',
+      blockingCodes: artifactBlockingCodes,
+      hardCodes: artifactHardCodes,
+      softCodes: (artifactProof.soft || []).map(function (row) { return row.code; })
+    });
+  if (artifactBlockingCodes.length || artifactHardCodes.length) {
+    var artifactFailures = (artifactRead.blocking || []).concat(artifactProof.hard || []);
+    throw artifactProofBarrierError(artifactFailures, 'shellSpine');
+  }
+
+  // Knowing is the first paid seat after proof. Printed rules/cover and theme
+  // were declared above but deliberately not executed until this point.
+  await runStandardKnowingStage();
+  releaseDeferredShellStages = true;
+  shellRulesStage = await runShellSubStage(deferredShellSpecs.shellRules);
+  shellThemeStage = await runShellSubStage(deferredShellSpecs.shellTheme);
+
+  shell = mergeShellParts(shellIdentityStage, shellRulesStage, shellThemeStage, shellSpineStage);
+  applyGameRulebook(shell, { gameRulebook: gameRulebook });
+  applyEconomyGraph(shell, economyState.output, declaredGraph);
+  applyProcessParticulars(shell, knowingOutput);
+  if (shell && shell.meta) {
+    if (rulebookAmendment.applied.length) {
+      shell.meta.rulebookAmendments = {
+        renames: rulebookAmendment.applied.map(function (row) {
+          return { from: row.kind + ':' + row.from, to: row.kind + ':' + row.to, why: row.why };
+        })
+      };
+    } else delete shell.meta.rulebookAmendments;
+  }
+  // Rules and theme do not exist at proof time. A repair routed to either seat
+  // must first restore/regenerate both deferred owners and rebuild the complete
+  // shell; only then can banked weeks be judged against the changed dependency.
+  if (repairPending && (repairPending.to === 'shellRules' || repairPending.to === 'shellTheme')) {
+    sweepWeeksAfterShellRepair();
+  }
+  identityContract = buildIdentityContract(shell, campaignPlan);
 
   var shellContext = extractShellContext(shell);
 
@@ -8372,7 +8521,6 @@ async function runSkeletonFleshPipeline(options) {
         })
       });
       if (sfStale.length) {
-        sfStale.forEach(function (key) { delete checkpoint.stages[key]; });
         checkpoint = pruneCheckpointStages(checkpoint, sfStale);
         console.warn('[LiftRPG] Repair swept ' + sfStale.length + ' banked week(s): ' + sfStale.join(', '));
       }
@@ -8390,7 +8538,32 @@ async function runSkeletonFleshPipeline(options) {
   // + 1 fragment call + 1 ending call
   var endingVariants = skeleton.endingVariants || ['canonical'];
   var fullFragRegistry = skeleton.fragmentRegistry || [];
-  totalStages = 1 + 1 + 1 + 1 + (skeleton.weekPlan || []).length + 1 + 1;
+  totalStages = (sfCanonState.applied ? 1 : 0)
+    + 1 + 1 + 1 + 1 + (skeleton.weekPlan || []).length + 1 + 1;
+
+  // S+F owns its complete topology and cadence ledger at the skeleton seat,
+  // so the same transient proof runs immediately after that bank closes. No
+  // Economy Pacing stage is invented for this pipeline.
+  var sfArtifactRead = readArtifactContractView(checkpoint, { pipeline: 'skeleton-flesh' });
+  var sfArtifactProof = sfArtifactRead.view ? proveArtifactContract(sfArtifactRead.view) : {
+    hard: [], soft: [], semanticDigest: ''
+  };
+  var sfArtifactBlockingCodes = (sfArtifactRead.blocking || []).map(function (row) { return row.code; });
+  var sfArtifactHardCodes = (sfArtifactProof.hard || []).map(function (row) { return row.code; });
+  emitPipelineEvent(onProgress, stageNum, totalStages,
+    sfArtifactBlockingCodes.length || sfArtifactHardCodes.length
+      ? 'Artifact proof found blocking game obligations.'
+      : 'Artifact proof closed before printed prose.', {
+      phase: 'artifact_proof',
+      semanticDigest: sfArtifactProof.semanticDigest || (sfArtifactRead.view && sfArtifactRead.view.semanticDigest) || '',
+      blockingCodes: sfArtifactBlockingCodes,
+      hardCodes: sfArtifactHardCodes,
+      softCodes: (sfArtifactProof.soft || []).map(function (row) { return row.code; })
+    });
+  if (sfArtifactBlockingCodes.length || sfArtifactHardCodes.length) {
+    var sfArtifactFailures = (sfArtifactRead.blocking || []).concat(sfArtifactProof.hard || []);
+    throw artifactProofBarrierError(sfArtifactFailures, 'skeleton');
+  }
 
   // Prompt caching: set system prompt from skeleton identity when the
   // resolved transport advertises support (capability, not format).
@@ -9593,6 +9766,9 @@ window.LiftRPGAPI = {
     buildSpineFrame: buildSpineFrame,
     formatSpineFrameBlock: formatSpineFrameBlock,
     simulateBook: simulateBook,
+    readArtifactContractView: readArtifactContractView,
+    proveArtifactContract: proveArtifactContract,
+    restoreStageContracts: restoreStageContracts,
     validateCriticVerdict: validateCriticVerdict,
     normalizeCriticVerdict: normalizeCriticVerdict,
     summarizeVerdict: summarizeVerdict,
@@ -9635,6 +9811,7 @@ window.LiftRPGAPI = {
     // validators, so the same defect routes to the same seat there; only the
     // performer of the re-entry differs (automatic here, a card there).
     planRepairRoute: planRepairRoute,
+    runPipelineWithRepairRouting: runPipelineWithRepairRouting,
     describeRepairRoute: describeRepairRoute,
     buildRepairDirective: buildRepairDirective,
     repairStageOrder: REPAIR_STAGE_ORDER,

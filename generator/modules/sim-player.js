@@ -127,7 +127,8 @@
 // a measurement rather than pretending to completeness.
 
 import {
-  parseSurfaceRef, parseBranchRef, BRANCH_OPTIONS, RECKONING_THRESHOLD_RATIO
+  parseSurfaceRef, parseBranchRef, BRANCH_OPTIONS, RECKONING_THRESHOLD_RATIO,
+  applyRulebookAmendments
 } from './constants.js';
 import { toSlugWords } from './assembly.js';
 
@@ -558,13 +559,10 @@ export function earliestHold(graph, classes, allowEdge) {
   var hold = {};
   Object.keys(graph.nodes).forEach(function (key) {
     var node = graph.nodes[key];
-    // Sources seed at their own week: the player's work is always available to
-    // them. A DOOR seeds too, and for a different reason worth stating — a door
-    // is TAKEN, not earned. The week it is printed, the player picks a side at
-    // no cost. What is contingent is not reaching the door; it is which side
-    // pays, and that is carried by the edge class, not by availability. Leaving
-    // doors unseeded made every branch edge dead and hid branch-only endgames.
-    hold[key] = (SIM_SOURCE_KINDS[node.kind] || node.kind === 'door')
+    // Only authored work sources seed themselves. A door is contingent but it
+    // is not a source: the player can choose a side only after a real incoming
+    // edge feeds the door. Branch attribution lives on the outgoing edges.
+    hold[key] = SIM_SOURCE_KINDS[node.kind]
       ? (node.printWeek === null ? 1 : node.printWeek)
       : INFINITY_WEEK;
   });
@@ -583,6 +581,31 @@ export function earliestHold(graph, classes, allowEdge) {
     if (!moved) break;
   }
   return hold;
+}
+
+// Classify a topology that begins at an unfed door without pretending the
+// player holds that door. Producer gates reject the orphan, while the shared
+// simulator retains its long-standing diagnostic taxonomy for direct runtime
+// callers that deliberately probe malformed books.
+function contingentPathFromDoor(graph, target) {
+  var wanted = {};
+  asArray(target.aliases).forEach(function (alias) { wanted[alias] = 1; });
+  var queue = Object.keys(graph.nodes).filter(function (key) {
+    return (graph.nodes[key] || {}).kind === 'door';
+  }).map(function (key) { return { key: key, chance: false }; });
+  var seen = {};
+  while (queue.length) {
+    var state = queue.shift();
+    var stateKey = state.key + '\u0000' + (state.chance ? '1' : '0');
+    if (seen[stateKey]) continue;
+    seen[stateKey] = 1;
+    if (wanted[state.key]) return { found: true, chance: state.chance };
+    graph.edges.forEach(function (edge) {
+      if (edge.from !== state.key) return;
+      queue.push({ key: edge.to, chance: state.chance || edge.cls === 'chance' });
+    });
+  }
+  return { found: false, chance: false };
 }
 
 /**
@@ -735,7 +758,7 @@ function finding(code, message, detail) {
  * `soft` are quality findings that route to the critic's revision machinery
  * under the ludic reopen scopes. `skipped` books carry neither.
  */
-export function simulateBook(booklet) {
+function runTransitionKernel(booklet, preparedBook) {
   var doc = booklet || {};
   var spine = (doc.meta || {}).playSpine;
   var base = {
@@ -762,7 +785,7 @@ export function simulateBook(booklet) {
     return base;
   }
 
-  var book = readBook(doc);
+  var book = preparedBook || readBook(doc);
   if (!book.weekCount) {
     base.skipped = true;
     base.skipReason = 'the booklet prints no weeks';
@@ -813,7 +836,7 @@ export function simulateBook(booklet) {
       return schedule[a] === undefined ? INFINITY_WEEK : schedule[a];
     }));
   }
-  var required = asArray(book.endgame);
+  var required = asArray(book.endgame).filter(function (target) { return target.required !== false; });
 
   required.forEach(function (target) {
     if (holdOf(guaranteedHold, target) !== INFINITY_WEEK) return;
@@ -839,6 +862,15 @@ export function simulateBook(booklet) {
           { node: target.label, lostOn: lost.map(function (w) { return w.label; }), attributed: true }));
         return;
       }
+    }
+
+    var orphanContingency = contingentPathFromDoor(graph, target);
+    if (orphanContingency.found) {
+      base.hard.push(finding(orphanContingency.chance ? 'contingent-only-path' : 'branch-only-path',
+        'The declared route to "' + target.label + '" begins at a door no authored source feeds.'
+        + ' The producer gate must wire the door before this contingent path can be played.',
+        { node: target.label, orphanDoor: true }));
+      return;
     }
 
     // H4/H5 first: naming WHY it is unreachable is the difference between a
@@ -908,7 +940,16 @@ export function simulateBook(booklet) {
     var key = 'week:' + toSlugWords('W' + row.week);
     var node = graph.nodes[key];
     if (!node) return;   // the spine never gates this week: the value is simply printed
-    if (guaranteedHold[key] !== INFINITY_WEEK) return;
+    // A printed week is normally a guaranteed source. When the spine itself
+    // places that week behind a branch/chance edge, however, treating the
+    // source classification as stronger than the authored gate makes the
+    // password walk blind to exactly the soft-lock it exists to catch. A
+    // contingent incoming edge with no guaranteed sibling therefore wins.
+    var incoming = graph.edges.filter(function (edge) { return edge.to === key; });
+    var contingentGate = incoming.some(function (edge) {
+      return edge.cls === 'branch' || edge.cls === 'chance';
+    }) && !incoming.some(function (edge) { return edge.cls === 'guaranteed'; });
+    if (!contingentGate && guaranteedHold[key] !== INFINITY_WEEK) return;
     base.hard.push(finding('password-element-unreachable',
       'Week ' + row.week + ' carries a password element ("' + row.componentValue + '") and the spine'
       + ' gates that week behind something the player cannot guarantee. Every element is needed on'
@@ -1326,6 +1367,830 @@ export function simulateBook(booklet) {
   base.holds[SIM_SPEND_POLICIES[0]] = stingy;
   base.holds[SIM_SPEND_POLICIES[1]] = guaranteedHold;
   return base;
+}
+
+/**
+ * The public assembled-book adapter. Both this reader and the pre-prose
+ * contract adapter below enter `runTransitionKernel`; there is one gameplay
+ * transition implementation and two honest readers of different source
+ * shapes.
+ */
+export function simulateBook(booklet) {
+  return runTransitionKernel(booklet, null);
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PART 5 — the transient pre-prose artifact contract (D267 Wave 2)
+// ════════════════════════════════════════════════════════════════════════════
+
+export var ARTIFACT_TRANSITION_KERNEL_ID = 'liftrpg-sim-transition-v1';
+
+var ARTIFACT_PROSE_FIELDS = {
+  body: 1, copy: 1, description: 1, instruction: 1, prompt: 1, text: 1
+};
+
+function artifactClone(value) {
+  if (Array.isArray(value)) return value.map(artifactClone);
+  if (!value || typeof value !== 'object') return value;
+  var out = {};
+  Object.keys(value).forEach(function (key) { out[key] = artifactClone(value[key]); });
+  return out;
+}
+
+function artifactPathGet(value, path) {
+  return String(path || '').replace(/\[(\d+)\]/g, '.$1').split('.').reduce(function (node, key) {
+    return node == null ? undefined : node[key];
+  }, value);
+}
+
+function artifactPathSet(value, path, next) {
+  var parts = String(path).replace(/\[(\d+)\]/g, '.$1').split('.');
+  var node = value;
+  parts.forEach(function (key, index) {
+    if (index === parts.length - 1) { node[key] = next; return; }
+    var followingIsIndex = /^\d+$/.test(parts[index + 1]);
+    if (!node[key]) node[key] = followingIsIndex ? [] : {};
+    node = node[key];
+  });
+}
+
+function artifactCanonical(value) {
+  if (Array.isArray(value)) return '[' + value.map(artifactCanonical).join(',') + ']';
+  if (value && typeof value === 'object') {
+    return '{' + Object.keys(value).sort().map(function (key) {
+      return JSON.stringify(key) + ':' + artifactCanonical(value[key]);
+    }).join(',') + '}';
+  }
+  return JSON.stringify(value);
+}
+
+function artifactDeepFreeze(value, seen) {
+  if (!value || typeof value !== 'object') return value;
+  var visited = seen || [];
+  if (visited.indexOf(value) !== -1) return value;
+  visited.push(value);
+  Object.keys(value).forEach(function (key) { artifactDeepFreeze(value[key], visited); });
+  return Object.freeze(value);
+}
+
+// Synchronous, dependency-free SHA-256. Browser SubtleCrypto is asynchronous;
+// the artifact view is a synchronous deterministic seam used identically by
+// the browser orchestrator and Node gates, so the digest implementation lives
+// beside the canonical serializer rather than acquiring a Node-only import.
+function artifactSha256(text) {
+  function rightRotate(value, amount) { return (value >>> amount) | (value << (32 - amount)); }
+  var bytes = unescape(encodeURIComponent(String(text)));
+  var words = [];
+  var bitLength = bytes.length * 8;
+  for (var i = 0; i < bytes.length; i++) words[i >> 2] = (words[i >> 2] || 0) | bytes.charCodeAt(i) << (24 - (i % 4) * 8);
+  words[bitLength >> 5] = (words[bitLength >> 5] || 0) | 0x80 << (24 - bitLength % 32);
+  words[((bitLength + 64 >> 9) << 4) + 15] = bitLength;
+  var h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+  var k = [
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+  ];
+  for (var offset = 0; offset < words.length; offset += 16) {
+    var w = new Array(64);
+    for (i = 0; i < 16; i++) w[i] = words[offset + i] | 0;
+    for (i = 16; i < 64; i++) {
+      var s0 = rightRotate(w[i - 15], 7) ^ rightRotate(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+      var s1 = rightRotate(w[i - 2], 17) ^ rightRotate(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+    }
+    var a=h[0],b=h[1],c=h[2],d=h[3],e=h[4],f=h[5],g=h[6],hh=h[7];
+    for (i = 0; i < 64; i++) {
+      var sOne = rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25);
+      var ch = (e & f) ^ (~e & g);
+      var t1 = (hh + sOne + ch + k[i] + w[i]) | 0;
+      var sZero = rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22);
+      var maj = (a & b) ^ (a & c) ^ (b & c);
+      var t2 = (sZero + maj) | 0;
+      hh=g; g=f; f=e; e=(d+t1)|0; d=c; c=b; b=a; a=(t1+t2)|0;
+    }
+    h[0]=(h[0]+a)|0; h[1]=(h[1]+b)|0; h[2]=(h[2]+c)|0; h[3]=(h[3]+d)|0;
+    h[4]=(h[4]+e)|0; h[5]=(h[5]+f)|0; h[6]=(h[6]+g)|0; h[7]=(h[7]+hh)|0;
+  }
+  return h.map(function (value) { return ('00000000' + (value >>> 0).toString(16)).slice(-8); }).join('');
+}
+
+function artifactFinding(code, ownerStage, ownerPath, message, paths) {
+  return {
+    code: code,
+    class: 'conformance',
+    severity: 'error',
+    blocking: true,
+    ownerStage: ownerStage || null,
+    ownerPath: ownerPath || null,
+    path: ownerPath || null,
+    message: message,
+    detail: { ownerStage: ownerStage || null, ownerPath: ownerPath || null, paths: paths || [ownerPath] }
+  };
+}
+
+function artifactOwner(path) {
+  var match = /^stages\.([^.[\]]+)/.exec(String(path || ''));
+  return match ? match[1] : null;
+}
+
+function artifactScrub(value, sourcePath, findings) {
+  if (Array.isArray(value)) return value.map(function (item, index) {
+    return artifactScrub(item, sourcePath + '[' + index + ']', findings);
+  });
+  if (!value || typeof value !== 'object') return value;
+  var out = {};
+  Object.keys(value).forEach(function (key) {
+    var path = sourcePath + '.' + key;
+    if (ARTIFACT_PROSE_FIELDS[key]) {
+      findings.push(artifactFinding('artifact-authority-conflict', artifactOwner(path), path,
+        'Printable prose field is outside the mechanical artifact contract: ' + path));
+      return;
+    }
+    out[key] = artifactScrub(value[key], path, findings);
+  });
+  return out;
+}
+
+function artifactLeafPairs(value, valuePath, sourcePath, out) {
+  if (Array.isArray(value)) {
+    if (!value.length) out.push({ valuePath: valuePath, sourcePath: sourcePath });
+    else value.forEach(function (item, index) {
+      artifactLeafPairs(item, valuePath + '[' + index + ']', sourcePath + '[' + index + ']', out);
+    });
+    return;
+  }
+  if (value && typeof value === 'object') {
+    var keys = Object.keys(value);
+    if (!keys.length) out.push({ valuePath: valuePath, sourcePath: sourcePath });
+    else keys.forEach(function (key) {
+      artifactLeafPairs(value[key], valuePath + '.' + key, sourcePath + '.' + key, out);
+    });
+    return;
+  }
+  out.push({ valuePath: valuePath, sourcePath: sourcePath });
+}
+
+function artifactSortRows(rows) {
+  return rows.slice().sort(function (a, b) {
+    var left = artifactCanonical(a.value);
+    var right = artifactCanonical(b.value);
+    return left < right ? -1 : (left > right ? 1 : a.sourceIndex - b.sourceIndex);
+  });
+}
+
+function artifactInput(path) { return { ownerStage: artifactOwner(path), sourcePath: path }; }
+
+function artifactSortedInputs(paths) {
+  return paths.map(artifactInput).sort(function (a, b) {
+    var left = a.ownerStage + '\u0000' + a.sourcePath;
+    var right = b.ownerStage + '\u0000' + b.sourcePath;
+    return left < right ? -1 : (left > right ? 1 : 0);
+  });
+}
+
+function artifactRefWeek(raw, fallback) {
+  var parsed = parseSurfaceRef(String(raw || ''));
+  var week = refWeek(parsed);
+  return week || fallback;
+}
+
+function artifactRequired(bank, path, findings) {
+  var value = artifactPathGet(bank, path);
+  if (value === undefined || value === null) {
+    findings.push(artifactFinding('artifact-obligation-missing', artifactOwner(path), path,
+      'Required artifact obligation is missing at ' + path));
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Build an immutable mechanical view over already-paid stage facts. It never
+ * invents a generation stage, mutates the checkpoint bank, or reads prose
+ * seats. The provenance ledger is parallel to mechanics rather than embedded
+ * inside it so digest and authority remain separate facts.
+ */
+export function readArtifactContractView(bank, options) {
+  var source = bank || {};
+  var pipeline = options && options.pipeline === 'skeleton-flesh' ? 'skeleton-flesh' : 'standard';
+  var findings = [];
+  var mechanics = {};
+  var direct = [];
+  var derived = [];
+
+  function requirePath(path) { return artifactRequired(source, path, findings); }
+  function addDirect(path, valuePath, opts) {
+    if (!requirePath(path)) return;
+    var raw = artifactPathGet(source, path);
+    var projected = opts && Object.prototype.hasOwnProperty.call(opts, 'projected')
+      ? opts.projected : raw;
+    var rows = Array.isArray(raw) && opts && opts.set
+      ? artifactSortRows(raw.map(function (_, sourceIndex) {
+        return { value: artifactScrub(projected[sourceIndex], path + '[' + sourceIndex + ']', findings), sourceIndex: sourceIndex };
+      })) : null;
+    function recordPairs(clean, targetPath, sourcePath) {
+      var pairs = [];
+      artifactLeafPairs(clean, targetPath, sourcePath, pairs);
+      pairs.forEach(function (pair) {
+        var projectedValue = artifactPathGet({ mechanics: mechanics }, pair.valuePath);
+        var sourceValue = artifactPathGet(source, pair.sourcePath);
+        if (opts && typeof opts.changedInputs === 'function'
+            && artifactCanonical(projectedValue) !== artifactCanonical(sourceValue)) {
+          derived.push({
+            valuePath: pair.valuePath,
+            derivation: 'apply legal rulebook amendment to pristine authored mechanic',
+            inputs: artifactSortedInputs([pair.sourcePath].concat(opts.changedInputs(sourceValue, projectedValue)))
+          });
+        } else {
+          direct.push({ valuePath: pair.valuePath, ownerStage: artifactOwner(pair.sourcePath), sourcePath: pair.sourcePath });
+        }
+      });
+    }
+    if (rows) {
+      var values = rows.map(function (row) { return row.value; });
+      artifactPathSet(mechanics, valuePath, values);
+      rows.forEach(function (row, targetIndex) {
+        recordPairs(row.value, 'mechanics.' + valuePath + '[' + targetIndex + ']', path + '[' + row.sourceIndex + ']');
+      });
+      return;
+    }
+    var clean = artifactScrub(projected, path, findings);
+    artifactPathSet(mechanics, valuePath, clean);
+    recordPairs(clean, 'mechanics.' + valuePath, path);
+  }
+  function addDerived(valuePath, value, operation, inputPaths) {
+    artifactPathSet(mechanics, valuePath, artifactClone(value));
+    derived.push({ valuePath: 'mechanics.' + valuePath, derivation: operation, inputs: artifactSortedInputs(inputPaths) });
+  }
+
+  var ruleRoot = 'stages.gameRulebook.gameRulebook';
+  var pristineRulebook = artifactPathGet(source, ruleRoot);
+  var amendmentRoot = 'stages.shellIdentity.meta.rulebookAmendments.renames';
+  var proposedAmendments = pipeline === 'standard'
+    ? artifactPathGet(source, 'stages.shellIdentity.meta.rulebookAmendments') : null;
+  var amendmentResult = pipeline === 'standard'
+    ? applyRulebookAmendments(pristineRulebook, proposedAmendments) : { rulebook: pristineRulebook, applied: [] };
+  var effectiveRulebook = options && options.effectiveRulebook
+    ? options.effectiveRulebook : amendmentResult.rulebook;
+  var appliedAmendments = options && Array.isArray(options.appliedAmendments)
+    ? options.appliedAmendments : amendmentResult.applied;
+  var proposedRenameRows = proposedAmendments && Array.isArray(proposedAmendments.renames)
+    ? proposedAmendments.renames : [];
+
+  function amendmentInputsForChange(before, after) {
+    var beforeRef = parseSurfaceRef(String(before == null ? '' : before));
+    var afterRef = parseSurfaceRef(String(after == null ? '' : after));
+    var matched = [];
+    proposedRenameRows.forEach(function (row, index) {
+      var fromRef = parseSurfaceRef(String((row || {}).from || ''));
+      var toRef = parseSurfaceRef(String((row || {}).to || ''));
+      var applied = appliedAmendments.some(function (accepted) {
+        return accepted.kind === fromRef.kind
+          && String(accepted.from).toLowerCase() === String(fromRef.id || '').toLowerCase()
+          && String(accepted.to).toLowerCase() === String(toRef.id || '').toLowerCase();
+      });
+      if (!applied || !beforeRef.valid || !afterRef.valid
+          || beforeRef.kind !== fromRef.kind || afterRef.kind !== toRef.kind
+          || String(beforeRef.id).toLowerCase() !== String(fromRef.id).toLowerCase()
+          || String(afterRef.id).toLowerCase() !== String(toRef.id).toLowerCase()) return;
+      matched.push(amendmentRoot + '[' + index + '].from');
+      matched.push(amendmentRoot + '[' + index + '].to');
+      matched.push(amendmentRoot + '[' + index + '].why');
+    });
+    return matched;
+  }
+  function rulebookProjection(path) {
+    return artifactPathGet(effectiveRulebook, path.slice(ruleRoot.length + 1));
+  }
+  function addRulebookDirect(path, valuePath, opts) {
+    var settings = Object.assign({}, opts || {}, {
+      projected: rulebookProjection(path),
+      changedInputs: amendmentInputsForChange
+    });
+    addDirect(path, valuePath, settings);
+  }
+  [
+    ruleRoot + '.artifactDesign', ruleRoot + '.winCondition', ruleRoot + '.coreVerbs',
+    ruleRoot + '.economy', ruleRoot + '.passwordPath', ruleRoot + '.sessionShape',
+    ruleRoot + '.weekShape', ruleRoot + '.teachingOrder'
+  ].forEach(requirePath);
+  // The conceit is one authored object; commitments are a set of simultaneous
+  // physical/gameplay promises, so source order cannot become semantic digest.
+  if (requirePath(ruleRoot + '.artifactDesign')) {
+    addRulebookDirect(ruleRoot + '.artifactDesign.governingConceit', 'artifactDesign.governingConceit');
+    addRulebookDirect(ruleRoot + '.artifactDesign.commitments', 'artifactDesign.commitments', { set: true });
+  }
+  addRulebookDirect(ruleRoot + '.winCondition.requires', 'winCondition.requires');
+  addRulebookDirect(ruleRoot + '.coreVerbs.verbs', 'coreVerbs', { set: true });
+  addRulebookDirect(ruleRoot + '.economy.currency', 'currency');
+  addRulebookDirect(ruleRoot + '.passwordPath.elements', 'passwordElements');
+  addRulebookDirect(ruleRoot + '.sessionShape.ritual', 'sessionRitual');
+  if (artifactPathGet(source, ruleRoot + '.teachingOrder.sequence') !== undefined) {
+    addRulebookDirect(ruleRoot + '.teachingOrder.sequence', 'teachingOrder');
+  } else {
+    // The current stage schema requires the teaching-order owner but its
+    // machine-readable sequence remains optional. Absence therefore means
+    // "no ordered mechanical commitment", not a fabricated reading of the
+    // prose answer. Keep the empty value traceable to the real owner object.
+    addDerived('teachingOrder', [], 'project optional authored teaching sequence',
+      [ruleRoot + '.teachingOrder']);
+  }
+
+  var weekRoot = pipeline === 'standard' ? 'stages.campaignPlan.weeks' : 'stages.skeleton.weekPlan';
+  if (requirePath(weekRoot)) {
+    var weekRows = artifactPathGet(source, weekRoot);
+    if (!Array.isArray(weekRows)) {
+      findings.push(artifactFinding('artifact-obligation-invalid', artifactOwner(weekRoot), weekRoot,
+        'Planned weeks must be an array.'));
+    } else {
+      var sortedWeekRows = weekRows.map(function (row, sourceIndex) {
+        return { row: row, sourceIndex: sourceIndex };
+      }).sort(function (a, b) {
+        return Number((a.row || {}).weekNumber) - Number((b.row || {}).weekNumber);
+      });
+      mechanics.weeks = [];
+      sortedWeekRows.forEach(function (entry, targetIndex) {
+        mechanics.weeks[targetIndex] = {};
+        ['weekNumber', 'sessionCount', 'guaranteedMarksPerSession'].forEach(function (field) {
+          addDirect(weekRoot + '[' + entry.sourceIndex + '].' + field, 'weeks[' + targetIndex + '].' + field);
+        });
+      });
+    }
+  }
+
+  var spineRoot = pipeline === 'standard'
+    ? 'stages.shellSpine.meta.playSpine' : 'stages.skeleton.meta.playSpine';
+  ['economyGraph', 'consequenceEdges', 'decisionLedger', 'tensionBudget'].forEach(function (family) {
+    requirePath(spineRoot + '.' + family);
+  });
+  addDirect(spineRoot + '.consequenceEdges', 'consequenceEdges', { set: true });
+  addDirect(spineRoot + '.decisionLedger', 'decisionLedger', { set: true });
+  addDirect(spineRoot + '.tensionBudget', 'tensionBudget', { set: true });
+
+  var bossPath = pipeline === 'standard' ? 'stages.campaignPlan.bossPlan' : 'stages.skeleton.bossPlan';
+  addDirect(bossPath, 'bossPlan');
+
+  var cadencePath = pipeline === 'standard'
+    ? 'stages.economyGraph.surfaceCadences' : spineRoot + '.surfaceCadences';
+  addDirect(cadencePath, 'surfaceCadences', { set: true });
+
+  var topologyPath = spineRoot + '.economyGraph';
+  var topology = artifactPathGet(source, topologyPath);
+  var pacingPath = pipeline === 'standard' ? 'stages.economyGraph.economyGraph' : topologyPath;
+  var pacing = artifactPathGet(source, pacingPath);
+  if (pipeline === 'standard') requirePath(pacingPath);
+  if (!Array.isArray(topology)) topology = [];
+  if (!Array.isArray(pacing)) pacing = [];
+
+  function edgeIdentity(edge) { return String((edge || {}).from || '') + '\u0000' + String((edge || {}).to || ''); }
+  var topologySeen = {};
+  var pacingSeen = {};
+  topology.forEach(function (edge, index) {
+    var key = edgeIdentity(edge);
+    if (topologySeen[key] !== undefined) {
+      var matchingPace = pacing.findIndex(function (row) { return edgeIdentity(row) === key; });
+      findings.push(artifactFinding('artifact-authority-conflict', artifactOwner(topologyPath), topologyPath + '[' + index + ']',
+        'Spine repeats one topology edge.', [topologyPath + '[' + index + ']', pacingPath + '[' + (matchingPace < 0 ? index : matchingPace) + ']']));
+    }
+    topologySeen[key] = index;
+  });
+  pacing.forEach(function (edge, index) {
+    var key = edgeIdentity(edge);
+    if (pacingSeen[key] !== undefined) findings.push(artifactFinding('artifact-authority-conflict', artifactOwner(pacingPath), pacingPath + '[' + index + ']',
+      'Pacing repeats one join edge.', [topologyPath + '[' + (topologySeen[key] === undefined ? pacingSeen[key] : topologySeen[key]) + ']', pacingPath + '[' + index + ']']));
+    pacingSeen[key] = index;
+  });
+  // A join key is identity, never position. Detect a true rename only among
+  // rows that did not join by (from,to), and only when one unique counterpart
+  // preserves one half of that identity. This keeps a producer-valid reorder
+  // neutral while retaining exact field provenance for an actual renamed key.
+  var renamedTopology = {};
+  var renamedPacing = {};
+  if (pipeline === 'standard') {
+    var unmatchedTopology = topology.map(function (edge, index) {
+      return pacingSeen[edgeIdentity(edge)] === undefined ? index : -1;
+    }).filter(function (index) { return index >= 0; });
+    var unmatchedPacing = pacing.map(function (edge, index) {
+      return topologySeen[edgeIdentity(edge)] === undefined ? index : -1;
+    }).filter(function (index) { return index >= 0; });
+    unmatchedTopology.forEach(function (topologyIndex) {
+      var sourceEdge = topology[topologyIndex] || {};
+      var candidates = unmatchedPacing.filter(function (pacingIndex) {
+        var candidate = pacing[pacingIndex] || {};
+        return (candidate.from === sourceEdge.from) !== (candidate.to === sourceEdge.to);
+      });
+      if (candidates.length !== 1) return;
+      var pacingIndex = candidates[0];
+      var reverseCandidates = unmatchedTopology.filter(function (otherTopologyIndex) {
+        var other = topology[otherTopologyIndex] || {};
+        var candidate = pacing[pacingIndex] || {};
+        return (candidate.from === other.from) !== (candidate.to === other.to);
+      });
+      if (reverseCandidates.length !== 1) return;
+      var field = sourceEdge.from === (pacing[pacingIndex] || {}).from ? 'to' : 'from';
+      renamedTopology[topologyIndex] = pacingIndex;
+      renamedPacing[pacingIndex] = topologyIndex;
+      findings.push(artifactFinding('artifact-authority-conflict', 'economyGraph', pacingPath + '[' + pacingIndex + '].' + field,
+        'Pacing renames a spine-owned join key.', [topologyPath + '[' + topologyIndex + '].' + field, pacingPath + '[' + pacingIndex + '].' + field]));
+    });
+  }
+
+  var graphRows = [];
+  topology.forEach(function (rawEdge, topologyIndex) {
+    var key = edgeIdentity(rawEdge);
+    var pacingIndex = pacingSeen[key];
+    var annotation = pacingIndex === undefined ? null : pacing[pacingIndex];
+    if (pipeline === 'standard' && !annotation && renamedTopology[topologyIndex] === undefined) {
+      findings.push(artifactFinding('artifact-authority-conflict', 'economyGraph', topologyPath + '[' + topologyIndex + ']',
+        'Pacing omits a topology edge.', [topologyPath + '[' + topologyIndex + ']', pacingPath]));
+    }
+    if (annotation && pipeline === 'standard') {
+      ['from', 'to', 'currency', 'branch'].forEach(function (field) {
+        // Pacing annotates topology; it may omit spine-owned echoes. When it
+        // does echo one, however, the two paid owners must agree exactly.
+        if (annotation[field] === undefined) return;
+        if (annotation[field] !== rawEdge[field]) {
+          findings.push(artifactFinding('artifact-authority-conflict', 'economyGraph', pacingPath + '[' + pacingIndex + '].' + field,
+            'Pacing conflicts with spine-owned topology.', [topologyPath + '[' + topologyIndex + '].' + field, pacingPath + '[' + pacingIndex + '].' + field]));
+        }
+      });
+    }
+    var edge = {};
+    ['from', 'to', 'currency', 'branch'].forEach(function (field) {
+      if (rawEdge && rawEdge[field] !== undefined) edge[field] = artifactClone(rawEdge[field]);
+    });
+    var paced = annotation || rawEdge || {};
+    ['price', 'closesAtWeek'].forEach(function (field) {
+      if (paced[field] !== undefined) edge[field] = artifactClone(paced[field]);
+    });
+    graphRows.push({ value: edge, topologyIndex: topologyIndex, pacingIndex: pacingIndex === undefined ? topologyIndex : pacingIndex });
+  });
+  if (pipeline === 'standard') pacing.forEach(function (edge, pacingIndex) {
+    if (topologySeen[edgeIdentity(edge)] !== undefined) return;
+    if (renamedPacing[pacingIndex] !== undefined) return;
+    findings.push(artifactFinding('artifact-authority-conflict', 'economyGraph', pacingPath + '[' + pacingIndex + ']',
+      'Pacing invents an edge the spine does not own.', [topologyPath, pacingPath + '[' + pacingIndex + ']']));
+  });
+
+  function graphTuple(edge) {
+    return ['from', 'to', 'currency', 'price', 'closesAtWeek', 'branch'].map(function (field) {
+      return artifactCanonical((edge || {})[field]);
+    }).join('\u0000');
+  }
+  graphRows.sort(function (a, b) {
+    var left = graphTuple(a.value); var right = graphTuple(b.value);
+    return left < right ? -1 : (left > right ? 1 : a.topologyIndex - b.topologyIndex);
+  });
+  mechanics.economyGraph = graphRows.map(function (row) { return row.value; });
+  graphRows.forEach(function (row, targetIndex) {
+    var rawEdge = topology[row.topologyIndex] || {};
+    var annotation = pacing[row.pacingIndex] || {};
+    ['from', 'to', 'currency', 'branch'].forEach(function (field) {
+      if (rawEdge[field] === undefined) return;
+      var valuePath = 'mechanics.economyGraph[' + targetIndex + '].' + field;
+      var topologyFieldPath = topologyPath + '[' + row.topologyIndex + '].' + field;
+      var annotationFieldPath = pacingPath + '[' + row.pacingIndex + '].' + field;
+      if (pipeline === 'standard' && annotation[field] !== undefined) {
+        derived.push({ valuePath: valuePath,
+          derivation: 'join spine-owned topology field to matching pacing echo',
+          inputs: artifactSortedInputs([topologyFieldPath, annotationFieldPath]) });
+      } else {
+        direct.push({ valuePath: valuePath,
+          ownerStage: artifactOwner(topologyFieldPath), sourcePath: topologyFieldPath });
+      }
+    });
+    ['price', 'closesAtWeek'].forEach(function (field) {
+      if (annotation[field] === undefined) return;
+      var valuePath = 'mechanics.economyGraph[' + targetIndex + '].' + field;
+      if (pipeline === 'standard') {
+        derived.push({ valuePath: valuePath,
+          derivation: 'join pacing annotation to spine topology by normalized from/to identity',
+          inputs: artifactSortedInputs([
+            topologyPath + '[' + row.topologyIndex + '].from',
+            topologyPath + '[' + row.topologyIndex + '].to',
+            pacingPath + '[' + row.pacingIndex + '].from',
+            pacingPath + '[' + row.pacingIndex + '].to',
+            pacingPath + '[' + row.pacingIndex + '].' + field
+          ]) });
+      } else {
+        direct.push({ valuePath: valuePath,
+          ownerStage: artifactOwner(pacingPath), sourcePath: pacingPath + '[' + row.pacingIndex + '].' + field });
+      }
+    });
+  });
+
+  var endings = [];
+  var endingInputs = [];
+  if (pipeline === 'skeleton-flesh') {
+    var endingPath = 'stages.skeleton.endingVariants';
+    if (requirePath(endingPath)) {
+      asArray(artifactPathGet(source, endingPath)).forEach(function (value, index) {
+        endings.push(String(value).replace(/^ending:/i, ''));
+        endingInputs.push(endingPath + '[' + index + ']');
+      });
+    }
+  } else {
+    topology.forEach(function (edge, index) {
+      var match = /^ending:(.+)$/i.exec(String((edge || {}).to || ''));
+      if (!match || endings.indexOf(match[1]) !== -1) return;
+      endings.push(match[1]); endingInputs.push(topologyPath + '[' + index + '].to');
+    });
+  }
+  var endingRows = endings.map(function (value, index) { return { value: value, sourcePath: endingInputs[index] }; })
+    .sort(function (a, b) { return a.value < b.value ? -1 : (a.value > b.value ? 1 : 0); });
+  mechanics.endingVariants = endingRows.map(function (row) { return row.value; });
+  endingRows.forEach(function (row, index) {
+    if (pipeline === 'skeleton-flesh' && artifactPathGet(source, row.sourcePath) === row.value) {
+      direct.push({ valuePath: 'mechanics.endingVariants[' + index + ']', ownerStage: 'skeleton', sourcePath: row.sourcePath });
+    } else {
+      derived.push({ valuePath: 'mechanics.endingVariants[' + index + ']', derivation: 'normalize declared ending reference', inputs: artifactSortedInputs([row.sourcePath]) });
+    }
+  });
+
+  var convergenceTopologyIndex = topology.findIndex(function (edge) { return String((edge || {}).to) === 'boss'; });
+  var convergencePacingIndex = pacing.findIndex(function (edge) { return String((edge || {}).to) === 'boss'; });
+  var convergenceInputs = [
+    ruleRoot + '.winCondition.requires[0]',
+    bossPath + '.decodeLogic',
+    topologyPath + '[' + convergenceTopologyIndex + '].to',
+    pacingPath + '[' + convergencePacingIndex + '].price'
+  ];
+  if (convergenceInputs.every(function (path) { return artifactPathGet(source, path) !== undefined; })) {
+    addDerived('convergenceFunded', true, 'derive guaranteed boss/assembly/ending convergence', convergenceInputs);
+  }
+
+  // Duplicate authorities are rejected rather than resolved by precedence.
+  ['artifactDesign', 'meta.artifactDesign', 'artifactPlan'].forEach(function (path) {
+    if (artifactPathGet(source, path) !== undefined) findings.push(artifactFinding('artifact-authority-conflict', null, path,
+      'Artifact design has one canonical owner.', [path, ruleRoot + '.artifactDesign']));
+  });
+  ['stages.shellSpine.artifactDesign', 'stages.shellSpine.meta.artifactDesign', 'stages.campaignPlan.artifactContract'].forEach(function (path) {
+    if (artifactPathGet(source, path) !== undefined) findings.push(artifactFinding('artifact-authority-conflict', artifactOwner(path), path,
+      'Artifact design has one canonical owner.', [path, ruleRoot + '.artifactDesign']));
+  });
+  if (artifactPathGet(source, ruleRoot + '.artifactDesign.winCondition') !== undefined) {
+    findings.push(artifactFinding('artifact-authority-conflict', 'gameRulebook', ruleRoot + '.artifactDesign.winCondition',
+      'Rulebook obligations are siblings of artifactDesign, never copied inside it.'));
+  }
+
+  // Recovery is owed only by a structured losable declaration. The topology
+  // owner names the answer; the annotation owner dates it.
+  asArray(artifactPathGet(source, spineRoot + '.tensionBudget')).forEach(function (row) {
+    var losable = String((row || {}).losable || '').trim();
+    if (!losable) return;
+    // Recovery topology is machine-readable only when fallBehind is itself one
+    // exact surface ref. Narrative descriptions such as "map:Route stays
+    // shut" remain tension prose and cannot silently create a route contract.
+    var answeringRef = String((row || {}).fallBehind || '').trim();
+    if (!/^[A-Za-z][A-Za-z0-9-]*:[^\s]+$/.test(answeringRef)) return;
+    var consequence = asArray(artifactPathGet(source, spineRoot + '.consequenceEdges')).filter(function (edge) {
+      return String((edge || {}).source || '').toLowerCase() === losable.toLowerCase()
+        && String((edge || {}).answeredBy || '').toLowerCase() === answeringRef.toLowerCase();
+    })[0];
+    if (!consequence) {
+      findings.push(artifactFinding('artifact-obligation-missing', artifactOwner(spineRoot), spineRoot + '.consequenceEdges',
+        'A structured loss declaration has no answering consequence edge.'));
+      return;
+    }
+    var edgeIndex = topology.findIndex(function (edge) {
+      return String((edge || {}).from || '').toLowerCase() === losable.toLowerCase()
+        && String((edge || {}).to || '').toLowerCase() === String(consequence.answeredBy || '').toLowerCase();
+    });
+    if (edgeIndex < 0) {
+      findings.push(artifactFinding('artifact-obligation-missing', artifactOwner(topologyPath), topologyPath,
+        'A structured recovery declaration has no matching topology edge.', [topologyPath]));
+      return;
+    }
+    var paceIndex = pipeline === 'standard' ? pacingSeen[edgeIdentity(topology[edgeIndex])] : edgeIndex;
+    var closes = paceIndex === undefined ? undefined : (pacing[paceIndex] || {}).closesAtWeek;
+    var due = Number(row.week) + Number(consequence.withinWeeks || 0);
+    if (Number.isFinite(Number(closes)) && Number(closes) > due) {
+      var closePath = pacingPath + '[' + paceIndex + '].closesAtWeek';
+      findings.push(artifactFinding('artifact-obligation-invalid', artifactOwner(closePath), closePath,
+        'Recovery closes after its declared answering bound.'));
+    }
+  });
+
+  direct.sort(function (a, b) { return a.valuePath < b.valuePath ? -1 : (a.valuePath > b.valuePath ? 1 : 0); });
+  derived.sort(function (a, b) { return a.valuePath < b.valuePath ? -1 : (a.valuePath > b.valuePath ? 1 : 0); });
+  var semanticCanonicalJson = artifactCanonical(mechanics);
+  var view = {
+    mechanics: mechanics,
+    provenance: { direct: direct, derived: derived },
+    semanticCanonicalJson: semanticCanonicalJson,
+    semanticDigest: artifactSha256(semanticCanonicalJson)
+  };
+  return { view: artifactDeepFreeze(view), blocking: artifactDeepFreeze(findings.slice()) };
+}
+
+function artifactPreparedBook(mechanics) {
+  var weeks = asArray(mechanics.weeks);
+  var sessions = [];
+  var perWeek = [];
+  var printWeek = {};
+  var lastWeek = weeks.reduce(function (max, row) { return Math.max(max, Number((row || {}).weekNumber) || 0); }, 0) || weeks.length;
+  function note(raw, fallback) {
+    var parsed = parseSurfaceRef(String(raw || ''));
+    if (!parsed || !parsed.valid) return;
+    var key = nodeKey(parsed);
+    var week = artifactRefWeek(raw, fallback);
+    if (parsed.kind === 'boss' || parsed.kind === 'assembly') week = lastWeek;
+    if (parsed.kind === 'ending') week = lastWeek + 1;
+    if (printWeek[key] === undefined || week < printWeek[key]) printWeek[key] = week;
+  }
+  weeks.forEach(function (row, index) {
+    var week = Number((row || {}).weekNumber) || index + 1;
+    var count = Number((row || {}).sessionCount) || 0;
+    var floor = Number((row || {}).guaranteedMarksPerSession) || 0;
+    for (var session = 1; session <= count; session++) {
+      sessions.push({ week: week, session: session, ticks: floor, hasBinaryChoice: false, fragmentRef: '' });
+      note('session:W' + week + '.' + session, week);
+      note('markStrip:W' + week + '.' + session, week);
+    }
+    note('week:W' + week, week); note('markStrip:W' + week, week); note('reckoning:W' + week, week);
+    var tension = asArray(mechanics.tensionBudget).filter(function (item) { return Number((item || {}).week) === week; })[0] || {};
+    perWeek.push({ week: week, ticks: count * floor, sessions: count,
+      hasDoor: asArray(mechanics.decisionLedger).some(function (decision) { return artifactRefWeek((decision || {}).fork, -1) === week; }),
+      binaryChoices: 0, clocks: String(tension.losable || '').trim() ? [{ name: tension.losable, type: 'danger-clock', losable: true }] : [],
+      componentValue: null, isBoss: week === lastWeek });
+  });
+  asArray(mechanics.economyGraph).forEach(function (edge) { note((edge || {}).from, 1); note((edge || {}).to, lastWeek); });
+  // In the authored contract an undated wallet exit stays open through the
+  // program. `map:W1` says where the surface first appears, not that spending
+  // closes in week one. The assembled reader can recover this distinction
+  // from pages; the pre-prose adapter must carry it explicitly into the same
+  // transition kernel.
+  asArray(mechanics.economyGraph).forEach(function (edge) {
+    if (String((edge || {}).from || '').toLowerCase() !== 'banked') return;
+    if (Number.isInteger((edge || {}).closesAtWeek) && edge.closesAtWeek > 0) return;
+    var target = nodeKey(parseSurfaceRef(String((edge || {}).to || '')));
+    if (target) printWeek[target] = Math.max(Number(printWeek[target]) || 0, lastWeek);
+  });
+  asArray(mechanics.passwordElements).forEach(function (ref) { note(ref, artifactRefWeek(ref, lastWeek)); });
+  var required = asArray(((mechanics.winCondition || {}).requires));
+  var endgame = required.map(function (ref) {
+    var parsed = parseSurfaceRef(String(ref || ''));
+    var key = nodeKey(parsed);
+    return { label: String(ref), aliases: [key], printWeek: printWeek[key] === undefined ? lastWeek + 1 : printWeek[key], required: true };
+  });
+  asArray(mechanics.endingVariants).forEach(function (variant) {
+    var label = /^ending:/i.test(String(variant || '')) ? String(variant) : 'ending:' + String(variant || '');
+    var key = nodeKey(parseSurfaceRef(label));
+    if (!key || endgame.some(function (target) { return target.aliases.indexOf(key) !== -1; })) return;
+    endgame.push({ label: label, aliases: [key],
+      printWeek: printWeek[key] === undefined ? lastWeek + 1 : printWeek[key], required: false });
+  });
+  return {
+    weeks: perWeek, weekCount: weeks.length, sessions: sessions, totalSessions: sessions.length,
+    totalTicks: sessions.reduce(function (sum, row) { return sum + row.ticks; }, 0), printWeek: printWeek,
+    bossWeek: lastWeek, threshold: null, endWeek: lastWeek + 1, endgame: endgame,
+    sealedFragments: [], passwordLength: asArray(mechanics.passwordElements).length
+  };
+}
+
+function artifactTopologyOwner(view) {
+  var provenance = ((view || {}).provenance || {});
+  var paths = asArray(provenance.direct).map(function (row) { return row.sourcePath; })
+    .concat(asArray(provenance.derived).reduce(function (all, row) {
+      return all.concat(asArray((row || {}).inputs).map(function (input) { return input.sourcePath; }));
+    }, []));
+  var path = paths.filter(function (item) { return /(?:shellSpine|skeleton)\.meta\.playSpine\.economyGraph\[/.test(item); })[0] || '';
+  return path.replace(/\[\d+\].*$/, '');
+}
+
+function artifactOwnerPathForFinding(view, row) {
+  var provenance = (view || {}).provenance || {};
+  var mechanics = (view || {}).mechanics || {};
+  var graph = asArray(mechanics.economyGraph);
+  var detail = row.detail || {};
+  var index = graph.findIndex(function (edge) {
+    return (!detail.from || edge.from === detail.from) && (!detail.to || edge.to === detail.to)
+      && (!detail.node || edge.to === detail.node || String(edge.to || '').toLowerCase() === String(detail.node || '').toLowerCase());
+  });
+  function provenanceSource(valuePath, suffix, topologyOnly) {
+    var directRow = asArray(provenance.direct).filter(function (item) { return item.valuePath === valuePath; })[0];
+    if (directRow && (!topologyOnly || /(?:shellSpine|skeleton)\.meta\.playSpine\.economyGraph/.test(directRow.sourcePath))) {
+      return directRow.sourcePath;
+    }
+    var derivedRow = asArray(provenance.derived).filter(function (item) { return item.valuePath === valuePath; })[0];
+    var inputs = asArray(derivedRow && derivedRow.inputs);
+    return (inputs.filter(function (input) {
+      return (!suffix || String(input.sourcePath || '').slice(-suffix.length) === suffix)
+        && (!topologyOnly || /(?:shellSpine|skeleton)\.meta\.playSpine\.economyGraph/.test(input.sourcePath || ''));
+    })[0] || {}).sourcePath || '';
+  }
+  if (row.code === 'unaffordable-required-spend' && index >= 0) {
+    return provenanceSource('mechanics.economyGraph[' + index + '].price', '.price', false)
+      || artifactTopologyOwner(view);
+  }
+  if ((row.code === 'branch-only-path' || row.code === 'dice-only-path') && index >= 0) {
+    var field = row.code === 'branch-only-path' ? 'branch' : 'from';
+    return provenanceSource('mechanics.economyGraph[' + index + '].' + field, '.' + field, true)
+      || artifactTopologyOwner(view);
+  }
+  return artifactTopologyOwner(view);
+}
+
+/**
+ * Execute the current simulator transition kernel over the prose-free view.
+ * Findings retain the simulator's public code/bucket shape and gain the exact
+ * paid owner path needed by repair routing.
+ */
+export function proveArtifactContract(view) {
+  var mechanics = (view || {}).mechanics || {};
+  var spine = {
+    economyGraph: artifactClone(asArray(mechanics.economyGraph)),
+    consequenceEdges: artifactClone(mechanics.consequenceEdges || []),
+    decisionLedger: artifactClone(mechanics.decisionLedger || []),
+    tensionBudget: artifactClone(mechanics.tensionBudget || [])
+  };
+  var preparedBook = artifactPreparedBook(mechanics);
+  var report = runTransitionKernel({ meta: { playSpine: spine } }, preparedBook);
+  report.transitionKernelId = ARTIFACT_TRANSITION_KERNEL_ID;
+  report.semanticDigest = view && view.semanticDigest;
+  report.bands.forEach(function (row) {
+    var band = SIM_ADHERENCE_BANDS.filter(function (candidate) { return candidate.id === row.band; })[0];
+    if (band) row.prefix = adversarialTicksByWeek(preparedBook, band.fraction).prefix;
+  });
+
+  // Before prose is funded, every authored price must be numerically usable;
+  // an optional choice priced above the strongest possible balance is still a
+  // false affordance. The assembled simulator's narrower endgame test remains
+  // unchanged, while this contract adapter applies the same arithmetic and
+  // preserves the existing public finding code for routing.
+  var hardBand = SIM_ADHERENCE_BANDS.filter(function (candidate) { return candidate.id === 'realistic'; })[0]
+    || SIM_ADHERENCE_BANDS[SIM_ADHERENCE_BANDS.length - 1];
+  var hardPrefix = hardBand ? adversarialTicksByWeek(preparedBook, hardBand.fraction).prefix : {};
+  spine.economyGraph.forEach(function (edge) {
+    var price = Number((edge || {}).price) || 0;
+    if (price <= 0) return;
+    var deadline = Number.isInteger((edge || {}).closesAtWeek) && edge.closesAtWeek > 0
+      ? Math.min(edge.closesAtWeek, preparedBook.weekCount) : preparedBook.weekCount;
+    var banked = Number(hardPrefix[deadline]) || 0;
+    if (price <= banked) return;
+    if (report.hard.some(function (row) {
+      return row.code === 'unaffordable-required-spend'
+        && (row.detail || {}).from === edge.from && (row.detail || {}).to === edge.to;
+    })) return;
+    report.hard.push(finding('unaffordable-required-spend',
+      'The authored spend "' + edge.from + ' → ' + edge.to + '" costs ' + price
+      + ' marks, but the realistic adherence band can bank at most ' + banked
+      + ' by week ' + deadline + '.',
+      { from: edge.from, to: edge.to, price: price, banked: banked, deadline: deadline }));
+  });
+
+  // The assembled reader normally encounters an oracle after another printed
+  // surface feeds it. The pre-prose contract intentionally has no fabricated
+  // oracle/session payload. An explicit oracle edge is still authored chance,
+  // so retain the kernel's existing dice-only class rather than degrading the
+  // diagnosis to generic unreachable merely because printable prose is absent.
+  report.hard.forEach(function (row) {
+    if (row.code !== 'unreachable-endgame') return;
+    var target = String(((row || {}).detail || {}).node || '');
+    var chanceEdge = spine.economyGraph.filter(function (edge) { return /^oracle:/i.test(String((edge || {}).from || '')); })
+      .filter(function (edge) {
+        if (String((edge || {}).to || '').toLowerCase() === target.toLowerCase()) return true;
+        var seen = {}; var frontier = [String((edge || {}).to || '')];
+        while (frontier.length) {
+          var current = frontier.pop();
+          if (current.toLowerCase() === target.toLowerCase()) return true;
+          if (seen[current]) continue;
+          seen[current] = true;
+          spine.economyGraph.forEach(function (next) {
+            if (String((next || {}).from || '') === current && !/^oracle:/i.test(String((next || {}).from || ''))) {
+              frontier.push(String((next || {}).to || ''));
+            }
+          });
+        }
+        return false;
+      })[0];
+    if (!chanceEdge) return;
+    row.code = 'dice-only-path';
+    row.detail = Object.assign({}, row.detail || {}, { from: chanceEdge.from, to: chanceEdge.to });
+  });
+
+  var guaranteed = ((report || {}).holds || {}).greedy || {};
+  asArray(mechanics.passwordElements).forEach(function (raw) {
+    var key = nodeKey(parseSurfaceRef(String(raw || '')));
+    if (guaranteed[key] !== undefined && guaranteed[key] !== INFINITY_WEEK) return;
+    if (report.hard.some(function (row) { return row.code === 'password-element-unreachable' && (row.detail || {}).element === raw; })) return;
+    report.hard.push(finding('password-element-unreachable',
+      'The required password element "' + raw + '" has no guaranteed route before assembly.',
+      { element: raw }));
+  });
+  ['hard', 'soft'].forEach(function (bucket) {
+    report[bucket].forEach(function (row) {
+      var ownerPath = artifactOwnerPathForFinding(view, row);
+      row.detail = Object.assign({}, row.detail || {}, { ownerPath: ownerPath, ownerStage: artifactOwner(ownerPath) });
+    });
+  });
+  return report;
 }
 
 // Can `target` be reached from `source` over guaranteed edges? Used by the

@@ -4434,13 +4434,13 @@
         generateMultiStage: [
           { key: 'gameRulebook', label: STAGE_LABELS.gameRulebook },
           { key: 'layerBible', label: STAGE_LABELS.layerBible },
-          { key: 'campaign', label: STAGE_LABELS.campaignPlan },
+          { key: 'campaignPlan', label: STAGE_LABELS.campaignPlan },
           { key: 'shellIdentity', label: STAGE_LABELS.shellIdentity },
+          { key: 'shellSpine', label: STAGE_LABELS.shellSpine },
+          { key: 'economyGraph', label: STAGE_LABELS.economyGraph },
+          { key: 'knowing', label: STAGE_LABELS.knowing },
           { key: 'shellRules', label: STAGE_LABELS.shellRules },
           { key: 'shellTheme', label: STAGE_LABELS.shellTheme },
-          { key: 'shellSpine', label: STAGE_LABELS.shellSpine },
-          { key: 'knowing', label: STAGE_LABELS.knowing },
-          { key: 'economyGraph', label: STAGE_LABELS.economyGraph },
           { key: 'weeks', label: STAGE_LABELS.weeks },
           { key: 'fragments', label: STAGE_LABELS.fragments },
           { key: 'endings', label: STAGE_LABELS.endings },
@@ -6552,7 +6552,7 @@
       function inferApiStageKey(message) {
         var lower = String(message || '').toLowerCase();
         if (lower.indexOf('layer bible') !== -1 || lower.indexOf('layer codex') !== -1 || lower.indexOf('foundation') !== -1) return 'layerBible';
-        if (lower.indexOf('campaign') !== -1 || lower.indexOf('story plan') !== -1 || lower.indexOf('planning story') !== -1) return 'campaign';
+        if (lower.indexOf('campaign') !== -1 || lower.indexOf('story plan') !== -1 || lower.indexOf('planning story') !== -1) return 'campaignPlan';
         // THE SHELL SPLIT. Ordered MOST SPECIFIC FIRST: `booklet setup` and a
         // bare `shell` are the family words and can only mean the run as a
         // whole, so they resolve to the first sub-stage — the same conservative
@@ -8926,7 +8926,7 @@
           does: 'Builds the world the book is set in from your program and your brief — who runs it, what is true in it, and the design logic every later step reads.',
           limit: 'Nothing is scheduled here. Which week does what, and which documents exist, is the next step’s work.'
         },
-        campaign: {
+        campaignPlan: {
           does: 'Plans the block week by week against your real program: the arc, the found documents and their names, and the route to the ending.',
           limit: 'It plans; it writes no week and no document. A plan that promises a document is only kept because the later steps are checked against this list.'
         },
