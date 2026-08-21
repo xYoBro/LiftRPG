@@ -225,7 +225,8 @@ import {
   simulateBook,
   simSoftFindings,
   readArtifactContractView,
-  proveArtifactContract
+  proveArtifactContract,
+  compareArtifactMaterialization
 } from './modules/sim-player.js';
 
 // The third referee (FUSION §4 mechanism 6). Its pure half lives in its own
@@ -4972,9 +4973,45 @@ async function completeAssembledProduction(booklet, options) {
   var mechanicalResult = typeof validateMechanical === 'function'
     ? await validateMechanical(booklet, options.mechanicalContext || { generationFloors: true })
     : { valid: false, errors: ['Assembled validator is unavailable'] };
+  var validatorMechanicalErrors = validatorErrors(mechanicalResult);
+  var materializationDrifts = [];
+  if (options.preProofView) {
+    materializationDrifts = compareArtifactMaterialization(options.preProofView, booklet).drifts || [];
+    if (materializationDrifts.length) {
+      // Preserve the validator's outward result shape. Consumers of the
+      // existing assembled gate therefore see the parity refusal as a normal
+      // mechanical error, rather than needing a second status channel.
+      mechanicalResult = Object.assign({}, mechanicalResult, {
+        valid: false,
+        errors: validatorMechanicalErrors.concat(materializationDrifts.map(function (drift) {
+          return drift.message;
+        }))
+      });
+    }
+  }
   var mechanicalErrors = adaptValidatorErrorsToFindingEvidence(
-    validatorErrors(mechanicalResult), booklet
+    validatorMechanicalErrors, booklet
   );
+  // The pre-prose view is a transient witness, not a new pipeline stage.  It
+  // reaches this one existing mechanical boundary after assembly, where a
+  // mismatch must make the delivered book an invalid draft and prevent critic
+  // spend.  Do not persist this comparison: the bank owns paid facts and the
+  // booklet owns the final outcome; a parity receipt is neither.
+  if (materializationDrifts.length) {
+    materializationDrifts.forEach(function (drift, index) {
+      mechanicalErrors.push({
+        id: 'materialization:' + artifactRevisionIdFor(booklet) + ':' + (index + 1),
+        artifactRevisionId: artifactRevisionIdFor(booklet),
+        source: 'validator',
+        class: 'conformance',
+        severity: 'error',
+        code: 'artifact_materialization_drift',
+        path: drift.ownerPath || drift.path || null,
+        message: drift.message,
+        evidence: { kind: drift.kind || '', ownerStage: drift.ownerStage || null }
+      });
+    });
+  }
 
   var preliminaryFacts = {
     run: { status: 'complete' },
@@ -5054,6 +5091,7 @@ async function completeStandardAssembledBranch(booklet, options) {
     editorialArgs: [options.settings || { criticLoop: false }, booklet,
       options.brief || '', options.editorialContext || {}],
     adaptEditorial: call.adaptEditorial,
+    preProofView: options.preProofView || null,
     receipt: options.receipt || { proof: 'not_run' }
   });
 }
@@ -5077,6 +5115,7 @@ async function completeSkeletonFleshAssembledBranch(booklet, options) {
     editorialArgs: [options.settings || { criticLoop: false }, booklet,
       options.brief || '', options.editorialContext || {}],
     adaptEditorial: call.adaptEditorial,
+    preProofView: options.preProofView || null,
     receipt: options.receipt || { proof: 'not_run' }
   });
 }
@@ -7429,6 +7468,7 @@ async function runApiPipeline(options) {
   var completedProduction = await completeStandardAssembledBranch(booklet, {
     settings: settings,
     brief: brief,
+    preProofView: artifactRead.view,
     editorialContext: {
       rateLimiter: rateLimiter,
       budgetEnforce: useGeminiBudget,
@@ -9212,6 +9252,7 @@ async function runSkeletonFleshPipeline(options) {
   var completedSFProduction = await completeSkeletonFleshAssembledBranch(booklet, {
     settings: settings,
     brief: brief,
+    preProofView: sfArtifactRead.view,
     editorialContext: {
       rateLimiter: rateLimiter,
       budgetEnforce: useGeminiBudget,
@@ -9768,6 +9809,7 @@ window.LiftRPGAPI = {
     simulateBook: simulateBook,
     readArtifactContractView: readArtifactContractView,
     proveArtifactContract: proveArtifactContract,
+    compareArtifactMaterialization: compareArtifactMaterialization,
     restoreStageContracts: restoreStageContracts,
     validateCriticVerdict: validateCriticVerdict,
     normalizeCriticVerdict: normalizeCriticVerdict,

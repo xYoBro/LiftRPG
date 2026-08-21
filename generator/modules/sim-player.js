@@ -2193,6 +2193,407 @@ export function proveArtifactContract(view) {
   return report;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// PART 6 — the assembled-materialization parity gate (D268 Wave 2)
+// ════════════════════════════════════════════════════════════════════════════
+
+// The proof is deliberately a plan, not an equality template for prose.  At
+// assembly we ask a narrower, mechanical question: did the printed book keep
+// every paid obligation?  Marks may exceed their planned floor; sessions may
+// not disappear or multiply.  This stays beside the two readers so both sides
+// enter the same transition kernel and no second simulator grows in assembly.
+
+function artifactMaterializationSource(view, valuePath, fallback) {
+  var provenance = (view || {}).provenance || {};
+  var direct = asArray(provenance.direct).filter(function (row) {
+    return row && row.valuePath === valuePath;
+  })[0];
+  if (direct && direct.sourcePath) return direct.sourcePath;
+  var derived = asArray(provenance.derived).filter(function (row) {
+    return row && row.valuePath === valuePath;
+  })[0];
+  var input = asArray(derived && derived.inputs)[0];
+  return (input && input.sourcePath) || fallback || null;
+}
+
+function artifactMaterializationDrift(kind, ownerPath, message, detail) {
+  return {
+    code: 'artifact-materialization-drift',
+    kind: kind,
+    class: 'conformance',
+    severity: 'error',
+    blocking: true,
+    ownerStage: artifactOwner(ownerPath),
+    ownerPath: ownerPath || null,
+    path: ownerPath || null,
+    message: message,
+    detail: detail || {}
+  };
+}
+
+function artifactMaterializationGraph(rows) {
+  return asArray(rows).map(function (edge) {
+    var next = {};
+    ['from', 'to', 'currency', 'price', 'closesAtWeek', 'branch'].forEach(function (field) {
+      if (edge && edge[field] !== undefined) next[field] = artifactClone(edge[field]);
+    });
+    return next;
+  }).sort(function (a, b) {
+    var left = ['from', 'to', 'currency', 'price', 'closesAtWeek', 'branch'].map(function (field) {
+      return artifactCanonical(a[field]);
+    }).join('\u0000');
+    var right = ['from', 'to', 'currency', 'price', 'closesAtWeek', 'branch'].map(function (field) {
+      return artifactCanonical(b[field]);
+    }).join('\u0000');
+    return left < right ? -1 : (left > right ? 1 : 0);
+  });
+}
+
+function artifactMaterializationSet(rows) {
+  return asArray(rows).map(artifactClone).sort(function (a, b) {
+    var left = artifactCanonical(a); var right = artifactCanonical(b);
+    return left < right ? -1 : (left > right ? 1 : 0);
+  });
+}
+
+function artifactMaterializationSources(view) {
+  var provenance = (view || {}).provenance || {};
+  return asArray(provenance.direct).map(function (row) {
+    return { valuePath: row.valuePath, sourcePath: row.sourcePath };
+  }).concat(asArray(provenance.derived).reduce(function (all, row) {
+    return all.concat(asArray((row || {}).inputs).map(function (input) {
+      return { valuePath: row.valuePath, sourcePath: input.sourcePath };
+    }));
+  }, []));
+}
+
+function artifactMaterializationOwner(view, valuePrefix, fallback, sourcePattern, collapsePattern) {
+  var candidates = artifactMaterializationSources(view).filter(function (row) {
+    return String(row.valuePath || '').indexOf(valuePrefix) === 0
+      && (!sourcePattern || sourcePattern.test(String(row.sourcePath || '')));
+  });
+  var path = (candidates[0] || {}).sourcePath || fallback;
+  return collapsePattern ? String(path || '').replace(collapsePattern, '') : path;
+}
+
+function artifactMaterializationExpectedWeekMap(view) {
+  var out = {};
+  asArray((((view || {}).mechanics || {}).weeks)).forEach(function (week, index) {
+    out[String((week || {}).weekNumber)] = { week: week || {}, index: index };
+  });
+  return out;
+}
+
+// Read every digest-bearing family from the assembled artifact.  This starts
+// empty on purpose: a missing actual remains missing and changes the digest;
+// it can never be backfilled from the paid view it is supposed to check.
+function artifactMaterializedMechanics(view, booklet) {
+  var doc = booklet || {};
+  var meta = doc.meta || {};
+  var rulebook = meta.gameRulebook || {};
+  var spine = meta.playSpine || {};
+  var expectedWeeks = artifactMaterializationExpectedWeekMap(view);
+  var mechanics = {
+    consequenceEdges: artifactMaterializationSet(spine.consequenceEdges),
+    convergenceFunded: false,
+    economyGraph: artifactMaterializationGraph(spine.economyGraph),
+    endingVariants: asArray(doc.endings).map(function (ending) {
+      return String((ending || {}).variant || '').replace(/^ending:/i, '');
+    }).sort(),
+    surfaceCadences: artifactMaterializationSet(spine.surfaceCadences),
+    weeks: asArray(doc.weeks).map(function (week) {
+      var sessions = asArray((week || {}).sessions);
+      var observedMinimum = sessions.length ? Math.min.apply(null, sessions.map(function (session) {
+        return asArray(((session || {}).markStrip || {}).targets).length;
+      })) : 0;
+      var paid = expectedWeeks[String((week || {}).weekNumber)];
+      var paidFloor = paid && Number((paid.week || {}).guaranteedMarksPerSession);
+      return {
+        weekNumber: (week || {}).weekNumber,
+        sessionCount: sessions.length,
+        guaranteedMarksPerSession: paid && Number.isFinite(paidFloor)
+          ? Math.min(observedMinimum, paidFloor) : observedMinimum
+      };
+    })
+  };
+  if (spine.decisionLedger !== undefined) {
+    mechanics.decisionLedger = artifactMaterializationSet(spine.decisionLedger);
+  }
+  if (spine.tensionBudget !== undefined) {
+    mechanics.tensionBudget = artifactMaterializationSet(spine.tensionBudget);
+  }
+  var requirements = rulebook.winCondition && Array.isArray(rulebook.winCondition.requires)
+    ? artifactClone(rulebook.winCondition.requires) : null;
+  mechanics.convergenceFunded = !!(requirements && requirements.length)
+    && requirements.every(function (required) {
+      return mechanics.economyGraph.some(function (edge) {
+        return String((edge || {}).to || '').toLowerCase() === String(required || '').toLowerCase();
+      });
+    });
+  if (rulebook.artifactDesign !== undefined) {
+    mechanics.artifactDesign = {
+      governingConceit: artifactClone((rulebook.artifactDesign || {}).governingConceit),
+      commitments: artifactMaterializationSet((rulebook.artifactDesign || {}).commitments)
+    };
+  }
+  var bossWeek = asArray(doc.weeks).filter(function (week) { return !!(week && week.bossEncounter); })[0];
+  var bossFields = ['decodeLogic', 'whyItFeelsEarned', 'requiredPriorKnowledge', 'weeklyComponentType'];
+  if (bossWeek && bossFields.every(function (field) {
+    return bossWeek.bossEncounter[field] !== undefined;
+  })) {
+    mechanics.bossPlan = {};
+    bossFields.forEach(function (field) {
+      mechanics.bossPlan[field] = artifactClone(bossWeek.bossEncounter[field]);
+    });
+  }
+  if (rulebook.coreVerbs && rulebook.coreVerbs.verbs !== undefined) mechanics.coreVerbs = artifactMaterializationSet(rulebook.coreVerbs.verbs);
+  if (rulebook.economy && rulebook.economy.currency !== undefined) mechanics.currency = artifactClone(rulebook.economy.currency);
+  if (rulebook.passwordPath && rulebook.passwordPath.elements !== undefined) mechanics.passwordElements = artifactClone(rulebook.passwordPath.elements);
+  if (rulebook.sessionShape && rulebook.sessionShape.ritual !== undefined) mechanics.sessionRitual = artifactClone(rulebook.sessionShape.ritual);
+  if (rulebook.teachingOrder && rulebook.teachingOrder.sequence !== undefined) mechanics.teachingOrder = artifactClone(rulebook.teachingOrder.sequence);
+  if (requirements !== null) mechanics.winCondition = { requires: requirements };
+  return mechanics;
+}
+
+function artifactMaterializationReport(view, booklet) {
+  var mechanics = artifactMaterializedMechanics(view, booklet);
+  var prepared = artifactPreparedBook(mechanics);
+  var printed = readBook(booklet);
+  prepared.weeks = printed.weeks;
+  prepared.weekCount = printed.weekCount;
+  prepared.sessions = printed.sessions;
+  prepared.totalSessions = printed.totalSessions;
+  prepared.totalTicks = printed.totalTicks;
+  prepared.printWeek = printed.printWeek;
+  prepared.bossWeek = printed.bossWeek || prepared.bossWeek;
+  prepared.endWeek = printed.endWeek || prepared.endWeek;
+  prepared.sealedFragments = printed.sealedFragments;
+
+  // Required/optional is authored by the win contract; physical presence is
+  // authored by printed endings.  Joining those two facts keeps an optional
+  // branch ending lawful while making a missing required last page unreachable.
+  var printedEndings = {};
+  asArray(mechanics.endingVariants).forEach(function (variant) {
+    printedEndings[String(variant).toLowerCase()] = true;
+  });
+  asArray(prepared.endgame).forEach(function (target) {
+    if (target.required === false || !/^ending:/i.test(String(target.label || ''))) return;
+    var variant = String(target.label).replace(/^ending:/i, '').toLowerCase();
+    if (!printedEndings[variant]) target.aliases = ['missing-printed-ending:' + variant];
+  });
+
+  var spine = {
+    economyGraph: artifactClone(asArray(mechanics.economyGraph)),
+    consequenceEdges: artifactClone(mechanics.consequenceEdges || []),
+    decisionLedger: artifactClone(mechanics.decisionLedger || []),
+    tensionBudget: artifactClone(mechanics.tensionBudget || [])
+  };
+  var after = runTransitionKernel({ meta: { playSpine: spine } }, prepared);
+  after.transitionKernelId = ARTIFACT_TRANSITION_KERNEL_ID;
+  after.mechanics = mechanics;
+  after.semanticCanonicalJson = artifactCanonical(mechanics);
+  after.semanticDigest = artifactSha256(after.semanticCanonicalJson);
+  after.bands.forEach(function (row) {
+    var band = SIM_ADHERENCE_BANDS.filter(function (candidate) { return candidate.id === row.band; })[0];
+    if (band) row.prefix = adversarialTicksByWeek(prepared, band.fraction).prefix;
+  });
+  return { report: after, mechanics: mechanics };
+}
+
+/**
+ * Compare the paid pre-prose mechanics to the mechanics that actually reached
+ * the assembled booklet.  The result is intentionally serializable but is
+ * transient at the production boundary: no artifact-proofs are checkpointed
+ * or written as pipeline debris.
+ */
+export function compareArtifactMaterialization(view, booklet) {
+  var before = proveArtifactContract(view);
+  var materialized = artifactMaterializationReport(view, booklet);
+  var after = materialized.report;
+  var expected = ((view || {}).mechanics) || {};
+  var actualWeeks = asArray((booklet || {}).weeks);
+  var drifts = [];
+  var surplus = [];
+  var meta = ((booklet || {}).meta) || {};
+  var rulebook = meta.gameRulebook || {};
+  var expectedWeekMap = artifactMaterializationExpectedWeekMap(view);
+  var expectedWeekNumbers = asArray(expected.weeks).map(function (week) { return (week || {}).weekNumber; });
+  var actualWeekNumbers = actualWeeks.map(function (week) { return (week || {}).weekNumber; });
+  var weekOwner = artifactMaterializationOwner(view, 'mechanics.weeks[', 'stages.campaignPlan.weeks', null, /\[\d+\].*$/);
+  if (artifactCanonical(expectedWeekNumbers) !== artifactCanonical(actualWeekNumbers)) {
+    drifts.push(artifactMaterializationDrift('week-identity', weekOwner,
+      'Assembled week identity or order differs from the paid week plan.'));
+  }
+  actualWeeks.forEach(function (actual, actualIndex) {
+    var plannedEntry = expectedWeekMap[String((actual || {}).weekNumber)];
+    if (!plannedEntry) return;
+    var planned = plannedEntry.week;
+    var weekIndex = plannedEntry.index;
+    var sessions = asArray((actual || {}).sessions);
+    var count = Number((planned || {}).sessionCount) || 0;
+    var floor = Number((planned || {}).guaranteedMarksPerSession) || 0;
+    if (sessions.length !== count) {
+      var countPath = artifactMaterializationSource(view, 'mechanics.weeks[' + weekIndex + '].sessionCount',
+        weekOwner + '[' + weekIndex + '].sessionCount');
+      drifts.push(artifactMaterializationDrift('session-count', countPath,
+        'Assembled week ' + (actual.weekNumber || actualIndex + 1) + ' prints ' + sessions.length + ' sessions; the paid plan requires ' + count + '.'));
+    }
+    sessions.forEach(function (session, sessionIndex) {
+      var marks = asArray(((session || {}).markStrip || {}).targets).length;
+      if (marks < floor) {
+        var floorPath = artifactMaterializationSource(view, 'mechanics.weeks[' + weekIndex + '].guaranteedMarksPerSession',
+          weekOwner + '[' + weekIndex + '].guaranteedMarksPerSession');
+        drifts.push(artifactMaterializationDrift('guaranteed-mark-floor', floorPath,
+          'Assembled session falls below its paid guaranteed mark floor.', {
+            weekNumber: actual.weekNumber, sessionNumber: Number((session || {}).sessionNumber) || sessionIndex + 1,
+            planned: floor, assembled: marks
+          }));
+      } else if (marks > floor) {
+        surplus.push({ weekNumber: actual.weekNumber,
+          sessionNumber: Number((session || {}).sessionNumber) || sessionIndex + 1, marks: marks - floor });
+      }
+    });
+  });
+
+  var expectedGraph = artifactMaterializationGraph(expected.economyGraph);
+  var actualGraph = materialized.mechanics.economyGraph;
+  var topology = function (rows) { return rows.map(function (edge) {
+    var next = {};
+    ['from', 'to', 'currency', 'branch'].forEach(function (field) {
+      if (edge[field] !== undefined) next[field] = edge[field];
+    });
+    return next;
+  }); };
+  var annotations = function (rows) { return rows.map(function (edge) {
+    return { from: edge.from, to: edge.to, price: edge.price, closesAtWeek: edge.closesAtWeek };
+  }); };
+  var topologyOwner = artifactTopologyOwner(view) || 'stages.shellSpine.meta.playSpine.economyGraph';
+  function firstSourceMatching(pattern, fallback) {
+    var provenance = (view || {}).provenance || {};
+    var candidates = asArray(provenance.direct).map(function (row) { return row.sourcePath; })
+      .concat(asArray(provenance.derived).reduce(function (all, row) {
+        return all.concat(asArray((row || {}).inputs).map(function (input) { return input.sourcePath; }));
+      }, []));
+    return candidates.filter(function (path) { return pattern.test(String(path || '')); })[0] || fallback;
+  }
+  if (artifactCanonical(topology(expectedGraph)) !== artifactCanonical(topology(actualGraph))) {
+    drifts.push(artifactMaterializationDrift('graph-topology', topologyOwner,
+      'Assembled economy topology differs from the paid play spine.'));
+  }
+  if (artifactCanonical(annotations(expectedGraph)) !== artifactCanonical(annotations(actualGraph))) {
+    var annotationPath = firstSourceMatching(/stages\.economyGraph\.economyGraph\[\d+\]\.(?:price|closesAtWeek)$/, topologyOwner)
+      .replace(/\[\d+\]\.(?:price|closesAtWeek)$/, '');
+    drifts.push(artifactMaterializationDrift('economy-annotation', annotationPath,
+      'Assembled economy price or deadline differs from its paid annotation.'));
+  }
+  if (artifactCanonical(artifactMaterializationSet(expected.surfaceCadences)) !== artifactCanonical(materialized.mechanics.surfaceCadences)) {
+    var cadencePath = firstSourceMatching(/\.surfaceCadences\[\d+\]\./,
+      'stages.economyGraph.surfaceCadences').replace(/\[\d+\]\..*$/, '');
+    drifts.push(artifactMaterializationDrift('surface-cadence', cadencePath,
+      'Assembled surface cadence differs from its paid cadence ledger.'));
+  }
+  if (artifactCanonical(artifactMaterializationSet(expected.consequenceEdges)) !== artifactCanonical(materialized.mechanics.consequenceEdges)) {
+    var recoveryPath = firstSourceMatching(/\.consequenceEdges\[\d+\]\./,
+      'stages.shellSpine.meta.playSpine.consequenceEdges').replace(/\[\d+\]\..*$/, '');
+    drifts.push(artifactMaterializationDrift('recovery-route', recoveryPath,
+      'Assembled recovery routes differ from the paid play spine.'));
+  }
+  if (artifactCanonical(expected.passwordElements) !== artifactCanonical(materialized.mechanics.passwordElements)) {
+    var passwordPath = firstSourceMatching(/\.passwordPath\.elements\[\d+\]$/,
+      'stages.gameRulebook.gameRulebook.passwordPath.elements').replace(/\.elements\[\d+\]$/, '');
+    // Array-order is the password itself, so unlike cadence or graph it is not
+    // normalized as a set.
+    drifts.push(artifactMaterializationDrift('password-order', passwordPath,
+      'Assembled password elements no longer preserve the paid order.'));
+  }
+  if (expected.convergenceFunded !== materialized.mechanics.convergenceFunded) {
+    drifts.push(artifactMaterializationDrift('endgame-convergence', topologyOwner,
+      'Assembly changed the simulated endgame convergence certified before prose.'));
+  }
+
+  var families = [
+    ['artifactDesign', 'artifact-design', artifactMaterializationOwner(view, 'mechanics.artifactDesign', 'stages.gameRulebook.gameRulebook.artifactDesign', null, /\.(?:governingConceit|commitments).*$/)],
+    ['bossPlan', 'boss-plan', artifactMaterializationOwner(view, 'mechanics.bossPlan', 'stages.campaignPlan.bossPlan', null, /\.(?:decodeLogic|whyItFeelsEarned|weeklyComponentType|requiredPriorKnowledge(?:\[\d+\])?).*$/)],
+    ['coreVerbs', 'core-verbs', artifactMaterializationOwner(view, 'mechanics.coreVerbs', 'stages.gameRulebook.gameRulebook.coreVerbs.verbs', null, /\[\d+\].*$/)],
+    ['currency', 'currency', artifactMaterializationOwner(view, 'mechanics.currency', 'stages.gameRulebook.gameRulebook.economy.currency')],
+    ['decisionLedger', 'decision-ledger', artifactMaterializationOwner(view, 'mechanics.decisionLedger', 'stages.shellSpine.meta.playSpine.decisionLedger', null, /\[\d+\].*$/)],
+    ['sessionRitual', 'session-ritual', artifactMaterializationOwner(view, 'mechanics.sessionRitual', 'stages.gameRulebook.gameRulebook.sessionShape.ritual', null, /\.(?:cue|on).*$/)],
+    ['teachingOrder', 'teaching-order', artifactMaterializationOwner(view, 'mechanics.teachingOrder', 'stages.gameRulebook.gameRulebook.teachingOrder.sequence', null, /\[\d+\].*$/)],
+    ['tensionBudget', 'tension-ledger', artifactMaterializationOwner(view, 'mechanics.tensionBudget', 'stages.shellSpine.meta.playSpine.tensionBudget', null, /\[\d+\].*$/)],
+    ['winCondition', 'win-condition', artifactMaterializationOwner(view, 'mechanics.winCondition', 'stages.gameRulebook.gameRulebook.winCondition.requires', null, /\[\d+\].*$/)]
+  ];
+  families.forEach(function (family) {
+    if (artifactCanonical(expected[family[0]]) === artifactCanonical(materialized.mechanics[family[0]])) return;
+    drifts.push(artifactMaterializationDrift(family[1], family[2],
+      'Assembled ' + family[0] + ' differs from its paid mechanical owner.'));
+  });
+
+  var expectedEndings = asArray(expected.endingVariants);
+  var actualEndings = asArray(materialized.mechanics.endingVariants);
+  var plannedEndingCounts = {};
+  var printedEndingCounts = {};
+  expectedEndings.forEach(function (variant) {
+    plannedEndingCounts[variant] = (plannedEndingCounts[variant] || 0) + 1;
+  });
+  actualEndings.forEach(function (variant) {
+    printedEndingCounts[variant] = (printedEndingCounts[variant] || 0) + 1;
+  });
+  var unplannedEndingCounts = {};
+  Object.keys(printedEndingCounts).forEach(function (variant) {
+    if (!plannedEndingCounts[variant]) unplannedEndingCounts[variant] = printedEndingCounts[variant];
+  });
+  Object.keys(plannedEndingCounts).forEach(function (variant) {
+    var plannedCount = plannedEndingCounts[variant];
+    var printedCount = printedEndingCounts[variant] || 0;
+    if (plannedCount === printedCount) return;
+    var index = expectedEndings.indexOf(variant);
+    var owner = artifactMaterializationSource(view, 'mechanics.endingVariants[' + index + ']', topologyOwner);
+    var actualPaths = asArray((booklet || {}).endings).reduce(function (paths, ending, printedIndex) {
+      var printedVariant = String((ending || {}).variant || '').replace(/^ending:/i, '');
+      if (printedVariant === variant) paths.push('endings[' + printedIndex + '].variant');
+      return paths;
+    }, []);
+    drifts.push(artifactMaterializationDrift('ending-materialization', owner,
+      'Planned ending ' + variant + ' has the wrong printed multiplicity.', {
+        variant: variant, plannedCount: plannedCount, printedCount: printedCount,
+        paidOwnerPath: owner, actualPaths: actualPaths
+      }));
+    // A renamed ending is one changed paid obligation, not both a missing
+    // planned row and an invented extra.  Consume only the unmatched physical
+    // rows needed to account for this shortage; genuinely additional endings
+    // remain and receive their own printed owner below.
+    var shortage = Math.max(0, plannedCount - printedCount);
+    Object.keys(unplannedEndingCounts).some(function (unplanned) {
+      var consumed = Math.min(shortage, unplannedEndingCounts[unplanned]);
+      unplannedEndingCounts[unplanned] -= consumed;
+      shortage -= consumed;
+      return shortage === 0;
+    });
+  });
+  Object.keys(unplannedEndingCounts).forEach(function (variant) {
+    if (!unplannedEndingCounts[variant]) return;
+    var actualPaths = asArray((booklet || {}).endings).reduce(function (paths, ending, printedIndex) {
+      var printedVariant = String((ending || {}).variant || '').replace(/^ending:/i, '');
+      if (printedVariant === variant) paths.push('endings[' + printedIndex + '].variant');
+      return paths;
+    }, []);
+    var owner = actualPaths[0];
+    drifts.push(artifactMaterializationDrift('ending-materialization', owner,
+      'Assembled booklet prints an unplanned ending ' + variant + '.', {
+        variant: variant, plannedCount: 0, printedCount: printedEndingCounts[variant],
+        paidOwnerPath: null, actualPaths: actualPaths
+      }));
+  });
+
+  return {
+    preserved: drifts.length === 0,
+    drifts: drifts,
+    surplus: surplus,
+    before: before,
+    after: after
+  };
+}
+
 // Can `target` be reached from `source` over guaranteed edges? Used by the
 // threshold gate: the question is not "is the threshold high" but "does
 // anything the book needs sit behind it".

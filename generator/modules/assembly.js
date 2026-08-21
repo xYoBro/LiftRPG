@@ -2960,6 +2960,13 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
   // — assigning undefined would leave an own key that the closed meta schema
   // rejects. deriveMarkStripEconomy synthesizes one below when none was authored.
   if (meta.economy) booklet.meta.economy = meta.economy;
+  // Wave 2's paid pre-prose proof is only meaningful if this assembler carries
+  // the same canonical game and spine facts into the booklet.  S+F's explicit
+  // meta projection otherwise dropped both silently while the standard path
+  // retained `shell.meta` wholesale.  They are planning records, not prose or
+  // a compatibility alias, so preserve exactly these two established homes.
+  if (meta.gameRulebook) booklet.meta.gameRulebook = meta.gameRulebook;
+  if (meta.playSpine) booklet.meta.playSpine = meta.playSpine;
   // Same conditional rule for the knowing (§11 Wave 1.5). It is authored by the
   // knowing stage onto skeleton.meta; without this line the field would reach
   // every prose prompt and then vanish from the shipped booklet, and nothing
