@@ -1,7 +1,7 @@
 // Generated from docs/jobs/publishing-compiler-status.json. Do not edit.
 window.LIFTRPG_PROGRAM_STATUS = {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-22T17:23:00-04:00",
+  "updatedAt": "2026-08-22T17:29:00-04:00",
   "overallProgress": 40,
   "eyebrow": "Publishing compiler program",
   "headline": "The machinery is becoming trustworthy.",
@@ -43,7 +43,7 @@ window.LIFTRPG_PROGRAM_STATUS = {
       },
       {
         "state": "active",
-        "text": "Correct the oracle and replace retired-corpus profiles before the final receipt-bound recording."
+        "text": "Oracle and current-profile corrections are running in parallel before the final receipt-bound recording."
       }
     ],
     "agents": [
@@ -51,29 +51,29 @@ window.LIFTRPG_PROGRAM_STATUS = {
         "name": "Orchestrator",
         "role": "Owns sequence and decisions",
         "state": "active",
-        "activity": "Adding the live workstream, then resuming oracle and profile closure.",
-        "lastSignal": "2026-08-22T17:23:00-04:00"
+        "activity": "Coordinating the oracle and current-profile lanes; review follows when both return.",
+        "lastSignal": "2026-08-22T17:29:00-04:00"
       },
       {
-        "name": "Fixture builder",
-        "role": "Runs the deterministic producer",
-        "state": "complete",
-        "activity": "Recorded valid evidence and isolated the remaining replay disagreement.",
-        "lastSignal": "2026-08-22T16:34:00-04:00"
+        "name": "Current-profile builder",
+        "role": "Replaces retired-corpus evidence",
+        "state": "active",
+        "activity": "Regenerating three layout profile contracts from the current Standard and S+F witnesses.",
+        "lastSignal": "2026-08-22T17:29:00-04:00"
+      },
+      {
+        "name": "Oracle builder",
+        "role": "Independently replays the transaction",
+        "state": "active",
+        "activity": "Separating fixed inputs from generated transcripts and preserving production model identity.",
+        "lastSignal": "2026-08-22T17:29:00-04:00"
       },
       {
         "name": "Independent reviewer",
         "role": "Challenges production claims",
-        "state": "complete",
-        "activity": "Proved two oracle bugs and froze the profile-before-rerecord sequence.",
-        "lastSignal": "2026-08-22T16:38:00-04:00"
-      },
-      {
-        "name": "Integrator",
-        "role": "Commits only reviewed work",
         "state": "waiting",
-        "activity": "No reviewed compiler commit is waiting for integration.",
-        "lastSignal": "2026-08-22T16:17:00-04:00"
+        "activity": "Waiting for both lanes; will review the combined producer transition before integration.",
+        "lastSignal": "2026-08-22T17:29:00-04:00"
       }
     ]
   },
