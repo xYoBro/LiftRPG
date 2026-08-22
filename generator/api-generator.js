@@ -6067,6 +6067,7 @@ async function runApiPipeline(options) {
   // Before the codex, before the plan, before anything. See
   // runGameRulebookStage for why FIRST is the ruling and not a convenience.
   var rulebookState = await runGameRulebookStage(settings, {
+    brief: brief,
     pipeline: 'standard',
     weekCount: weekCount,
     restoreCached: restoreStandardCheckpointedStage,
@@ -7916,7 +7917,8 @@ async function runGameRulebookStage(settings, config) {
     }, {
       requestedWeekCount: config.weekCount,
       generationFloors: true,
-      seedAssignments: config.seedAssignments
+      seedAssignments: config.seedAssignments,
+      brief: config.brief
     });
     config.checkpoint = restored.checkpoint;
     if (!restored.accepted) cached = null;
@@ -7962,7 +7964,8 @@ async function runGameRulebookStage(settings, config) {
     validate: function (result) {
       return validateGameRulebookStage(result, {
         generationFloors: true,
-        seedAssignments: config.seedAssignments
+        seedAssignments: config.seedAssignments,
+        brief: config.brief
       });
     },
     buildPrompt: function (retryState) {
@@ -8512,6 +8515,7 @@ async function runSkeletonFleshPipeline(options) {
   // The one thing that differs is which seat downstream is the spine's, and
   // that difference is why the parity floor takes its label as a parameter.
   var sfRulebookState = await runGameRulebookStage(settings, {
+    brief: brief,
     pipeline: 'skeleton-flesh',
     weekCount: weekCount,
     restoreCached: restoreSkeletonFleshCheckpointedStage,

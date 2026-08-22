@@ -1919,11 +1919,32 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
         }
         rings.forEach(function (ring, ri) {
           var label = String((ring || {}).label || '').trim();
-          if (label.length > ringGuard.ringLabelMaxChars) {
-            warnings.push('Concentric ring[' + ri + '] label is ' + label.length
-              + ' chars (recommend \u2264' + ringGuard.ringLabelMaxChars + ' for print legibility)');
+          if (floorsOn(expectedOptions) && !label) {
+            errors.push('Concentric ring[' + ri + '] label is empty; every printed ring needs a name');
+          } else if (label.length > ringGuard.ringLabelMaxChars) {
+            var ringLengthFinding = 'Concentric ring[' + ri + '] label is ' + label.length
+              + ' chars (maximum ' + ringGuard.ringLabelMaxChars + ' for print legibility)';
+            if (floorsOn(expectedOptions)) errors.push(ringLengthFinding);
+            else warnings.push(ringLengthFinding);
           }
         });
+        if (floorsOn(expectedOptions)) {
+          if (!Number.isInteger(Number(currentRing)) || Number(currentRing) < 1
+            || Number(currentRing) > rings.length) {
+            // The general current-ring arm above covers present invalid values;
+            // this generation arm additionally refuses absence.
+            if (currentRing === undefined || currentRing === null) {
+              errors.push('Concentric map: currentRing is missing; one ring must be visibly current');
+            }
+          }
+          var breachMarks = fo.mapState.breachMarks;
+          if (!Number.isInteger(Number(breachMarks)) || Number(breachMarks) < 1
+            || Number(breachMarks) > ringGuard.maxBreachMarks) {
+            errors.push('Concentric map: breachMarks=' + String(breachMarks)
+              + ' must be an integer from 1-' + ringGuard.maxBreachMarks
+              + ' so the printed map has a nonempty pencil affordance');
+          }
+        }
       }
       if (fo.mapState.mapType === 'maze') {
         var mazeGuard = SPATIAL_GUARDRAILS.maze;
@@ -2528,6 +2549,39 @@ function evidenceNames(evidence, value) {
   return text.indexOf(needle) !== -1 || text.indexOf(needle.replace(/-/g, ' ')) !== -1;
 }
 
+// Evidence is written by the model, so its merely naming a chosen enum cannot
+// prove that the user's brief funded that choice. When the real stage gate has
+// the brief, require the evidence to carry an independently observable phrase
+// from it. Exact enum text in the brief is sufficient; otherwise the evidence
+// must quote a concrete two-word phrase. Calls without a brief retain their
+// historical behavior because hand-built and focused unit fixtures do not have
+// the commission available at this seam.
+function briefFundsEvidence(brief, evidence, value) {
+  var source = String(brief || '').trim().toLowerCase();
+  if (!source) return true;
+  var proof = String(evidence || '').trim().toLowerCase();
+  var choice = String(value || '').trim().toLowerCase();
+  if (!proof || !choice) return false;
+  var choiceWords = choice.replace(/-/g, ' ');
+  if (source.indexOf(choice) !== -1 || source.indexOf(choiceWords) !== -1) return true;
+
+  var generic = {
+    make: 1, it: 1, surprising: 1, coherent: 1, playable: 1,
+    book: 1, game: 1, story: 1, experience: 1, good: 1, great: 1
+  };
+  var quotePattern = /["“`]([^"”`]+)["”`]/g;
+  var match;
+  while ((match = quotePattern.exec(proof))) {
+    var phrase = String(match[1] || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    var meaningful = phrase.split(/\s+/)
+      .filter(function (word) { return word.length >= 3 && !generic[word]; });
+    if (meaningful.length >= 2 && source.replace(/[^a-z0-9]+/g, ' ').indexOf(phrase) !== -1) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function readEvidenceAt(unit, dotPath) {
   var parts = String(dotPath || '').split('.');
   var node = unit;
@@ -2551,7 +2605,7 @@ function readEvidenceAt(unit, dotPath) {
 // and read twice. A parallel `seedObedienceWarnings` with its own copy of the
 // logic would be two answers to "did the book obey the die?", and the two would
 // stop agreeing on the first amendment either one received.
-function collectSeedObedienceFindings(unit, where, stage, seedAssignments) {
+function collectSeedObedienceFindings(unit, where, stage, seedAssignments, brief) {
   if (!seedAssignments || typeof seedAssignments !== 'object') return [];
   var axes = identityAxesForStage(stage);
   if (!axes.length) return [];
@@ -2571,7 +2625,9 @@ function collectSeedObedienceFindings(unit, where, stage, seedAssignments) {
       || (axis.answerRequired && Array.isArray(delivered) && !delivered.length);
     if (unanswered) {
       if (!axis.answerRequired) continue;
-      if (evidenceNames(readEvidenceAt(unit, axis.evidencePath), assigned)) continue;
+      var declineEvidence = readEvidenceAt(unit, axis.evidencePath);
+      if (evidenceNames(declineEvidence, assigned)
+        && briefFundsEvidence(brief, declineEvidence, assigned)) continue;
       errors.push({ axis: axis, reportOnly: !!axis.reportOnly, message:
         (where || 'Stage') + ' → ' + axis.label + ' answers nothing: the system '
         + 'assigned `' + assigned + '` and the book neither declares it nor says why not. '
@@ -2592,7 +2648,9 @@ function collectSeedObedienceFindings(unit, where, stage, seedAssignments) {
 
     var evidence = readEvidenceAt(unit, axis.evidencePath);
     var chosen = Array.isArray(delivered) ? delivered : [delivered];
-    var funded = chosen.some(function (value) { return evidenceNames(evidence, value); });
+    var funded = chosen.some(function (value) {
+      return evidenceNames(evidence, value) && briefFundsEvidence(brief, evidence, value);
+    });
     if (funded) continue;
 
     errors.push({ axis: axis, reportOnly: !!axis.reportOnly, message:
@@ -2612,8 +2670,8 @@ function collectSeedObedienceFindings(unit, where, stage, seedAssignments) {
  * The BLOCKING projection. Everything the die assigned that the book neither
  * took nor answered for, on an axis whose obedience is a contract question.
  */
-export function seedObedienceFloorErrors(unit, where, stage, seedAssignments) {
-  return collectSeedObedienceFindings(unit, where, stage, seedAssignments)
+export function seedObedienceFloorErrors(unit, where, stage, seedAssignments, brief) {
+  return collectSeedObedienceFindings(unit, where, stage, seedAssignments, brief)
     .filter(function (f) { return !f.reportOnly; })
     .map(function (f) { return f.message; });
 }
@@ -2624,8 +2682,8 @@ export function seedObedienceFloorErrors(unit, where, stage, seedAssignments) {
  * Separate function rather than a flag on the one above, so a caller cannot
  * accidentally concat report-class findings onto its blocking list.
  */
-export function seedObedienceFloorWarnings(unit, where, stage, seedAssignments) {
-  return collectSeedObedienceFindings(unit, where, stage, seedAssignments)
+export function seedObedienceFloorWarnings(unit, where, stage, seedAssignments, brief) {
+  return collectSeedObedienceFindings(unit, where, stage, seedAssignments, brief)
     .filter(function (f) { return f.reportOnly; })
     .map(function (f) { return f.message; });
 }
@@ -6141,7 +6199,7 @@ var canonicalSurfaceCadenceErrors = function (graph, surfaceCadences, options) {
   return errors;
 };
 
-export function artifactDesignStageFloorErrors(rulebook) {
+export function artifactDesignStageFloorErrors(rulebook, options) {
   var S = 'Game Rulebook → gameRulebook.artifactDesign';
   var design = (rulebook || {}).artifactDesign;
   if (!design || typeof design !== 'object' || Array.isArray(design)) {
@@ -6164,6 +6222,16 @@ export function artifactDesignStageFloorErrors(rulebook) {
     });
     if (['brief', 'seed'].indexOf(String(conceit.source || '').trim()) === -1) {
       errors.push(S + '.governingConceit.source must be `brief` or `seed`');
+    } else if (String(conceit.source || '').trim() === 'seed') {
+      var assignedConceit = String((((options || {}).seedAssignments || {}).governingConceit) || '').trim();
+      if (assignedConceit && id !== assignedConceit) {
+        errors.push(S + '.governingConceit names `' + id + '` as seed-authored, but this run assigned `'
+          + assignedConceit + '` — generated provenance cannot rewrite what the seed said');
+      }
+    } else if (!briefFundsEvidence((options || {}).brief, conceit.rationale, id)) {
+      errors.push(S + '.governingConceit names `' + id + '` as brief-authored, but its rationale '
+        + 'quotes no concrete phrase from the actual brief. A generated sentence naming the choice '
+        + 'is not independent evidence that the user funded it; take the seed assignment or cite the brief.');
     }
   }
 
@@ -6427,8 +6495,9 @@ export function validateGameRulebookStage(result, options) {
   // hand-authored fixtures. A live generation has a retry seat, so policy is
   // strict there and only there.
   if (options && options.generationFloors) {
-    errors = errors.concat(artifactDesignStageFloorErrors(rulebook));
-    errors = errors.concat(seedObedienceFloorErrors(result, 'Game Rulebook', 'gameRulebook', options.seedAssignments));
+    errors = errors.concat(artifactDesignStageFloorErrors(rulebook, options));
+    errors = errors.concat(seedObedienceFloorErrors(result, 'Game Rulebook', 'gameRulebook',
+      options.seedAssignments, options.brief));
   }
 
   if (options && options.collect) return errors;
@@ -11080,7 +11149,7 @@ export function validateSkeletonStage(result, weekCount, options) {
     // authors eight of the fifteen axes and was handed exactly those eight
     // (D148 W-2a), so it is checked against exactly those eight.
     var obedience = seedObedienceFloorErrors(result, 'Skeleton', 'skeleton',
-      (options || {}).seedAssignments);
+      (options || {}).seedAssignments, (options || {}).brief);
     if (obedience.length) return obedience.join('; ');
 
     // The arrangement floor's S+F half. Same surface, same helper, same opt-in

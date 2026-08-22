@@ -3252,10 +3252,12 @@ export var IDENTITY_AXES = [
   // axes drops from BLOCKING at a stage gate to REPORT-class at the referee.
   // Restoring it means giving the spine an evidence field of its own — a
   // doctrine decision about where a declination is recorded, which is an author
-  // ruling and is filed as one, not taken here.
+  // ruling and is filed as one, not taken here. The S+F compiler authors the
+  // play spine and artifact intent together, so its skeleton seat owns the
+  // same value/evidence pair rather than inheriting a silent default.
   { id: 'harvestPatterns', label: 'playSpine.harvestPatterns', path: 'meta.playSpine.harvestPatterns',
     menu: VALID_HARVEST_PATTERNS, kind: 'member', answerRequired: true,
-    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shellIdentity'] },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shellIdentity', 'skeleton'] },
   // THE INSTRUMENT (D170). The ludic lens's own axis, and the last one to get
   // a die — which is why the first completed book's composition was four
   // pieces of furniture. VISION §4.6 asks the compiler for a COMPOSITION
@@ -3277,10 +3279,12 @@ export var IDENTITY_AXES = [
   // (VISION §4.4). Declining is legitimate and costs one sentence.
   // THE COMPILER DECLARES; THE SPINE BUILDS — harvestPatterns' ruling above,
   // for the same reason and at the same cost. The composition's arity, menu,
-  // distinctness and role floors all still block at the spine seat.
+  // distinctness and role floors all still block at the spine seat. The S+F
+  // skeleton is also a spine seat: it chooses the composition and records the
+  // selection evidence in the same response.
   { id: 'ludicInstrument', label: 'playSpine.composition[].entry', path: 'meta.playSpine.composition',
     menu: LUDIC_DISCRETIONARY_ENTRIES, kind: 'objectMember', itemKey: 'entry', answerRequired: true,
-    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shellIdentity'] },
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['shellIdentity', 'skeleton'] },
   // ── THE VOICE SKELETON AXES (the voice die, ratified 2026-08-17; W3) ─────
   // Five axes, one per structural dimension of the narrating hand. The menus
   // are up at VOICE_PERSON_REGIMES and its siblings; the reasoning for the
@@ -3417,14 +3421,14 @@ export var IDENTITY_AXES = [
   // whatever funded the family. What it is NOT is a licence to ignore the die:
   // the exemption applies only when the declared family's own Serves row
   // refuses the assignment, and `familyRefusesGeometry()` below is the single
-  // predicate both the floor and the referee ask. Authored at the CAMPAIGN
-  // PLAN (`topology.mainMapType`) and realised in the weeks' mapState, which is
-  // why its stage is the planner's and why its obedience is report-class this
-  // wave — see the referee in quality.js for the reasoning.
+  // predicate both the floor and the referee ask. The staged pipeline authors
+  // it at the CAMPAIGN PLAN (`topology.mainMapType`); S+F authors and realises
+  // it in the skeleton's weeks. Its obedience remains report-class this wave —
+  // see the referee in quality.js for the reasoning.
   { id: 'mapGeometry', label: 'the board geometry (mapState.mapType)',
     path: 'weeks[].fieldOps.mapState.mapType',
     menu: VALID_MAP_TYPES, kind: 'dominant',
-    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['campaign-plan'], familyDecides: true }
+    evidencePath: 'meta.artifactIntent.selectionReason', stages: ['campaign-plan', 'skeleton'], familyDecides: true }
 // ── THE FORM AXES (ARRANGEMENT §2 axis 5 / §3, phase B) ─────────────────────
 // The five arrangement axes above PAINT. These three MEASURE, and they are on
 // this table for the reason ARRANGEMENT §8 gives for the paint axes: *every
