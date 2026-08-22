@@ -16,6 +16,14 @@
   const currentWave = data.waves.find((wave) => wave.state === "in_progress");
   const nextMoves = currentWave?.remaining?.slice(0, 3) ?? [];
   const shortLog = data.log.slice(0, 4);
+  const stateLabel = {
+    complete: "Complete",
+    in_progress: "In progress",
+    queued: "Queued",
+    active: "Active",
+    found: "Found",
+    investigating: "Investigating",
+  };
 
   app.innerHTML = `
     <section class="command-header" id="top">
@@ -39,18 +47,53 @@
       </dl>
     </section>
 
+    <section class="current-view" aria-labelledby="current-view-title">
+      <div class="current-view-head">
+        <p class="label">Current view</p>
+        <span class="view-state"><i aria-hidden="true"></i>${esc(stateLabel[data.currentView.state] ?? data.currentView.state)}</span>
+      </div>
+      <h2 id="current-view-title"><span>${esc(data.currentView.step)}</span> ${esc(data.currentView.title)}</h2>
+      <p class="objective">${esc(data.currentView.objective)}</p>
+      <ol class="activity-list">
+        ${data.currentView.activity
+          .map(
+            (item) => `
+              <li class="${esc(item.state)}">
+                <span>${esc(stateLabel[item.state] ?? item.state)}</span>
+                <p>${esc(item.text)}</p>
+              </li>`,
+          )
+          .join("")}
+      </ol>
+    </section>
+
     <section class="section" aria-labelledby="route-title">
-      <div class="section-head"><h2 id="route-title">Program route</h2><p>Weighted by scope</p></div>
+      <div class="section-head"><h2 id="route-title">Program route</h2><p>Open any wave</p></div>
       <div class="route">
         ${data.waves
           .map(
             (wave) => `
-              <div class="route-row ${wave.state === "in_progress" ? "current" : ""}">
-                <span class="number">${esc(wave.number)}</span>
-                <span class="title">${esc(wave.title)}</span>
-                <span class="bar"><span style="width:${Number(wave.progress)}%"></span></span>
-                <span class="percent">${esc(wave.progress)}%</span>
-              </div>`,
+              <details class="route-item ${wave.state === "in_progress" ? "current" : ""}">
+                <summary>
+                  <span class="number">${esc(wave.number)}</span>
+                  <span class="title">${esc(wave.title)}</span>
+                  <span class="bar"><span style="width:${Number(wave.progress)}%"></span></span>
+                  <span class="percent">${esc(wave.progress)}%</span>
+                  <span class="chevron" aria-hidden="true">+</span>
+                </summary>
+                <ol class="step-list">
+                  ${wave.steps
+                    .map(
+                      (step) => `
+                        <li class="${esc(step.state)}">
+                          <span class="step-id">${esc(step.id)}</span>
+                          <span class="step-title">${esc(step.title)}</span>
+                          <span class="step-state">${esc(stateLabel[step.state] ?? step.state)}</span>
+                        </li>`,
+                    )
+                    .join("")}
+                </ol>
+              </details>`,
           )
           .join("")}
       </div>

@@ -23,6 +23,30 @@ window.LIFTRPG_PROGRAM_STATUS = {
     "description": "A compact, inexpensive game treatment and representative week are ready for the author to read before any full paid book run.",
     "authorAction": "None. We will ask for a 20–40 minute canary read."
   },
+  "currentView": {
+    "step": "2.4",
+    "title": "Canonical evidence closure",
+    "state": "investigating",
+    "objective": "Make the recorder and independent replay describe the same transaction before evidence is committed.",
+    "activity": [
+      {
+        "state": "complete",
+        "text": "Recorded Standard and Skeleton + Flesh deterministically with zero validation, render-contract, or generation-floor errors."
+      },
+      {
+        "state": "found",
+        "text": "The oracle counts generated transcripts as fixed recipe inputs; the recorder correctly treats them as outputs."
+      },
+      {
+        "state": "found",
+        "text": "Independent replay changes the model identity, which changes persisted provenance."
+      },
+      {
+        "state": "active",
+        "text": "Correct the oracle and replace retired-corpus profiles before the final receipt-bound recording."
+      }
+    ]
+  },
   "waves": [
     {
       "id": "wave-1",
@@ -37,6 +61,28 @@ window.LIFTRPG_PROGRAM_STATUS = {
         "Separate run, mechanical, editorial, and release states",
         "Restored stages re-enter their real gates",
         "The user always receives banked work with an honest label"
+      ],
+      "steps": [
+        {
+          "id": "1.1",
+          "title": "Transport error closure",
+          "state": "complete"
+        },
+        {
+          "id": "1.2",
+          "title": "Honest release states",
+          "state": "complete"
+        },
+        {
+          "id": "1.3",
+          "title": "Resumed stages re-enter gates",
+          "state": "complete"
+        },
+        {
+          "id": "1.4",
+          "title": "One status-panel reader",
+          "state": "complete"
+        }
       ]
     },
     {
@@ -58,6 +104,38 @@ window.LIFTRPG_PROGRAM_STATUS = {
         "Fix oracle input inventory and replay identity",
         "Replace historical profiles with current-book profiles",
         "Rerecord evidence and run cumulative proof"
+      ],
+      "steps": [
+        {
+          "id": "2.1",
+          "title": "Executable game skeleton",
+          "state": "complete"
+        },
+        {
+          "id": "2.2",
+          "title": "Workout and materialization fidelity",
+          "state": "complete"
+        },
+        {
+          "id": "2.3",
+          "title": "Coherent deterministic witness",
+          "state": "complete"
+        },
+        {
+          "id": "2.4",
+          "title": "Canonical evidence closure",
+          "state": "in_progress"
+        },
+        {
+          "id": "2.5",
+          "title": "Current-book layout profiles",
+          "state": "queued"
+        },
+        {
+          "id": "2.6",
+          "title": "Cumulative mechanical proof",
+          "state": "queued"
+        }
       ]
     },
     {
@@ -78,6 +156,33 @@ window.LIFTRPG_PROGRAM_STATUS = {
         "Anti-attractor assessor that reports evidence without using a blacklist",
         "Executable representative-week canary",
         "Author prediction and read before full-book generation"
+      ],
+      "steps": [
+        {
+          "id": "3.1",
+          "title": "Creative-authority law",
+          "state": "complete"
+        },
+        {
+          "id": "3.2",
+          "title": "Treatment and experience-promise compiler",
+          "state": "queued"
+        },
+        {
+          "id": "3.3",
+          "title": "Anti-attractor evidence assessor",
+          "state": "queued"
+        },
+        {
+          "id": "3.4",
+          "title": "Representative-week premise canary",
+          "state": "queued"
+        },
+        {
+          "id": "3.5",
+          "title": "Author prediction and read",
+          "state": "queued"
+        }
       ]
     },
     {
@@ -94,6 +199,33 @@ window.LIFTRPG_PROGRAM_STATUS = {
         "The author-delegated Phase C authority ruling",
         "A spread-plan intermediate representation",
         "Rendered paper-scale proof"
+      ],
+      "steps": [
+        {
+          "id": "4.1",
+          "title": "Attention and content budgets",
+          "state": "queued"
+        },
+        {
+          "id": "4.2",
+          "title": "Form geometry and intact atoms",
+          "state": "queued"
+        },
+        {
+          "id": "4.3",
+          "title": "Phase C authority ruling",
+          "state": "queued"
+        },
+        {
+          "id": "4.4",
+          "title": "Spread-plan intermediate representation",
+          "state": "queued"
+        },
+        {
+          "id": "4.5",
+          "title": "Rendered paper-scale proof",
+          "state": "queued"
+        }
       ]
     },
     {
@@ -110,6 +242,33 @@ window.LIFTRPG_PROGRAM_STATUS = {
         "Complete proving-book generation and print package",
         "Author trains with and reads the book",
         "Final correction and deployment"
+      ],
+      "steps": [
+        {
+          "id": "5.1",
+          "title": "Immutable finding evidence",
+          "state": "queued"
+        },
+        {
+          "id": "5.2",
+          "title": "Finding-to-owner routing",
+          "state": "queued"
+        },
+        {
+          "id": "5.3",
+          "title": "Selective bounded replay",
+          "state": "queued"
+        },
+        {
+          "id": "5.4",
+          "title": "Complete proving book",
+          "state": "queued"
+        },
+        {
+          "id": "5.5",
+          "title": "Author paper read and release",
+          "state": "queued"
+        }
       ]
     }
   ],
