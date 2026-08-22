@@ -1,8 +1,10 @@
 (function () {
   "use strict";
+
   const data = window.LIFTRPG_PROGRAM_STATUS;
   const app = document.getElementById("app");
   if (!data || !app) return;
+
   const esc = (value) =>
     String(value ?? "")
       .replaceAll("&", "&amp;")
@@ -10,13 +12,77 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
-  const list = (items) =>
-    items?.length
-      ? `<ul>${items.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>`
-      : "";
-  const wave = (item) =>
-    `<details class="wave" ${item.state === "in_progress" ? "open" : ""}><summary><span class="wave-number">${esc(item.number)}</span><span class="wave-title">${esc(item.title)}</span><span class="wave-state"><strong>${esc(item.progress)}%</strong>${esc(item.weight)}% of program</span></summary><div class="wave-body"><p>${esc(item.promise)}</p>${list(item.delivered)}${list(item.remaining)}<div class="mini-track" aria-label="${esc(item.progress)} percent complete"><span style="width:${Number(item.progress)}%"></span></div></div></details>`;
-  app.innerHTML = `<section class="hero" id="top"><p class="eyebrow">${esc(data.eyebrow)}</p><h1>${esc(data.headline)}</h1><p class="hero-copy">${esc(data.summary)}</p><div class="hero-meta"><strong>${esc(data.current.wave)} · ${esc(data.current.label)}</strong><span>Updated ${esc(new Date(data.updatedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }))}</span></div></section><section class="progress-panel" aria-label="Overall program progress"><div class="progress-number">${esc(data.overallProgress)}<span>% through the program</span></div><div class="track"><span style="width:${Number(data.overallProgress)}%"></span></div><p class="progress-caption">Weighted by scope. The waves are intentionally not equal.</p></section><section class="current-card"><div class="current-top"><div><p class="section-label">Right now</p><h2>${esc(data.current.now)}</h2></div><span class="state-pill">In progress · ${esc(data.current.progress)}%</span></div><div class="current-copy"><p><strong>Why this matters</strong>${esc(data.current.why)}</p><p><strong>Exit condition</strong>${esc(data.current.exit)}</p></div></section><section><div class="section-head"><div><p class="section-label">The route</p><h2>Five waves. One proving book.</h2></div><p>Open a wave for its promise, what has landed, and what remains.</p></div><div class="wave-list">${data.waves.map(wave).join("")}</div></section><section><div class="section-head"><div><p class="section-label">Evidence</p><h2>${esc(data.proof.headline)}</h2></div><p>These figures describe the current deterministic witness, not a creative-quality verdict.</p></div><div class="proof-grid">${data.proof.items.map((item) => `<div class="proof-item"><span class="proof-value">${esc(item.value)}</span><span class="proof-label">${esc(item.label)}</span></div>`).join("")}</div></section><section class="milestone"><div><p class="section-label">Next moment that needs you</p><h2>${esc(data.nextMilestone.label)}</h2></div><div class="milestone-copy"><p>${esc(data.nextMilestone.description)}</p><p class="action">${esc(data.nextMilestone.authorAction)}</p></div></section><section class="terms"><div class="section-head"><div><p class="section-label">Plain language</p><h2>Three kinds of proof.</h2></div><p>The system is easier to trust when each role has one job.</p></div><div class="term-grid">${data.terms.map((item) => `<article class="term"><h3>${esc(item.term)}</h3><p class="short">${esc(item.short)}</p><p class="detail">${esc(item.detail)}</p></article>`).join("")}</div></section><section class="log"><div class="section-head"><div><p class="section-label">Milestone log</p><h2>What changed, without the noise.</h2></div><p>Append-only decisions and proof transitions. Newest first.</p></div><div class="log-list">${data.log.map((item) => `<article class="log-entry"><div class="log-date"><span class="status-dot ${esc(item.state)}"></span>${esc(item.date)}</div><div><h3>${esc(item.title)}</h3><p>${esc(item.detail)}</p></div></article>`).join("")}</div></section>`;
+
+  const currentWave = data.waves.find((wave) => wave.state === "in_progress");
+  const nextMoves = currentWave?.remaining?.slice(0, 3) ?? [];
+  const shortLog = data.log.slice(0, 4);
+
+  app.innerHTML = `
+    <section class="command-header" id="top">
+      <p class="eyebrow">Publishing compiler</p>
+      <h1>${esc(data.overallProgress)}% <span>complete.</span></h1>
+      <p class="position">${esc(data.current.wave)} is ${esc(data.current.progress)}% complete. ${esc(data.current.now)}</p>
+      <div class="meter" aria-label="${esc(data.overallProgress)} percent of the full program complete"><span style="width:${Number(data.overallProgress)}%"></span></div>
+    </section>
+
+    <section class="situation" aria-labelledby="situation-title">
+      <div>
+        <p class="label">Situation</p>
+        <h2 id="situation-title">${esc(data.current.situation)}</h2>
+        <p>${esc(data.current.why)}</p>
+      </div>
+      <dl class="fact-list">
+        <div><dt>Product risk</dt><dd>${esc(data.current.risk)}</dd></div>
+        <div><dt>Active blocker</dt><dd>${esc(data.current.blocker)}</dd></div>
+        <div><dt>Author action</dt><dd>None</dd></div>
+        <div><dt>Next author checkpoint</dt><dd>${esc(data.nextMilestone.label)}</dd></div>
+      </dl>
+    </section>
+
+    <section class="section" aria-labelledby="route-title">
+      <div class="section-head"><h2 id="route-title">Program route</h2><p>Weighted by scope</p></div>
+      <div class="route">
+        ${data.waves
+          .map(
+            (wave) => `
+              <div class="route-row ${wave.state === "in_progress" ? "current" : ""}">
+                <span class="number">${esc(wave.number)}</span>
+                <span class="title">${esc(wave.title)}</span>
+                <span class="bar"><span style="width:${Number(wave.progress)}%"></span></span>
+                <span class="percent">${esc(wave.progress)}%</span>
+              </div>`,
+          )
+          .join("")}
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="next-title">
+      <div class="section-head"><h2 id="next-title">Next three moves</h2></div>
+      <ol class="next-list">${nextMoves.map((move) => `<li>${esc(move)}</li>`).join("")}</ol>
+    </section>
+
+    <section class="author-callout">
+      <strong>When you are needed</strong>
+      <p>${esc(data.nextMilestone.authorAction)}</p>
+    </section>
+
+    <section class="section" aria-labelledby="log-title">
+      <div class="section-head"><h2 id="log-title">Recent movement</h2><p>Newest first</p></div>
+      <div class="log">
+        ${shortLog
+          .map(
+            (item) => `
+              <div class="log-row">
+                <time datetime="${esc(item.date)}"><span class="signal ${esc(item.state)}"></span> ${esc(item.date.slice(5))}</time>
+                <p>${esc(item.title)}</p>
+              </div>`,
+          )
+          .join("")}
+      </div>
+    </section>
+
+    <p class="glossary"><strong>Canary</strong> tests direction. <strong>Recorder</strong> preserves what happened. <strong>Oracle</strong> proves it independently.</p>
+  `;
 
   const restoredScroll = Number(sessionStorage.getItem("program-room-scroll"));
   if (Number.isFinite(restoredScroll) && restoredScroll > 0) {

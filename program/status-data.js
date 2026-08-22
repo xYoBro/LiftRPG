@@ -11,14 +11,17 @@ window.LIFTRPG_PROGRAM_STATUS = {
     "label": "Executable book compiler",
     "progress": 90,
     "state": "in_progress",
-    "now": "Aligning the fixture recorder and independent oracle, then replacing retired-corpus layout profiles.",
-    "why": "The artifact itself validates. The remaining disagreement is about evidence identity: which files are fixed inputs, which are generated transcripts, and which model identity an independent replay must preserve.",
+    "situation": "The book validates. Its evidence identity is being reconciled.",
+    "risk": "No artifact defect",
+    "blocker": "Evidence replay identity",
+    "now": "Resolving evidence identity, then replacing retired-corpus layout profiles.",
+    "why": "Artifact: valid. Disagreement: which files are fixed inputs and which model identity replay must preserve.",
     "exit": "Canonical evidence is independently reproducible, current-book profiles replace historical references, and the cumulative mechanical baseline is green."
   },
   "nextMilestone": {
     "label": "Premise canary ready",
     "description": "A compact, inexpensive game treatment and representative week are ready for the author to read before any full paid book run.",
-    "authorAction": "None yet. We will explicitly ask for a 20–40 minute read when the canary is ready."
+    "authorAction": "None. We will ask for a 20–40 minute canary read."
   },
   "waves": [
     {
@@ -52,10 +55,9 @@ window.LIFTRPG_PROGRAM_STATUS = {
         "Zero canonical, render-contract, and generation-floor errors after recording"
       ],
       "remaining": [
-        "Correct two independent-oracle identity assumptions",
-        "Replace historical layout profiles with current-book evidence",
-        "Rerecord and commit receipt-bound canonical evidence",
-        "Run the cumulative deterministic and bounded browser proof"
+        "Fix oracle input inventory and replay identity",
+        "Replace historical profiles with current-book profiles",
+        "Rerecord evidence and run cumulative proof"
       ]
     },
     {
