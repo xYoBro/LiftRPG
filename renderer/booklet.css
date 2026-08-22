@@ -3105,8 +3105,8 @@ body[data-booklet-loaded="true"] .renderer-empty-state{
   padding-top:4px;
 }
 .boss-right > .week-progress{
-  margin-top:8px;
-  padding-top:0;
+  margin-top:auto;
+  padding-top:8px;
 }
 
 .week-progress-dots{

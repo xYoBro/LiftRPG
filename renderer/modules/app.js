@@ -1,4 +1,5 @@
 import { decryptBlob, encryptBlob } from './crypto.js?v=48';
+import { fontFacesStillLoading, verticalFlowSlackPx } from './audit-geometry.mjs?v=48';
 import { qs } from './dom.js?v=48';
 import { exportBookletPdf } from './pdf-export.js?v=48';
 import { renderBooklet, syncLayoutMode } from './render.js?v=48';
@@ -53,10 +54,13 @@ function syncLoadedState() {
 // States: idle (nothing loaded) → rendering → settled; stalled on timeout.
 // `settled` is only ever raised by a watcher whose generation still matches,
 // and only when ALL of:
-//   (a) document.fonts.status === 'loaded' — no face in flight. Re-checked at
-//       every sample and un-latched by the FontFaceSet 'loading' event, because
-//       'loaded' is ALSO what the set reports BEFORE loading has begun. That is
-//       not a hypothetical: MEASURED on this renderer, document.fonts.ready
+//   (a) no observable FontFace has status `loading` — re-checked at every
+//       sample and un-latched by the FontFaceSet 'loading' event. Safari can
+//       retain the aggregate set status `loading` after every face settles, so
+//       the faces are the authority; the aggregate is only the fallback when a
+//       browser does not expose them. This also avoids the opposite lie:
+//       `loaded` is what the set reports BEFORE loading has begun. That is not
+//       hypothetical: MEASURED on this renderer, document.fonts.ready
 //       resolves ~250ms in against the TOOLBAR's faces — before the booklet has
 //       rendered at all (~600ms) and before its own faces have been requested.
 //       Awaiting that promise proves nothing about the book.
@@ -117,7 +121,7 @@ function bookletGeometrySignature() {
 }
 
 function renderSettleBlocker(sample) {
-  if (document.fonts && document.fonts.status !== 'loaded') return 'fonts-loading';
+  if (fontFacesStillLoading(document.fonts)) return 'fonts-loading';
   // Two forms of the same debt. The token says a re-render has been SCHEDULED;
   // fontRerenderOwed() says the layout on screen was computed against fewer
   // faces than are down now, which is true from the instant the face lands —
@@ -223,10 +227,25 @@ function roundAuditPx(value) {
 function summarizeWeeklyAudit(config) {
   const pages = [...refs.booklet.querySelectorAll('.booklet-page[data-page-number]')];
   if (!pages.length || !window.__v2PageCount || pages.length !== window.__v2PageCount) {
-    return { status: 'pending' };
+    return {
+      status: 'pending',
+      reason: 'page-count',
+      pages: pages.length,
+      expectedPages: Number(window.__v2PageCount || 0)
+    };
   }
-  if (document.fonts && document.fonts.status !== 'loaded') {
-    return { status: 'pending' };
+  if (fontFacesStillLoading(document.fonts)) {
+    const pendingFonts = typeof document.fonts.values === 'function'
+      ? [...document.fonts.values()]
+        .filter((face) => face.status === 'loading')
+        .map((face) => face.family)
+        .slice(0, 8)
+      : [];
+    return {
+      status: 'pending',
+      reason: 'fonts-' + document.fonts.status,
+      pendingFonts
+    };
   }
 
   const failures = [];
@@ -237,6 +256,17 @@ function summarizeWeeklyAudit(config) {
   const inspectPages = new Set(Array.isArray(config.inspectPages) ? config.inspectPages : []);
   const inspectedPages = [];
   let auditedPages = 0;
+
+  function flowRectsBetween(start, end) {
+    const rects = [];
+    let node = start ? start.nextElementSibling : null;
+    while (node && node !== end) {
+      const rect = node.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) rects.push(rect);
+      node = node.nextElementSibling;
+    }
+    return rects;
+  }
 
   function fail(message) {
     if (failures.length < 12) failures.push(message);
@@ -260,6 +290,7 @@ function summarizeWeeklyAudit(config) {
     if (inspectPages.has(pageNumber)) {
       const sessionCards = page.querySelector('.session-cards');
       const sessionRect = sessionCards ? sessionCards.getBoundingClientRect() : null;
+      const workoutFlowRects = flowRectsBetween(sessionCards, footer);
       const mechanicContent = page.querySelector('.rp-content');
       const mechanicRect = mechanicContent ? mechanicContent.getBoundingClientRect() : null;
       inspectedPages.push({
@@ -267,7 +298,9 @@ function summarizeWeeklyAudit(config) {
         pageType,
         footerBottomGapPx: (frameRect && footerRect) ? roundAuditPx(frameRect.bottom - footerRect.bottom) : null,
         contentBottomGapPx: (frameRect && lastChildRect) ? roundAuditPx(frameRect.bottom - lastChildRect.bottom) : null,
-        workoutSlackPx: (sessionRect && footerRect) ? roundAuditPx(footerRect.top - sessionRect.bottom) : null,
+        workoutSlackPx: (sessionRect && footerRect)
+          ? roundAuditPx(verticalFlowSlackPx(sessionRect, workoutFlowRects, footerRect))
+          : null,
         mechanicSlackPx: (mechanicRect && footerRect) ? roundAuditPx(footerRect.top - mechanicRect.bottom) : null,
         frameOverflowPx: frame ? Math.max(0, frame.scrollHeight - frame.clientHeight) : null,
         sessionCardCount: page.querySelectorAll('.session-card').length,
@@ -319,13 +352,17 @@ function summarizeWeeklyAudit(config) {
     if (pageType === 'workout-left') {
       const sessionCards = page.querySelector('.session-cards');
       const sessionRect = sessionCards ? sessionCards.getBoundingClientRect() : null;
+      const workoutFlowRects = flowRectsBetween(sessionCards, footer);
       const cardCountAttr = frame ? Number(frame.getAttribute('data-card-count') || 0) : 0;
       const sessionCardCount = page.querySelectorAll('.session-card').length;
       if (sessionCardCount !== cardCountAttr) {
         fail('page ' + page.dataset.pageNumber + ' (workout-left) lost card-count metadata');
       }
       if (sessionRect && footerRect) {
-        const slack = footerRect.top - sessionRect.bottom;
+        // Clocks and reckoning panels are printed content, not empty space.
+        // Sum every real gap around them so a later hole cannot hide behind an
+        // earlier valid sibling.
+        const slack = verticalFlowSlackPx(sessionRect, workoutFlowRects, footerRect);
         if (slack > config.maxWorkoutSlackPx) {
           fail('page ' + page.dataset.pageNumber + ' (workout-left) has ' + Math.round(slack * 100) / 100 + 'px of slack');
         }
@@ -365,7 +402,7 @@ function publishAuditStatus() {
 
   const summary = summarizeWeeklyAudit(state.auditConfig);
   if (summary.status === 'pending') {
-    document.title = 'LIFTRPG_AUDIT_PENDING';
+    document.title = 'LIFTRPG_AUDIT_PENDING:' + encodeURIComponent(JSON.stringify(summary));
     return;
   }
 
@@ -391,7 +428,7 @@ function renderCurrentBooklet() {
 }
 
 function waitForFontsReady() {
-  if (!document.fonts || document.fonts.status === 'loaded') {
+  if (!fontFacesStillLoading(document.fonts)) {
     return Promise.resolve();
   }
   return document.fonts.ready.catch(() => {});
