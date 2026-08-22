@@ -1,7 +1,7 @@
 // Generated from docs/jobs/publishing-compiler-status.json. Do not edit.
 window.LIFTRPG_PROGRAM_STATUS = {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-22T17:29:00-04:00",
+  "updatedAt": "2026-08-22T18:13:24-04:00",
   "overallProgress": 40,
   "eyebrow": "Publishing compiler program",
   "headline": "The machinery is becoming trustworthy.",
@@ -13,9 +13,9 @@ window.LIFTRPG_PROGRAM_STATUS = {
     "state": "in_progress",
     "situation": "The book validates. Its evidence identity is being reconciled.",
     "risk": "No artifact defect",
-    "blocker": "Evidence replay identity",
-    "now": "Resolving evidence identity, then replacing retired-corpus layout profiles.",
-    "why": "Artifact: valid. Disagreement: which files are fixed inputs and which model identity replay must preserve.",
+    "blocker": "Safari weekly-audit handshake",
+    "now": "Binding the weekly profile audit to the exact Safari tab it opens.",
+    "why": "The oracle repair is complete. Layout and mechanic profiles regenerate cleanly, but Safari never publishes the weekly audit result, so the atomic recorder correctly rolls all three profiles back.",
     "exit": "Canonical evidence is independently reproducible, current-book profiles replace historical references, and the cumulative mechanical baseline is green."
   },
   "nextMilestone": {
@@ -43,7 +43,15 @@ window.LIFTRPG_PROGRAM_STATUS = {
       },
       {
         "state": "active",
-        "text": "Oracle and current-profile corrections are running in parallel before the final receipt-bound recording."
+        "text": "The oracle repair now passes four additional replay checks; seven genuine public-profile and browser checks remain."
+      },
+      {
+        "state": "found",
+        "text": "Layout and mechanic profiles regenerate with zero errors, then the Safari weekly audit times out and the recorder rolls the batch back."
+      },
+      {
+        "state": "active",
+        "text": "Reproducing the Safari failure and binding the audit harness to one exact tab before rerecording."
       }
     ],
     "agents": [
@@ -51,29 +59,29 @@ window.LIFTRPG_PROGRAM_STATUS = {
         "name": "Orchestrator",
         "role": "Owns sequence and decisions",
         "state": "active",
-        "activity": "Coordinating the oracle and current-profile lanes; review follows when both return.",
-        "lastSignal": "2026-08-22T17:29:00-04:00"
+        "activity": "Reproduced the weekly-audit timeout; testing exact-tab binding as the leading cause.",
+        "lastSignal": "2026-08-22T18:13:24-04:00"
       },
       {
         "name": "Current-profile builder",
         "role": "Replaces retired-corpus evidence",
-        "state": "active",
-        "activity": "Regenerating three layout profile contracts from the current Standard and S+F witnesses.",
-        "lastSignal": "2026-08-22T17:29:00-04:00"
+        "state": "blocked",
+        "activity": "Layout and mechanic profiles passed; the weekly Safari audit did not enter audit mode, so all profile writes were rolled back.",
+        "lastSignal": "2026-08-22T17:53:00-04:00"
       },
       {
         "name": "Oracle builder",
         "role": "Independently replays the transaction",
-        "state": "active",
-        "activity": "Separating fixed inputs from generated transcripts and preserving production model identity.",
-        "lastSignal": "2026-08-22T17:29:00-04:00"
+        "state": "complete",
+        "activity": "Separated generated transcripts from fixed recipe inputs and preserved the production model identity; PC-A2 improved from 141/11 to 145/7.",
+        "lastSignal": "2026-08-22T17:51:00-04:00"
       },
       {
         "name": "Independent reviewer",
         "role": "Challenges production claims",
         "state": "waiting",
         "activity": "Waiting for both lanes; will review the combined producer transition before integration.",
-        "lastSignal": "2026-08-22T17:29:00-04:00"
+        "lastSignal": "2026-08-22T18:13:24-04:00"
       }
     ]
   },
@@ -341,6 +349,12 @@ window.LIFTRPG_PROGRAM_STATUS = {
     }
   ],
   "log": [
+    {
+      "date": "2026-08-22",
+      "state": "investigating",
+      "title": "Current-profile recording is blocked at the Safari audit handshake",
+      "detail": "Layout and mechanic profiles regenerate with zero errors. Safari never publishes the weekly audit title, so the atomic recorder rolls the entire profile batch back instead of preserving partial evidence."
+    },
     {
       "date": "2026-08-22",
       "state": "investigating",
