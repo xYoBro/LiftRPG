@@ -184,6 +184,101 @@ p {
   line-height: 1.4;
 }
 
+.current-view {
+  margin-top: 54px;
+  padding: 30px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+}
+
+.current-view-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.current-view-head .label {
+  margin-bottom: 0;
+}
+
+.view-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--amber);
+  font-size: 12px;
+}
+
+.view-state i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--amber);
+}
+
+.current-view h2 {
+  margin: 24px 0 10px;
+  font-size: clamp(27px, 4vw, 38px);
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+}
+
+.current-view h2 span {
+  margin-right: 8px;
+  color: var(--soft);
+  font-weight: 450;
+}
+
+.objective {
+  max-width: 680px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.activity-list {
+  margin: 25px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.activity-list li {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  gap: 20px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.activity-list li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.activity-list li > span {
+  color: var(--soft);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding-top: 3px;
+}
+
+.activity-list li.active > span {
+  color: var(--blue);
+}
+
+.activity-list li.found > span {
+  color: var(--amber);
+}
+
+.activity-list p {
+  margin-bottom: 0;
+  line-height: 1.45;
+}
+
 .section {
   padding-top: 54px;
 }
@@ -212,37 +307,95 @@ p {
   border-top: 1px solid var(--line);
 }
 
-.route-row {
+.route-item {
+  border-bottom: 1px solid var(--line);
+}
+
+.route-item summary {
   display: grid;
-  grid-template-columns: 32px 1fr 78px 46px;
+  grid-template-columns: 32px 1fr 78px 46px 16px;
   gap: 16px;
   align-items: center;
   min-height: 58px;
-  border-bottom: 1px solid var(--line);
   font-size: 14px;
+  list-style: none;
+  cursor: pointer;
 }
 
-.route-row .number,
-.route-row .percent {
+.route-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.route-item .number,
+.route-item .percent {
   color: var(--soft);
   font-variant-numeric: tabular-nums;
 }
 
-.route-row.current .title {
+.route-item.current .title {
   font-weight: 700;
 }
 
-.route-row .bar {
+.route-item .bar {
   height: 3px;
   border-radius: 9px;
   background: #e3e3dd;
 }
 
-.route-row .bar span {
+.route-item .bar span {
   display: block;
   height: 100%;
   border-radius: inherit;
   background: var(--blue);
+}
+
+.chevron {
+  color: var(--soft);
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 160ms ease;
+}
+
+.route-item[open] .chevron {
+  transform: rotate(45deg);
+}
+
+.step-list {
+  margin: 0 0 17px 48px;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.step-list li {
+  display: grid;
+  grid-template-columns: 46px 1fr 84px;
+  gap: 14px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.step-list li:last-child {
+  border-bottom: 0;
+}
+
+.step-id,
+.step-state {
+  color: var(--soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.step-state {
+  text-align: right;
+}
+
+.step-list .complete .step-state {
+  color: var(--green);
+}
+
+.step-list .in_progress .step-state {
+  color: var(--blue);
 }
 
 .next-list {
@@ -350,12 +503,16 @@ p {
     gap: 36px;
   }
 
-  .route-row {
-    grid-template-columns: 26px 1fr 40px;
+  .route-item summary {
+    grid-template-columns: 26px 1fr 40px 14px;
   }
 
-  .route-row .bar {
+  .route-item .bar {
     display: none;
+  }
+
+  .step-list {
+    margin-left: 42px;
   }
 
   .author-callout {
@@ -380,6 +537,24 @@ p {
   .log-row {
     grid-template-columns: 1fr;
     gap: 5px;
+  }
+
+  .current-view {
+    padding: 22px;
+  }
+
+  .activity-list li {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .step-list li {
+    grid-template-columns: 38px 1fr;
+  }
+
+  .step-state {
+    grid-column: 2;
+    text-align: left;
   }
 }
 
