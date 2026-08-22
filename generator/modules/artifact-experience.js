@@ -5,8 +5,7 @@
 // separate question: does this particular book still carry the experience its
 // owners promised before any prose was bought?
 
-import { buildSurfaceIndex, surfaceRefResolves } from './validation.js';
-import { toSlugWords } from './assembly.js';
+import { buildMaterializedSurfaceIndex, resolveMaterializedSurfaceRef } from './materialized-surfaces.js';
 import { applyRulebookAmendments } from './constants.js';
 
 function clone(value) {
@@ -259,61 +258,8 @@ export function readArtifactExperienceProjection(bank, options) {
   return { projection: deepFreeze(projection), blocking: validation.blocking };
 }
 
-function parseRef(ref) {
-  var raw = String(ref || '').trim();
-  if (!raw || raw.indexOf(':') === -1) return { kind: raw.toLowerCase(), id: '' };
-  var colon = raw.indexOf(':');
-  var kind = raw.slice(0, colon).trim().toLowerCase();
-  if (kind === 'markstrip') kind = 'markStrip';
-  return { kind: kind, id: raw.slice(colon + 1).trim() };
-}
-
-function weekForRef(id) {
-  var match = /^w\s*(\d+)/i.exec(String(id || ''));
-  return match ? Number(match[1]) : null;
-}
-
-// buildSurfaceIndex is the publishing compiler's one vocabulary for authored
-// surfaces. Materialization is intentionally stricter than its planning-time
-// promise rule: at assembly there are no future surfaces left to promise.
-function materializedSurface(booklet, index, ref) {
-  var parsed = parseRef(ref);
-  var weeks = Array.isArray((booklet || {}).weeks) ? booklet.weeks : [];
-  if (!surfaceRefResolves(index, ref).ok) return false;
-  if (parsed.kind === 'boss') return weeks.some(function (week) { return !!(week || {}).bossEncounter; });
-  if (parsed.kind === 'assembly' || parsed.kind === 'banked') return true;
-  if (!parsed.id) return false;
-
-  var weekNumber = weekForRef(parsed.id);
-  if (parsed.kind === 'week') {
-    return weekNumber !== null && !!index.weeks[weekNumber];
-  }
-  if (parsed.kind === 'reckoning') {
-    return weeks.some(function (week) {
-      return Number((week || {}).weekNumber) === weekNumber && !!(week || {}).reckoning;
-    });
-  }
-  if (parsed.kind === 'session') {
-    var sessionMatch = /^w\s*(\d+)(?:\s*[.\-]?\s*(\d+))?/i.exec(parsed.id);
-    if (!sessionMatch) return false;
-    var sessionWeek = weeks.find(function (week) { return Number((week || {}).weekNumber) === Number(sessionMatch[1]); });
-    return !!sessionWeek && (!sessionMatch[2] || (sessionWeek.sessions || []).length >= Number(sessionMatch[2]));
-  }
-  if (parsed.kind === 'markStrip') {
-    return weeks.some(function (week) {
-      if (weekNumber !== null && Number((week || {}).weekNumber) !== weekNumber) return false;
-      return (week.sessions || []).some(function (session) { return !!(session || {}).markStrip; });
-    });
-  }
-  if (parsed.kind === 'oracle') {
-    return weeks.some(function (week) {
-      if (weekNumber !== null && Number((week || {}).weekNumber) !== weekNumber) return false;
-      var ops = (week || {}).fieldOps || {};
-      return !!(ops.oracleTable || ops.oracle);
-    });
-  }
-  var bucket = index.kinds[parsed.kind];
-  return !!(bucket && bucket[toSlugWords(parsed.id)]);
+function materializedSurface(_booklet, index, ref) {
+  return resolveMaterializedSurfaceRef(index, ref).ok;
 }
 
 function projectionOwner(projection, valuePath) {
@@ -332,7 +278,7 @@ function projectionOwner(projection, valuePath) {
 export function compareArtifactExperienceMaterialization(projection, booklet) {
   var doc = booklet || {};
   var drifts = [];
-  var actualIndex = buildSurfaceIndex(doc);
+  var actualIndex = buildMaterializedSurfaceIndex(doc);
   var surfaceIndex = { promise: { resolved: String((((doc.meta || {}).artifactIntent || {}).artifactPromise || '')) === String((projection || {}).artifactPromise || '') }, commitments: [] };
   if (!surfaceIndex.promise.resolved) {
     var promiseOwner = projectionOwner(projection, 'experience.artifactPromise');

@@ -2565,7 +2565,10 @@ export var BOOKLET_SCHEMA = {
         title: { type: 'string' },
         subtitle: { type: 'string' },
         narrative: { type: 'string' },
-        mechanismDescription: { type: 'string' },
+        whyItFeelsEarned: nonEmptyString,
+        requiredPriorKnowledge: {
+          type: 'array', minItems: 1, items: nonEmptyString
+        },
         componentInputs: { type: 'array' },
         decodingKey: {
           type: 'object',
@@ -2584,7 +2587,12 @@ export var BOOKLET_SCHEMA = {
           properties: { ifA: { type: 'string' }, ifB: { type: 'string' } }
         },
         _x: xt
-      }
+      },
+      allOf: [{
+        if: { required: ['whyItFeelsEarned'] },
+        then: { required: ['requiredPriorKnowledge'] },
+        else: { not: { required: ['requiredPriorKnowledge'] } }
+      }]
     },
 
     fragment: {

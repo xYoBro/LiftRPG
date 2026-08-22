@@ -319,7 +319,7 @@
     '  told about and can never touch.',
     '',
     '### bossEncounter',
-    '- Shape: { title, narrative, mechanismDescription, componentInputs, decodingKey, convergenceProof, passwordRevealInstruction, binaryChoiceAcknowledgement?: { ifA, ifB } }',
+    '- Shape: { title, narrative, componentInputs, decodingKey, convergenceProof, passwordRevealInstruction, binaryChoiceAcknowledgement?: { ifA, ifB } }',
     '- `decodingKey`: { instruction, referenceTable }',
     '- `componentInputs` must match the prior weeklyComponent values in order. This is the',
     '  collection record and it is fixed in every convergence pattern — a pattern changes what',
@@ -798,8 +798,8 @@
     '',
     '## bossPlan (object)',
     '- `passwordWord` (string): the target password (all-caps, e.g., "HERON")',
-    '- `decodingLogic` (string): how componentValues map to letters (e.g., "A1Z26: 1=A, 2=B, ..., 26=Z")',
-    '- `convergenceRequirements` (string): what the boss encounter must reference from prior weeks',
+    '- `whyItFeelsEarned` (string): why the final decision is earned by prior play',
+    '- `requiredPriorKnowledge` (string[]): exact prior printed surface refs the boss asks the player to use',
     '- `binaryChoiceSetup` (string): what choice was offered and how the boss acknowledges both paths',
     '',
     '## endingVariants (string[])',
@@ -898,7 +898,7 @@
     fragmentRegistry: [
       { id: 'F.01', documentType: '', inWorldAuthor: '', inWorldRecipient: '', title: '', narrativePurpose: '' }
     ],
-    bossPlan: { passwordWord: '', decodingLogic: '', convergenceRequirements: '', binaryChoiceSetup: '' },
+    bossPlan: { passwordWord: '', whyItFeelsEarned: '', requiredPriorKnowledge: [], binaryChoiceSetup: '' },
     endingVariants: ['canonical']
   }, null, 2);
 
@@ -1444,11 +1444,14 @@
       },
       bossPlan: {
         type: 'object',
+        additionalProperties: false,
         properties: {
-          passwordWord: { type: 'string' }, decodingLogic: { type: 'string' },
-          convergenceRequirements: { type: 'string' }, binaryChoiceSetup: { type: 'string' }
+          passwordWord: { type: 'string' },
+          whyItFeelsEarned: { type: 'string' },
+          requiredPriorKnowledge: { type: 'array', minItems: 1, items: { type: 'string' } },
+          binaryChoiceSetup: { type: 'string' }
         },
-        required: ['passwordWord', 'decodingLogic', 'convergenceRequirements']
+        required: ['passwordWord', 'whyItFeelsEarned', 'requiredPriorKnowledge']
       },
       endingVariants: { type: 'array', items: { type: 'string' } }
     },
@@ -6515,10 +6518,8 @@
       }
     ],
     bossPlan: {
-      decodeLogic: '',
       whyItFeelsEarned: '',
-      requiredPriorKnowledge: [],
-      weeklyComponentType: ''
+      requiredPriorKnowledge: []
     },
     fragmentRegistry: [
       {

@@ -602,6 +602,7 @@ import {
   SURFACE_REF_KINDS,
   SURFACE_REF_SINGLETONS,
   parseSurfaceRef,
+  surfaceRefKey,
   VALID_GATE_STRUCTURES,
   GATE_STRUCTURE_SHAPES,
   VALID_LEGACY_MOVES,
@@ -698,6 +699,7 @@ export {
   SURFACE_REF_KINDS,
   SURFACE_REF_SINGLETONS,
   parseSurfaceRef,
+  surfaceRefKey,
   // ── The Ludic Harvest, tranche 1 (W5a) ────────────────────────────────
   // The tier-2 patterns that landed a declaration surface. Same seam, same
   // rule: parseBranchRef has one home beside parseSurfaceRef, because a

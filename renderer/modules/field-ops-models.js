@@ -282,7 +282,6 @@ export function buildBossPageModel(data, week, options = 'standard') {
     : requestedLayoutVariant;
   const narrativeParagraphs = splitParagraphs(sanitizeBossTextForDisplay(boss.narrative || '', derivedPassword));
   const splitNarrative = splitLongNarrativeParagraphs(narrativeParagraphs);
-  const mechanismParagraphs = splitParagraphs(sanitizeBossTextForDisplay(boss.mechanismDescription || '', derivedPassword));
   const splitInstruction = splitLongInstruction(sanitizeBossTextForDisplay(decodingKey.instruction || '', derivedPassword), 170);
   // THE PROOF'S OWN PARAGRAPHS, COUNTED (2026-08-20). `.boss-proof` prints
   // under a slot budget, and the renderer cannot tell which of these paragraphs
@@ -301,7 +300,6 @@ export function buildBossPageModel(data, week, options = 'standard') {
   if (hasConvergenceAppendix) {
     continuationAppendixParagraphs.push.apply(continuationAppendixParagraphs, splitNarrative.tail);
     if (splitInstruction.tail) continuationAppendixParagraphs.push(splitInstruction.tail);
-    continuationAppendixParagraphs.push.apply(continuationAppendixParagraphs, mechanismParagraphs.slice(1));
     continuationAppendixParagraphs.push.apply(continuationAppendixParagraphs, proofParagraphs);
   }
 
@@ -316,9 +314,12 @@ export function buildBossPageModel(data, week, options = 'standard') {
       ? ((boss.title || week.title || 'Convergence') + ' — Continued')
       : (boss.title || week.title || 'Convergence'),
     narrativeParagraphs: isContinuation ? [] : (hasConvergenceAppendix ? splitNarrative.head : narrativeParagraphs),
-    mechanismParagraphs: isContinuation ? [] : (hasConvergenceAppendix ? mechanismParagraphs.slice(0, 1) : mechanismParagraphs),
+    mechanismParagraphs: [],
     decodingInstruction: isContinuation ? '' : (hasConvergenceAppendix ? splitInstruction.head : (decodingKey.instruction || '')),
     decodingTable: isContinuation ? '' : normalizeDecodingTable(decodingKey.referenceTable),
+    whyItFeelsEarned: isContinuation ? '' : sanitizeBossTextForDisplay(boss.whyItFeelsEarned || '', derivedPassword),
+    requiredPriorKnowledge: isContinuation ? [] : (boss.requiredPriorKnowledge || []).map((ref) =>
+      sanitizeBossTextForDisplay(String(ref || ''), derivedPassword)),
     componentInputs: isContinuation ? [] : (boss.componentInputs || []).map((item, index) => ({
       weekLabel: 'W' + pad2(componentInputWeekNumber(item, index)),
       value: formatComponentInputValue(item)

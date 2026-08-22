@@ -179,7 +179,7 @@ function findBossPasswordSpoiler(boss) {
   if (!boss || typeof boss !== 'object') return '';
   var texts = [
     boss.narrative,
-    boss.mechanismDescription,
+    (boss.decodingKey || {}).instruction,
     boss.convergenceProof,
     boss.passwordRevealInstruction
   ].filter(Boolean).map(function (value) { return String(value); });

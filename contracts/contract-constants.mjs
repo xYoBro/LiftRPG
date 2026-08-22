@@ -22,7 +22,7 @@ export var SCHEMA_VERSION = '1.5.0';
 // SCHEMA_VERSION exactly. 1.5.0 is strictly additive over 1.4.0 (the
 // percentile-stat companion type plus its optional fields), so 1.4.0 documents
 // remain readable; normalization bumps them to SCHEMA_VERSION (D21).
-export var ACCEPTED_SCHEMA_VERSIONS = ['1.4.0', '1.5.0'];
+export var ACCEPTED_SCHEMA_VERSIONS = [SCHEMA_VERSION];
 
 // Extension namespace: pipeline telemetry, migration residue, and any
 // non-contract data live under `_x` (top level, week level, or bossEncounter
@@ -3817,6 +3817,24 @@ export function parseSurfaceRef(ref) {
     return out;
   }
   return out;
+}
+
+/**
+ * Return the canonical identity for a grammatical surface reference.
+ *
+ * Parsing and identity deliberately share this home: every graph, simulator,
+ * and materialization reader must agree that spelling/case differences in an
+ * id do not create a second printed surface.
+ */
+export function surfaceRefKey(ref) {
+  var parsed = ref && typeof ref === 'object' && Object.prototype.hasOwnProperty.call(ref, 'valid')
+    ? ref : parseSurfaceRef(ref);
+  if (!parsed || !parsed.valid) return '';
+  var normalizedId = String(parsed.id || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+  return parsed.id ? parsed.kind + ':' + normalizedId : parsed.kind;
 }
 
 // ── THE RULEBOOK FLAVOUR-AMENDMENT CHANNEL (2026-08-20) ─────────────────────

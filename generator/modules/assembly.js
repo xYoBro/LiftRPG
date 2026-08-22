@@ -735,7 +735,6 @@ export function buildContinuityLedger(context) {
     if (entry && entry.id) overflowIds[normalizeId(entry.id)] = true;
   });
 
-  var bossPlan = campaignPlan.bossPlan || {};
   var expectedBossInputCount = weeks.filter(function (week) { return !week.isBossWeek; }).length;
   if (!expectedBossInputCount && Array.isArray(campaignPlan.weeks)) {
     expectedBossInputCount = Math.max(0, campaignPlan.weeks.length - 1);
@@ -744,7 +743,7 @@ export function buildContinuityLedger(context) {
   return {
     artifactIdentity: identity,
     weekCount: Array.isArray(campaignPlan.weeks) ? campaignPlan.weeks.length : weeks.length,
-    weeklyComponentType: firstNonEmpty((shell.meta || {}).weeklyComponentType, bossPlan.weeklyComponentType),
+    weeklyComponentType: firstNonEmpty((shell.meta || {}).weeklyComponentType),
     expectedBossInputCount: expectedBossInputCount,
     componentValues: componentValues,
     fragmentIds: fragmentIds,

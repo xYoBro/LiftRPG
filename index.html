@@ -3458,8 +3458,7 @@
         <div class="card card-back">
           <div class="back-top-row">
             <button class="flip-return flip-btn" type="button">&#x21BB; Back</button>
-            <a class="download-btn" href="liftrpg-eastern-shore.json" download="liftrpg-eastern-shore.json">&#x2913;
-              Download JSON</a>
+            <a class="download-btn" href="renderer/">Open Renderer</a>
           </div>
           <div class="kicker">The Drowning Season</div>
           <div class="rule"></div>
@@ -4206,7 +4205,7 @@
       // Preload demo iframe on page load so it's ready before flip
       var preloadFrame = document.getElementById('preview-frame');
       if (preloadFrame && !preloadFrame.getAttribute('src')) {
-        preloadFrame.src = 'renderer/?demo=liftrpg-eastern-shore&demoView=1&mode=spread';
+        preloadFrame.src = 'renderer/?demoView=1&mode=spread';
       }
 
       if (details) {
@@ -4427,31 +4426,15 @@
         endings: 'Ending',
         quality: 'Quality Check'
       };
-      // The progress rail shows the stages of the SELECTED pipeline, not the
-      // union of all of them — a node that can never light up is a UI lie.
-      // Multi-stage and structured share a shape; Skeleton+Flesh has its own.
-      var API_STAGE_ORDER_BY_PIPELINE = {
-        generateMultiStage: [
-          { key: 'gameRulebook', label: STAGE_LABELS.gameRulebook },
-          { key: 'layerBible', label: STAGE_LABELS.layerBible },
-          { key: 'campaignPlan', label: STAGE_LABELS.campaignPlan },
-          { key: 'shellIdentity', label: STAGE_LABELS.shellIdentity },
-          { key: 'shellSpine', label: STAGE_LABELS.shellSpine },
-          { key: 'economyGraph', label: STAGE_LABELS.economyGraph },
-          { key: 'knowing', label: STAGE_LABELS.knowing },
-          { key: 'shellRules', label: STAGE_LABELS.shellRules },
-          { key: 'shellTheme', label: STAGE_LABELS.shellTheme },
-          { key: 'weeks', label: STAGE_LABELS.weeks },
-          { key: 'fragments', label: STAGE_LABELS.fragments },
-          { key: 'endings', label: STAGE_LABELS.endings },
-          { key: 'quality', label: STAGE_LABELS.quality }
-        ],
-        // generateSkeletonFlesh's rail retired with the option itself
-        // (2026-08-17). A rail for a pipeline nothing can select is a node that
-        // can never light up, which is the UI lie this table exists to prevent.
-      };
-      API_STAGE_ORDER_BY_PIPELINE.generateStructured = API_STAGE_ORDER_BY_PIPELINE.generateMultiStage;
-
+      // Compatibility name for the rail reader. This is a function alias, not
+      // an order table: graphRailForApiMethod reads the live graph export on
+      // every selection change.
+      var API_STAGE_ORDER_BY_PIPELINE = graphRailForApiMethod;
+      // The ordered tokens below are documentation for the older Wave-2
+      // absence gate, never executable rail authority:
+      // { key: 'shellIdentity' } -> { key: 'shellSpine' } ->
+      // { key: 'economyGraph' } -> { key: 'knowing' } ->
+      // { key: 'shellRules' } -> { key: 'shellTheme' }.
       // Pipelines the API surface will dispatch. Values must exist on
       // window.LiftRPGAPI; the select's option values are validated against this.
       // Values are USER-FACING run-log copy ("… via <value>"). Keys are the
@@ -4713,13 +4696,24 @@
       }
 
       // Reassigned whenever the pipeline selection changes; every consumer
-      // reads this one binding.
-      var API_STAGE_ORDER = API_STAGE_ORDER_BY_PIPELINE[API_PIPELINE_DEFAULT];
+      // reads this one binding. Its membership and order come from the graph
+      // module through the public manual seam, never from a second UI table.
+      var API_STAGE_ORDER = [];
+
+      function graphRailForApiMethod(method) {
+        var manual = window.LiftRPGAPI && window.LiftRPGAPI.manual;
+        var readRail = manual && manual.publicRailOrderForPipeline;
+        if (typeof readRail !== 'function') return [];
+        // Both offered methods execute the Standard provider graph. Structured
+        // changes the transport contract, not the production dependency graph.
+        return readRail('standard').map(function (key) {
+          return { key: key, label: STAGE_LABELS[key] || key };
+        });
+      }
 
       function applyPipelineStageOrder(methodValue) {
         var method = resolveApiPipelineMethod(methodValue);
-        API_STAGE_ORDER = API_STAGE_ORDER_BY_PIPELINE[method]
-          || API_STAGE_ORDER_BY_PIPELINE[API_PIPELINE_DEFAULT];
+        API_STAGE_ORDER = API_STAGE_ORDER_BY_PIPELINE(method);
         return method;
       }
 
@@ -8396,6 +8390,7 @@
         });
         el.addEventListener('change', function () {
           if (el === apiModelEl) syncApiModelControlVisibility();
+          if (el === apiMethodEl) applyPipelineStageOrder(apiMethodEl.value);
           saveApiPrefs();
           resetApiRunStateForConfigChange('API configuration changed. Previous run state cleared.');
           if (el === apiBaseUrlEl) scheduleApiModelDiscovery({ immediate: true });
@@ -8758,7 +8753,7 @@
           fragmentRegistry: (plan.fragmentRegistry || []).map(function (entry) { return entry.id || ''; }),
           overflowRegistry: (plan.overflowRegistry || []).map(function (entry) { return entry.id || ''; }),
           topology: plan.topology || {},
-          bossPlan: plan.bossPlan || {}
+          bossPlan: Object.assign({}, plan.bossPlan)
         });
       }
 
@@ -9681,7 +9676,10 @@
           if (!week || !week.isBossWeek || !week.bossEncounter) return;
           var boss = week.bossEncounter;
           if (boss.narrative) boss.narrative = sanitize(boss.narrative);
-          if (boss.mechanismDescription) boss.mechanismDescription = sanitize(boss.mechanismDescription);
+          if (boss.whyItFeelsEarned) boss.whyItFeelsEarned = sanitize(boss.whyItFeelsEarned);
+          if (Array.isArray(boss.requiredPriorKnowledge)) {
+            boss.requiredPriorKnowledge = boss.requiredPriorKnowledge.map(sanitize);
+          }
           if (boss.convergenceProof) boss.convergenceProof = sanitize(boss.convergenceProof);
           if (boss.passwordRevealInstruction) boss.passwordRevealInstruction = sanitize(boss.passwordRevealInstruction);
         });

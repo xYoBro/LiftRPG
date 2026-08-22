@@ -511,11 +511,21 @@
       ]
     },
     {
-      "path": "weeks[].bossEncounter.mechanismDescription",
+      "path": "weeks[].bossEncounter.whyItFeelsEarned",
       "status": "rendered",
       "presence": "optional",
       "renderer": [
-        "renderBossRight"
+        "buildBossPageModel",
+        "renderBossPage"
+      ]
+    },
+    {
+      "path": "weeks[].bossEncounter.requiredPriorKnowledge[]",
+      "status": "rendered",
+      "presence": "optional",
+      "renderer": [
+        "buildBossPageModel",
+        "renderBossPage"
       ]
     },
     {

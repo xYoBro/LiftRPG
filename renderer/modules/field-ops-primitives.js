@@ -2151,6 +2151,15 @@ export function renderBossPage(model) {
     frame.appendChild(components);
   }
 
+  if ((model.requiredPriorKnowledge || []).length) {
+    const prior = make('div', 'boss-prior-knowledge');
+    prior.appendChild(make('div', 'boss-prior-knowledge-label', 'Bring Forward'));
+    const list = make('ol', 'boss-prior-knowledge-list');
+    model.requiredPriorKnowledge.forEach((ref) => list.appendChild(make('li', '', ref)));
+    prior.appendChild(list);
+    frame.appendChild(prior);
+  }
+
   if (model.binaryChoiceAcknowledgement) {
     const branch = make('div', 'boss-branch-note');
     branch.appendChild(make('div', 'boss-branch-label', 'Path Reconciliation'));
@@ -2170,6 +2179,13 @@ export function renderBossPage(model) {
       proof.appendChild(make('p', '', paragraph));
     });
     (appendixGrid || frame).appendChild(proof);
+  }
+
+  if (model.whyItFeelsEarned) {
+    const rationale = make('div', 'boss-earned-rationale');
+    rationale.appendChild(make('div', 'boss-earned-rationale-label', 'Why This Converges'));
+    rationale.appendChild(make('p', '', model.whyItFeelsEarned));
+    (appendixGrid || frame).appendChild(rationale);
   }
 
   if (appendixGrid && appendixGrid.childNodes.length) {

@@ -653,7 +653,6 @@ export function validateWeekChunkContinuity(chunk, context) {
 
     var bossText = [
       bossWeek.bossEncounter.narrative,
-      bossWeek.bossEncounter.mechanismDescription,
       (bossWeek.bossEncounter.decodingKey || {}).instruction,
       bossWeek.bossEncounter.convergenceProof,
       bossWeek.bossEncounter.passwordRevealInstruction
@@ -1984,7 +1983,6 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
     } else {
       if (!boss.title) errors.push('Boss encounter missing title');
       if (!boss.narrative) errors.push('Boss encounter missing narrative');
-      if (!boss.mechanismDescription) errors.push('Boss encounter missing mechanismDescription');
       if (!boss.convergenceProof) errors.push('Boss encounter missing convergenceProof');
       if (!boss.passwordRevealInstruction) errors.push('Boss encounter missing passwordRevealInstruction');
 
@@ -5219,7 +5217,8 @@ export function collectNounRosterFindings(booklet) {
     }
     var boss = week.bossEncounter;
     if (boss) {
-      var bossText = [boss.narrative, boss.mechanismDescription, boss.convergenceProof].join('\n');
+      var bossText = [boss.narrative, (boss.decodingKey || {}).instruction,
+        boss.convergenceProof, boss.whyItFeelsEarned].join('\n');
       if (!references(bossText)) {
         findings.push(label + ' boss mechanism references no Core Noun Roster noun');
       }
@@ -5366,7 +5365,6 @@ function buildSinkRefIndex(booklet) {
   (((booklet || {}).fragments) || []).forEach(function (fragment) {
     if (!fragment) return;
     addId(fragment.id);
-    addName(fragment.title);
   });
 
   function indexCompanions(pool) {
@@ -5610,7 +5608,6 @@ export function buildSurfaceIndex(booklet) {
   fragments.forEach(function (fragment) {
     if (!fragment) return;
     note('fragment', fragment.id);
-    note('fragment', fragment.title);
     // A seal rides ON a fragment, so `seal:F.07` names the document that will
     // carry it. Indexed for every fragment rather than only sealed ones: at
     // declaration time the seal does not exist yet, and the spine is where the
@@ -10327,6 +10324,24 @@ function guaranteedMarksPerSessionError(value, label) {
   return label + '.guaranteedMarksPerSession: missing or invalid; expected one integer >= 0 for the marks every completed session guarantees';
 }
 
+function bossPlanProjectionErrors(bossPlan, root) {
+  var errors = [];
+  var plan = bossPlan || {};
+  if (!String(plan.whyItFeelsEarned || '').trim()) {
+    errors.push(root + '.whyItFeelsEarned: missing or empty');
+  }
+  if (!Array.isArray(plan.requiredPriorKnowledge) || plan.requiredPriorKnowledge.length === 0) {
+    errors.push(root + '.requiredPriorKnowledge: missing or empty');
+  } else {
+    plan.requiredPriorKnowledge.forEach(function (ref, index) {
+      if (!parseSurfaceRef(ref).valid) {
+        errors.push(root + '.requiredPriorKnowledge[' + index + ']: invalid surface ref');
+      }
+    });
+  }
+  return errors;
+}
+
 export function validateCampaignPlanStage(result, options) {
   if (!result) return 'Campaign Plan → missing required sections (null result).';
   var errors = [];
@@ -10342,6 +10357,7 @@ export function validateCampaignPlanStage(result, options) {
     errors.push('Campaign Plan → weeks: empty array');
   }
   if (!result.bossPlan) errors.push('Campaign Plan → bossPlan: missing');
+  else errors = errors.concat(bossPlanProjectionErrors(result.bossPlan, 'bossPlan'));
   // Advisory warnings: sub-field checks for debugging
   if (!result.topology) {
     warnings.push('Campaign Plan → topology: missing entirely');
@@ -11171,6 +11187,8 @@ export function validateSkeletonStage(result, weekCount, options) {
   // ── bossPlan ──
   if (!result.bossPlan) return 'Skeleton → bossPlan: missing';
   if (!result.bossPlan.passwordWord) return 'Skeleton → bossPlan.passwordWord: missing';
+  var bossProjectionErrors = bossPlanProjectionErrors(result.bossPlan, 'bossPlan');
+  if (bossProjectionErrors.length) return bossProjectionErrors.join('; ');
 
   // ── endingVariants ──
   if (!Array.isArray(result.endingVariants) || result.endingVariants.length === 0) {

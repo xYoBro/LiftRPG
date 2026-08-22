@@ -713,7 +713,7 @@
     options = options || {};
     var lines = [
       '## Booklet Identity',
-      '- Title: ' + ctx.blockTitle,
+      '- skeleton.meta.blockTitle: ' + ctx.blockTitle,
       '- World Contract: ' + ctx.worldContract,
       '- Voice: ' + JSON.stringify(ctx.narrativeVoice),
       '- Register: ' + JSON.stringify(ctx.literaryRegister)
@@ -2964,7 +2964,7 @@
       contextLines.push('- There are exactly ' + allComponentValues.length + ' non-boss weeks, so componentInputs MUST have exactly ' + allComponentValues.length + ' entries.');
       contextLines.push('- Every approved boss-week fragmentRef must appear directly in session.fragmentRef at least once.');
       contextLines.push('- decodingKey.referenceTable maps these values to letters.');
-      contextLines.push('- Must include: title, narrative, mechanismDescription, convergenceProof, passwordRevealInstruction.');
+      contextLines.push('- Must include: title, narrative, decodingKey, convergenceProof, passwordRevealInstruction.');
       if (weekPlan.isBinaryChoiceWeek || (skeleton.bossPlan && skeleton.bossPlan.binaryChoiceSetup)) {
         contextLines.push('- Include binaryChoiceAcknowledgement: { ifA, ifB }');
       }
@@ -3062,7 +3062,8 @@
       }),
       '## Boss Context',
       '- Password: ' + (boss.passwordWord || ''),
-      '- Convergence: ' + (boss.convergenceRequirements || ''),
+      '- Why it is earned: ' + (boss.whyItFeelsEarned || ''),
+      '- Required prior knowledge: ' + ((boss.requiredPriorKnowledge || []).join(', ')),
       '- Binary choice: ' + (boss.binaryChoiceSetup || 'none'),
       '',
       finalWeekSummary ? '## Final Week Summary\n' + compactJson(finalWeekSummary) + '\n' : '',
@@ -3135,7 +3136,8 @@
       }),
       '## Boss Context',
       '- Password: ' + (boss.passwordWord || ''),
-      '- Convergence: ' + (boss.convergenceRequirements || ''),
+      '- Why it is earned: ' + (boss.whyItFeelsEarned || ''),
+      '- Required prior knowledge: ' + ((boss.requiredPriorKnowledge || []).join(', ')),
       '- Binary choice: ' + (boss.binaryChoiceSetup || 'none'),
       '',
       finalWeekSummary ? '## Final Week Summary\n' + compactJson(finalWeekSummary) + '\n' : '',

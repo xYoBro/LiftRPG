@@ -127,7 +127,7 @@
 // a measurement rather than pretending to completeness.
 
 import {
-  parseSurfaceRef, parseBranchRef, BRANCH_OPTIONS, RECKONING_THRESHOLD_RATIO,
+  parseSurfaceRef, surfaceRefKey, parseBranchRef, BRANCH_OPTIONS, RECKONING_THRESHOLD_RATIO,
   applyRulebookAmendments
 } from './constants.js';
 import { toSlugWords } from './assembly.js';
@@ -195,8 +195,35 @@ var INFINITY_WEEK = Number.POSITIVE_INFINITY;
 // `clock: relief  ledger` are one node — the ref grammar accepts both and a
 // graph that treated them as two would report a phantom orphan.
 function nodeKey(parsed) {
-  if (!parsed || !parsed.valid) return '';
-  return parsed.id ? parsed.kind + ':' + toSlugWords(parsed.id) : parsed.kind;
+  return surfaceRefKey(parsed);
+}
+
+/**
+ * Narrow declaration-time topology fact. This does not claim reachability or
+ * affordability; the transition kernel remains the authority for those.
+ */
+export function deriveConvergenceTopologyDeclared(input) {
+  var graph = input && input.economyGraph;
+  var requirements = input && input.winRequirements;
+  if (!Array.isArray(graph) || !graph.length || !Array.isArray(requirements) || !requirements.length) return false;
+  var edges = [];
+  for (var i = 0; i < graph.length; i++) {
+    var from = surfaceRefKey((graph[i] || {}).from);
+    var to = surfaceRefKey((graph[i] || {}).to);
+    if (!from || !to) return false;
+    edges.push({ from: from, to: to });
+  }
+  var requiredKeys = [];
+  for (var r = 0; r < requirements.length; r++) {
+    var required = surfaceRefKey(requirements[r]);
+    if (!required) return false;
+    requiredKeys.push(required);
+  }
+  var intoBoss = edges.some(function (edge) { return edge.to === 'boss'; });
+  var intoAssembly = edges.some(function (edge) { return edge.to === 'assembly'; });
+  return intoBoss && intoAssembly && requiredKeys.every(function (target) {
+    return edges.some(function (edge) { return edge.to === target; });
+  });
 }
 
 function refWeek(parsed) {
@@ -338,7 +365,6 @@ function readBook(booklet) {
     // session.fragmentRef does above (note() keeps the minimum).
     var fallback = perWeek.length || 1;
     note('fragment', fragment.id, fallback);
-    if (fragment.title) note('fragment', fragment.title, fallback);
     if (fragment.seal) note('seal', fragment.id, printWeek['fragment:' + toSlugWords(fragment.id)] || fallback);
   });
 
@@ -387,8 +413,17 @@ function readBook(booklet) {
         unlockCondition: String((f.seal || {}).unlockCondition || '')
       };
     });
+  var requiredSurfaceKeys = asArray((((doc.meta || {}).gameRulebook || {}).winCondition || {}).requires)
+    .map(function (ref) { return surfaceRefKey(ref); }).filter(Boolean);
+  var graphTargetKeys = asArray(((doc.meta || {}).playSpine || {}).economyGraph)
+    .map(function (edge) { return surfaceRefKey((edge || {}).to); }).filter(Boolean);
   sealed.forEach(function (s) {
-    endgame.push({ label: 'seal:' + s.id, aliases: [s.key], printWeek: s.printWeek });
+    // A physical seal can be an ordinary authored reveal whose printed
+    // unlockCondition is sufficient. It becomes an economy endgame target
+    // only when the win contract or graph actually names it. Treating every
+    // decorative/chronological seal as graph-gated fabricated a soft-lock.
+    endgame.push({ label: 'seal:' + s.id, aliases: [s.key], printWeek: s.printWeek,
+      required: requiredSurfaceKeys.indexOf(s.key) !== -1 || graphTargetKeys.indexOf(s.key) !== -1 });
   });
 
   return {
@@ -1691,16 +1726,6 @@ export function readArtifactContractView(bank, options) {
   addRulebookDirect(ruleRoot + '.economy.currency', 'currency');
   addRulebookDirect(ruleRoot + '.passwordPath.elements', 'passwordElements');
   addRulebookDirect(ruleRoot + '.sessionShape.ritual', 'sessionRitual');
-  if (artifactPathGet(source, ruleRoot + '.teachingOrder.sequence') !== undefined) {
-    addRulebookDirect(ruleRoot + '.teachingOrder.sequence', 'teachingOrder');
-  } else {
-    // The current stage schema requires the teaching-order owner but its
-    // machine-readable sequence remains optional. Absence therefore means
-    // "no ordered mechanical commitment", not a fabricated reading of the
-    // prose answer. Keep the empty value traceable to the real owner object.
-    addDerived('teachingOrder', [], 'project optional authored teaching sequence',
-      [ruleRoot + '.teachingOrder']);
-  }
 
   var weekRoot = pipeline === 'standard' ? 'stages.campaignPlan.weeks' : 'stages.skeleton.weekPlan';
   if (requirePath(weekRoot)) {
@@ -1734,7 +1759,8 @@ export function readArtifactContractView(bank, options) {
   addDirect(spineRoot + '.tensionBudget', 'tensionBudget', { set: true });
 
   var bossPath = pipeline === 'standard' ? 'stages.campaignPlan.bossPlan' : 'stages.skeleton.bossPlan';
-  addDirect(bossPath, 'bossPlan');
+  addDirect(bossPath + '.whyItFeelsEarned', 'bossPlan.whyItFeelsEarned');
+  addDirect(bossPath + '.requiredPriorKnowledge', 'bossPlan.requiredPriorKnowledge');
 
   var cadencePath = pipeline === 'standard'
     ? 'stages.economyGraph.surfaceCadences' : spineRoot + '.surfaceCadences';
@@ -1913,17 +1939,12 @@ export function readArtifactContractView(bank, options) {
     }
   });
 
-  var convergenceTopologyIndex = topology.findIndex(function (edge) { return String((edge || {}).to) === 'boss'; });
-  var convergencePacingIndex = pacing.findIndex(function (edge) { return String((edge || {}).to) === 'boss'; });
-  var convergenceInputs = [
-    ruleRoot + '.winCondition.requires[0]',
-    bossPath + '.decodeLogic',
-    topologyPath + '[' + convergenceTopologyIndex + '].to',
-    pacingPath + '[' + convergencePacingIndex + '].price'
-  ];
-  if (convergenceInputs.every(function (path) { return artifactPathGet(source, path) !== undefined; })) {
-    addDerived('convergenceFunded', true, 'derive guaranteed boss/assembly/ending convergence', convergenceInputs);
-  }
+  var convergenceInputs = [ruleRoot + '.winCondition.requires', topologyPath];
+  if (deriveConvergenceTopologyDeclared({
+    economyGraph: topology,
+    winRequirements: artifactPathGet(source, ruleRoot + '.winCondition.requires')
+  })) addDerived('convergenceTopologyDeclared', true,
+    'derive declared boss-to-assembly-to-ending topology', convergenceInputs);
 
   // Duplicate authorities are rejected rather than resolved by precedence.
   ['artifactDesign', 'meta.artifactDesign', 'artifactPlan'].forEach(function (path) {
@@ -2295,7 +2316,7 @@ function artifactMaterializedMechanics(view, booklet) {
   var expectedWeeks = artifactMaterializationExpectedWeekMap(view);
   var mechanics = {
     consequenceEdges: artifactMaterializationSet(spine.consequenceEdges),
-    convergenceFunded: false,
+    convergenceTopologyDeclared: false,
     economyGraph: artifactMaterializationGraph(spine.economyGraph),
     endingVariants: asArray(doc.endings).map(function (ending) {
       return String((ending || {}).variant || '').replace(/^ending:/i, '');
@@ -2324,12 +2345,10 @@ function artifactMaterializedMechanics(view, booklet) {
   }
   var requirements = rulebook.winCondition && Array.isArray(rulebook.winCondition.requires)
     ? artifactClone(rulebook.winCondition.requires) : null;
-  mechanics.convergenceFunded = !!(requirements && requirements.length)
-    && requirements.every(function (required) {
-      return mechanics.economyGraph.some(function (edge) {
-        return String((edge || {}).to || '').toLowerCase() === String(required || '').toLowerCase();
-      });
-    });
+  mechanics.convergenceTopologyDeclared = deriveConvergenceTopologyDeclared({
+    economyGraph: mechanics.economyGraph,
+    winRequirements: requirements
+  });
   if (rulebook.artifactDesign !== undefined) {
     mechanics.artifactDesign = {
       governingConceit: artifactClone((rulebook.artifactDesign || {}).governingConceit),
@@ -2337,7 +2356,7 @@ function artifactMaterializedMechanics(view, booklet) {
     };
   }
   var bossWeek = asArray(doc.weeks).filter(function (week) { return !!(week && week.bossEncounter); })[0];
-  var bossFields = ['decodeLogic', 'whyItFeelsEarned', 'requiredPriorKnowledge', 'weeklyComponentType'];
+  var bossFields = ['whyItFeelsEarned', 'requiredPriorKnowledge'];
   if (bossWeek && bossFields.every(function (field) {
     return bossWeek.bossEncounter[field] !== undefined;
   })) {
@@ -2350,7 +2369,6 @@ function artifactMaterializedMechanics(view, booklet) {
   if (rulebook.economy && rulebook.economy.currency !== undefined) mechanics.currency = artifactClone(rulebook.economy.currency);
   if (rulebook.passwordPath && rulebook.passwordPath.elements !== undefined) mechanics.passwordElements = artifactClone(rulebook.passwordPath.elements);
   if (rulebook.sessionShape && rulebook.sessionShape.ritual !== undefined) mechanics.sessionRitual = artifactClone(rulebook.sessionShape.ritual);
-  if (rulebook.teachingOrder && rulebook.teachingOrder.sequence !== undefined) mechanics.teachingOrder = artifactClone(rulebook.teachingOrder.sequence);
   if (requirements !== null) mechanics.winCondition = { requires: requirements };
   return mechanics;
 }
@@ -2506,19 +2524,18 @@ export function compareArtifactMaterialization(view, booklet) {
     drifts.push(artifactMaterializationDrift('password-order', passwordPath,
       'Assembled password elements no longer preserve the paid order.'));
   }
-  if (expected.convergenceFunded !== materialized.mechanics.convergenceFunded) {
-    drifts.push(artifactMaterializationDrift('endgame-convergence', topologyOwner,
-      'Assembly changed the simulated endgame convergence certified before prose.'));
+  if (expected.convergenceTopologyDeclared !== materialized.mechanics.convergenceTopologyDeclared) {
+    drifts.push(artifactMaterializationDrift('convergence-topology', topologyOwner,
+      'Assembly changed the declared boss-to-assembly-to-ending topology.'));
   }
 
   var families = [
     ['artifactDesign', 'artifact-design', artifactMaterializationOwner(view, 'mechanics.artifactDesign', 'stages.gameRulebook.gameRulebook.artifactDesign', null, /\.(?:governingConceit|commitments).*$/)],
-    ['bossPlan', 'boss-plan', artifactMaterializationOwner(view, 'mechanics.bossPlan', 'stages.campaignPlan.bossPlan', null, /\.(?:decodeLogic|whyItFeelsEarned|weeklyComponentType|requiredPriorKnowledge(?:\[\d+\])?).*$/)],
+    ['bossPlan', 'boss-plan', artifactMaterializationOwner(view, 'mechanics.bossPlan', 'stages.campaignPlan.bossPlan', null, /\.(?:whyItFeelsEarned|requiredPriorKnowledge(?:\[\d+\])?).*$/)],
     ['coreVerbs', 'core-verbs', artifactMaterializationOwner(view, 'mechanics.coreVerbs', 'stages.gameRulebook.gameRulebook.coreVerbs.verbs', null, /\[\d+\].*$/)],
     ['currency', 'currency', artifactMaterializationOwner(view, 'mechanics.currency', 'stages.gameRulebook.gameRulebook.economy.currency')],
     ['decisionLedger', 'decision-ledger', artifactMaterializationOwner(view, 'mechanics.decisionLedger', 'stages.shellSpine.meta.playSpine.decisionLedger', null, /\[\d+\].*$/)],
     ['sessionRitual', 'session-ritual', artifactMaterializationOwner(view, 'mechanics.sessionRitual', 'stages.gameRulebook.gameRulebook.sessionShape.ritual', null, /\.(?:cue|on).*$/)],
-    ['teachingOrder', 'teaching-order', artifactMaterializationOwner(view, 'mechanics.teachingOrder', 'stages.gameRulebook.gameRulebook.teachingOrder.sequence', null, /\[\d+\].*$/)],
     ['tensionBudget', 'tension-ledger', artifactMaterializationOwner(view, 'mechanics.tensionBudget', 'stages.shellSpine.meta.playSpine.tensionBudget', null, /\[\d+\].*$/)],
     ['winCondition', 'win-condition', artifactMaterializationOwner(view, 'mechanics.winCondition', 'stages.gameRulebook.gameRulebook.winCondition.requires', null, /\[\d+\].*$/)]
   ];

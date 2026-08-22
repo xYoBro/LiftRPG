@@ -228,6 +228,16 @@ import {
   proveArtifactContract,
   compareArtifactMaterialization
 } from './modules/sim-player.js';
+import {
+  buildMaterializedSurfaceIndex,
+  materializeBossPlanProjection
+} from './modules/materialized-surfaces.js';
+import {
+  checkpointInvalidationSet,
+  repairStageOrder,
+  publicRailOrderForPipeline
+} from './modules/stage-graph.js';
+import { stageSha256, stageValueDigest, upstreamStageDigests } from './modules/stage-provenance.js';
 
 import {
   validateArtifactExperienceContract,
@@ -552,13 +562,12 @@ var STRUCTURED_SCHEMA_CAMPAIGN = {
     },
     bossPlan: {
       type: 'object',
+      additionalProperties: false,
       properties: {
-        decodeLogic: { type: 'string' },
         whyItFeelsEarned: { type: 'string' },
-        requiredPriorKnowledge: { type: 'array', items: { type: 'string' } },
-        weeklyComponentType: { type: 'string' }
+        requiredPriorKnowledge: { type: 'array', minItems: 1, items: { type: 'string' } }
       },
-      required: ['decodeLogic', 'whyItFeelsEarned', 'requiredPriorKnowledge', 'weeklyComponentType']
+      required: ['whyItFeelsEarned', 'requiredPriorKnowledge']
     },
     fragmentRegistry: {
       type: 'array',
@@ -2562,30 +2571,7 @@ async function runTensionBudgetRepairCall(ctx) {
 // compiler seats and never coexist in a run, so a single merged order is a
 // legal linearisation of both stage sequences and there is no per-pipeline
 // table to drift.
-var REPAIR_STAGE_ORDER = [
-  // `gameRulebook` sits after canonicalization and before every compiler seat,
-  // which is where the stage actually runs on both pipelines (D173). Its rank
-  // matters even though no floor currently routes TO it: an error carrying its
-  // label at a later stage would otherwise rank -1 and be silently unroutable,
-  // and a stage missing from this table is a stage whose repairs vanish.
-  // `economyGraph` sits directly after the compiler seats and before the weeks,
-  // which is where it runs (§4.11) — it annotates the spine those seats declare.
-  // Its rank is load-bearing for a reason the rulebook's note only anticipates:
-  // the cadence floor blocks at the WEEK gate and names this stage's own
-  // declarations, so a cadence defect found in week 4 must route BACKWARD past
-  // three banked weeks to the seat that wrote the cadence. A stage missing from
-  // this table ranks -1 and its repairs vanish.
-  // THE SHELL SPLIT ranks the four sub-stages in RUN ORDER, which is what this
-  // table is for: a defect found at the spine seat that belongs to the identity
-  // seat must route BACKWARD, and it can only do that if identity ranks lower.
-  // `shell` is gone from this table rather than kept as an alias — a legacy
-  // `Shell → ` prefix now resolves to `shellIdentity` at the label table
-  // (REPAIR_STAGE_LABEL_KEYS), so it arrives here already translated, and a row
-  // for a stage no pipeline runs is a route that re-enters nothing.
-  'workoutCanonical', 'canonicalize', 'gameRulebook', 'layerBible', 'campaignPlan',
-  'skeleton', 'shellIdentity', 'shellSpine', 'economyGraph', 'knowing',
-  'shellRules', 'shellTheme', 'rules', 'weeks', 'fragments', 'endings'
-];
+var REPAIR_STAGE_ORDER = repairStageOrder();
 
 // The four seats one Booklet Setup became. One home, read by the repair sweep,
 // the rail wiring and the harness — a second hand-written list of these four is
@@ -2609,6 +2595,16 @@ var SHELL_SUB_STAGE_KEYS = ['shellIdentity', 'shellSpine', 'shellRules', 'shellT
  * implementation of it — which is the D93 defect wearing a test's clothes: two
  * merges, one of them never exercised by a run.
  */
+function cloneShellPartValue(value) {
+  if (Array.isArray(value)) return value.map(cloneShellPartValue);
+  if (!value || typeof value !== 'object') return value;
+  var out = {};
+  Object.keys(value).forEach(function (key) {
+    out[key] = cloneShellPartValue(value[key]);
+  });
+  return out;
+}
+
 function mergeShellParts() {
   var out = { meta: {} };
   for (var i = 0; i < arguments.length; i++) {
@@ -2617,9 +2613,9 @@ function mergeShellParts() {
     Object.keys(part).forEach(function (key) {
       if (key === 'meta') {
         var m = part.meta || {};
-        Object.keys(m).forEach(function (mk) { out.meta[mk] = m[mk]; });
+        Object.keys(m).forEach(function (mk) { out.meta[mk] = cloneShellPartValue(m[mk]); });
       } else {
-        out[key] = part[key];
+        out[key] = cloneShellPartValue(part[key]);
       }
     });
   }
@@ -4203,7 +4199,17 @@ async function runJsonStage(settings, config) {
       emitPipelineEvent(config.onProgress, config.stageIndex || 0, config.getTotalStages ? config.getTotalStages() : 0, config.completeMessage || config.stageName, {
         phase: 'complete',
         stageKey: config.stageKey || '',
+        providerStageKey: config.providerStageKey || config.stageKey || '',
         stageName: config.stageName,
+        inputDigest: stageSha256(prompt),
+        outputDigest: stageValueDigest(
+          config.outputDigestValue ? config.outputDigestValue(result) : result
+        ),
+        upstreamDigests: Object.assign(
+          upstreamStageDigests(config.upstreamValues),
+          config.upstreamDigests || {}
+        ),
+        transportId: (response.meta && response.meta.provider) || settings.format || '',
         telemetry: summary
       });
       if (Array.isArray(config.telemetryCollector)) {
@@ -4590,6 +4596,9 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
   try {
     return await runJsonStage(settings, {
       stageKey: config.stageKey || 'fragments',
+      providerStageKey: config.providerStageKey || config.stageKey || 'fragments',
+      upstreamValues: config.upstreamValues,
+      upstreamDigests: config.upstreamDigests,
       stageName: config.label,
       stageIndex: config.stageIndex || 0,
       completeMessage: config.label + ' complete.',
@@ -4613,7 +4622,7 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
             componentInputs: config.componentValues || undefined });   // W3-ARM fragment-batch · W7-ARM seal-batch
       },
       buildPrompt: function (retryState) {
-        return builders.fragmentBatch(
+        var prompt = builders.fragmentBatch(
           config.layerBible,
           config.registry,
           config.batchWeekSummaries,
@@ -4629,6 +4638,7 @@ async function generateFragmentBatchAdaptive(settings, builders, config) {
             gameRulebook: config.gameRulebook || null
           }
         );
+        return config.ownerGiven ? config.ownerGiven(prompt) : prompt;
       }
     });
   } catch (err) {
@@ -5185,56 +5195,6 @@ function assembledProductionContracts() {
   ];
 }
 
-// The real current validators guarding every owner the transient artifact
-// proof reads. This is an observable contract inventory for deterministic
-// restore tests; it creates no second validation implementation.
-function restoreStageContracts() {
-  return [
-    {
-      pipeline: 'standard', family: 'gameRulebook', stageKey: 'gameRulebook',
-      validatorOwner: 'validateGameRulebookStage', validator: validateGameRulebookStage,
-      validate: function (payload) { return validateGameRulebookStage(payload, { collect: true }); }
-    },
-    {
-      pipeline: 'standard', family: 'campaignPlan', stageKey: 'campaignPlan',
-      validatorOwner: 'validateCampaignPlanStage', validator: validateCampaignPlanStage,
-      validate: function (payload) { return validateCampaignPlanStage(payload, { generationFloors: false }); }
-    },
-    {
-      pipeline: 'standard', family: 'shellSpine', stageKey: 'shellSpine',
-      validatorOwner: 'validateShellSpineSchema', validator: validateShellSpineSchema,
-      validate: function (payload) {
-        var playSpine = (((payload || {}).meta || {}).playSpine || {});
-        var weekCount = Array.isArray(playSpine.tensionBudget) ? playSpine.tensionBudget.length : 0;
-        return validateShellSpineSchema(payload, { generationFloors: true, weekCount: weekCount });
-      }
-    },
-    {
-      pipeline: 'standard', family: 'economyGraph', stageKey: 'economyGraph',
-      validatorOwner: 'validateEconomyGraphStage', validator: validateEconomyGraphStage,
-      validate: function (payload) {
-        return validateEconomyGraphStage(payload, {
-          priorGraph: (payload || {}).economyGraph,
-          requireCanonicalCadence: true
-        });
-      }
-    },
-    {
-      pipeline: 'skeleton-flesh', family: 'gameRulebook', stageKey: 'gameRulebook',
-      validatorOwner: 'validateGameRulebookStage', validator: validateGameRulebookStage,
-      validate: function (payload) { return validateGameRulebookStage(payload, { collect: true }); }
-    },
-    {
-      pipeline: 'skeleton-flesh', family: 'skeleton', stageKey: 'skeleton',
-      validatorOwner: 'validateSkeletonStage', validator: validateSkeletonStage,
-      validate: function (payload) {
-        var weekPlan = Array.isArray((payload || {}).weekPlan) ? payload.weekPlan : [];
-        return validateSkeletonStage(payload, weekPlan.length, { generationFloors: false });
-      }
-    }
-  ];
-}
-
 async function restoreCheckpointedStage(options) {
   options = options || {};
   var errors = validatorErrors(await options.validate(options.payload, options.context || {}));
@@ -5247,7 +5207,14 @@ async function restoreCheckpointedStage(options) {
       errors: []
     };
   }
-  var checkpoint = pruneCheckpointStage(options.stageKey, options.checkpoint || getCheckpoint());
+  var current = options.checkpoint || getCheckpoint();
+  var keys = current && current.stages ? Object.keys(current.stages) : [];
+  var invalid = checkpointInvalidationSet({
+    pipeline: options.pipeline,
+    ownerKey: options.stageKey,
+    checkpointKeys: keys
+  });
+  var checkpoint = pruneCheckpointStages(current, Array.from(invalid));
   return {
     accepted: false,
     payload: null,
@@ -5936,7 +5903,8 @@ async function runApiPipeline(options) {
       payload: payload,
       validate: validate,
       context: context || {},
-      checkpoint: checkpoint
+      checkpoint: checkpoint,
+      pipeline: 'standard'
     });
     checkpoint = restored.checkpoint;
     return restored;
@@ -6252,8 +6220,21 @@ async function runApiPipeline(options) {
     checkpoint = saveCheckpoint('campaignPlan', campaignPlan, checkpoint);
   }
 
+  // Capture the paid bytes before downstream convenience normalization mutates
+  // the in-memory object. This must equal the owner's completion outputDigest.
+  var standardOwnerOutputDigest = stageValueDigest(campaignPlan);
   if (!Array.isArray(campaignPlan.fragmentRegistry)) campaignPlan.fragmentRegistry = [];
   if (!Array.isArray(campaignPlan.overflowRegistry)) campaignPlan.overflowRegistry = [];
+
+  // The paid campaign owner remains an explicit GIVEN to every downstream
+  // provider seat. Keep the path in the prompt: a value without its owner path
+  // is not independently auditable dataflow and invites the consumer to
+  // reinterpret it as optional context.
+  function withStandardOwnerGiven(prompt) {
+    return String(prompt || '') + '\n\n## Paid Upstream Owner (BINDING)\n'
+      + 'campaignPlan.bossPlan\n' + JSON.stringify(campaignPlan.bossPlan || {});
+  }
+  var standardOwnerDigests = { campaignPlan: standardOwnerOutputDigest };
 
   // ── The planned week shapes (D143) ───────────────────────────────────
   // ONE derivation, two readers: the shell gate's pre-flight (which holds the
@@ -6388,6 +6369,8 @@ async function runApiPipeline(options) {
     progress(spec.stageKey, spec.startMessage);
     var out = await runJsonStage(settings, {
       stageKey: spec.stageKey,
+      providerStageKey: spec.stageKey,
+      upstreamDigests: standardOwnerDigests,
       stageName: spec.stageName,
       stageIndex: stageNum,
       completeMessage: spec.stageName + ' complete.',
@@ -6445,6 +6428,10 @@ async function runApiPipeline(options) {
         }
         return result;
       },
+      outputDigestValue: function (result) {
+        recordSeedOnStage(result, divergenceSeed);
+        return result;
+      },
       autoRepair: spec.autoRepair,
       repairDirective: repairDirectiveFor(spec.stageKey),
       validate: function (result) {
@@ -6461,7 +6448,7 @@ async function runApiPipeline(options) {
         return '';
       },
       buildPrompt: function (retryState) {
-        return spec.buildPrompt(retryState);
+        return withStandardOwnerGiven(spec.buildPrompt(retryState));
       }
     });
     recordSeedOnStage(out, divergenceSeed);
@@ -6794,6 +6781,8 @@ async function runApiPipeline(options) {
       progress('knowing', 'Working out how this world runs…');
       knowingOutput = await runJsonStage(settings, {
         stageKey: 'knowing',
+        providerStageKey: 'knowing',
+        upstreamDigests: standardOwnerDigests,
         stageName: 'World Detail',
         stageIndex: stageNum,
         completeMessage: 'World detail complete.',
@@ -6806,7 +6795,9 @@ async function runApiPipeline(options) {
         normalizeResult: normalizeKnowingShape,
         validate: function (result) { return validateKnowingStage(result); },
         buildPrompt: function (retryState) {
-          return builders.knowing(shell, brief, { retryMode: retryState.attempt > 0 });
+          return withStandardOwnerGiven(
+            builders.knowing(shell, brief, { retryMode: retryState.attempt > 0 })
+          );
         }
       });
       checkpoint = saveCheckpoint('knowing', knowingOutput, checkpoint);
@@ -6862,14 +6853,15 @@ async function runApiPipeline(options) {
       });
     },
     buildPrompt: function (retryState) {
-      return builders.economyGraph(shell, {
+      return withStandardOwnerGiven(builders.economyGraph(shell, {
         retryMode: retryState.attempt > 0,
         weekCount: weekCount,
         gameRulebook: gameRulebook,
         economyGraph: declaredGraph,
         workout: workout
-      });
-    }
+      }));
+    },
+    upstreamDigests: standardOwnerDigests
   });
   checkpoint = economyState.checkpoint;
   // OUTSIDE ANY else, exactly as applyGameRulebook is and for the same reason: a
@@ -7116,6 +7108,8 @@ async function runApiPipeline(options) {
     progress('weeks', 'Writing Week ' + w + (isBossWeek ? ' (Boss)' : '') + '\u2026');
     var weekObject = await runJsonStage(settings, {
       stageKey: 'weeks',
+      providerStageKey: weekCacheKey,
+      upstreamDigests: standardOwnerDigests,
       stageName: 'Week ' + w,
       stageIndex: stageNum,
       completeMessage: 'Week ' + w + ' complete.',
@@ -7146,6 +7140,10 @@ async function runApiPipeline(options) {
           return null;
         }
         if (result) normalizeCompanionComponents(result);
+        if (result) {
+          result.weekNumber = w;
+          result.isBossWeek = isBossWeek;
+        }
         return result;
       },
       autoRepair: function (result) {
@@ -7162,7 +7160,7 @@ async function runApiPipeline(options) {
         return validateCurrentStandardWeek(result);
       },
       buildPrompt: function (retryState) {
-        return builders.singleWeekFinal(
+        return withStandardOwnerGiven(builders.singleWeekFinal(
           workout,
           brief,
           layerBible,
@@ -7186,7 +7184,7 @@ async function runApiPipeline(options) {
             gameRulebook: gameRulebook,
             playSpine: weekFloorOptions.playSpine
           }
-        );
+        ));
       }
     });
 
@@ -7302,8 +7300,11 @@ async function runApiPipeline(options) {
       // config so the answer-bearing-seal floor (D200 ruling 3) can see them.
       // Populated by the week loop above; fragments always generate after it.
       componentValues: allComponentValues,
+      upstreamDigests: standardOwnerDigests,
+      ownerGiven: withStandardOwnerGiven,
       label: batchLabel,
       stageKey: 'fragments',
+      providerStageKey: 'fragBatch_' + (fb + 1),
       stageIndex: stageNum,
       onProgress: onProgress,
       getTotalStages: function () { return totalStages; },
@@ -7358,6 +7359,9 @@ async function runApiPipeline(options) {
     progress('endings', 'Writing finale\u2026');
     var endingObj = await runJsonStage(settings, {
       stageKey: 'endings',
+      providerStageKey: 'endings',
+      upstreamDigests: standardOwnerDigests,
+      outputDigestValue: function (result) { return [result]; },
       stageName: 'Finale Variant',
       stageIndex: stageNum,
       completeMessage: 'Finale complete.',
@@ -7454,8 +7458,10 @@ async function runApiPipeline(options) {
       buildPrompt: function (retryState) {
         // THE PROSE FUNDING (VISION §5): the ending is the payoff of the win
         // condition and the password path this rulebook declared.
-        return builders.singleEnding(layerBible, campaignPlan, "Primary", shellContext, weekSummaries,
-          { gameRulebook: gameRulebook });
+        return withStandardOwnerGiven(
+          builders.singleEnding(layerBible, campaignPlan, "Primary", shellContext, weekSummaries,
+            { gameRulebook: gameRulebook })
+        );
       }
     });
     finalEndings.push(endingObj);
@@ -7473,6 +7479,17 @@ async function runApiPipeline(options) {
   console.log('[LiftRPG] Assembling booklet from ' + finalWeeks.length + ' weeks, ' + finalFragments.length + ' fragments, ' + finalEndings.length + ' endings.');
 
   var booklet = options.assemble(shell, assembledWeeksOutput, assembledFragmentsOutput, assembledEndingsOutput, campaignPlan);
+  var bossProjectionResult = materializeBossPlanProjection(booklet, campaignPlan.bossPlan, {
+    ownerPath: 'stages.campaignPlan.bossPlan'
+  });
+  booklet = bossProjectionResult.booklet;
+  if (bossProjectionResult.blocking) {
+    var bossProjectionError = new Error(bossProjectionResult.diagnostics.map(function (row) {
+      return row.path + ': ' + row.message;
+    }).join('; '));
+    bossProjectionError.findings = bossProjectionResult.diagnostics;
+    throw bossProjectionError;
+  }
   emitAssemblyNormalizationNotes(onProgress, booklet, totalStages, totalStages);
   enforceIdentityContract(booklet, identityContract);
   truthBoardStateMode(booklet, readPipelineDebris(booklet, '_assemblyDiagnostics') || []);
@@ -7938,6 +7955,10 @@ async function runGameRulebookStage(settings, config) {
     unknownKeyScopes: [
       { from: 'gameRulebook', schemaPath: 'meta.gameRulebook', label: 'meta.gameRulebook' }
     ],
+    outputDigestValue: function (result) {
+      recordSeedOnStage(result, config.divergenceSeed);
+      return result;
+    },
     validate: function (result) {
       return validateGameRulebookStage(result, {
         generationFloors: true,
@@ -8001,6 +8022,13 @@ async function runEconomyGraphStage(settings, config) {
   config.progress('economyGraph', 'Pacing the economy…');
   var output = await runJsonStage(settings, {
     stageKey: 'economyGraph',
+    providerStageKey: 'economyGraph',
+    upstreamValues: config.upstreamValues,
+    upstreamDigests: config.upstreamDigests,
+    outputDigestValue: function (result) {
+      recordSeedOnStage(result, config.divergenceSeed);
+      return result;
+    },
     stageName: 'Economy Pacing',
     stageIndex: config.getStageIndex(),
     completeMessage: 'Economy pacing complete.',
@@ -8437,7 +8465,8 @@ async function runSkeletonFleshPipeline(options) {
       payload: payload,
       validate: validate,
       context: context || {},
-      checkpoint: checkpoint
+      checkpoint: checkpoint,
+      pipeline: 'skeleton-flesh'
     });
     checkpoint = restored.checkpoint;
     if (!restored.accepted) {
@@ -8557,6 +8586,7 @@ async function runSkeletonFleshPipeline(options) {
     progress('skeleton', 'Building structural skeleton\u2026');
     skeleton = await runJsonStage(settings, {
       stageKey:        'skeleton',
+      providerStageKey: 'skeleton',
       stageName:        'Skeleton',
       stageIndex:       stageNum,
       getTotalStages:   function () { return totalStages; },
@@ -8568,6 +8598,10 @@ async function runSkeletonFleshPipeline(options) {
       budgetEnforce:    useGeminiBudget,
       telemetryCollector: sfTelemetry,
       repairDirective:  sfRepairDirectiveFor('skeleton'),
+      outputDigestValue: function (result) {
+        recordSeedOnStage(result, divergenceSeed);
+        return result;
+      },
       buildPrompt: function (retryState) {
         return builders.skeleton(workout, brief, {
           retryMode: retryState.attempt > 0,
@@ -8639,6 +8673,21 @@ async function runSkeletonFleshPipeline(options) {
       }
     }
   }
+
+  // Preserve the exact paid owner bytes before the deterministic rulebook
+  // projection below enriches the working skeleton.
+  var sfOwnerOutputDigest = stageValueDigest(skeleton);
+  var sfOwnerDigests = { skeleton: sfOwnerOutputDigest };
+  function withSfOwnerGiven(prompt) {
+    return String(prompt || '') + '\n\n## Paid Upstream Owner (BINDING)\n'
+      + 'skeleton.meta.blockTitle\n' + String(((skeleton || {}).meta || {}).blockTitle || '');
+  }
+
+  // The downstream working document is enriched with rulebook and prose
+  // particulars. Detach it from the pristine paid checkpoint value first so
+  // later deterministic projections cannot rewrite the owner after its
+  // completion receipt has closed.
+  skeleton = cloneShellPartValue(skeleton);
 
   // THE RULEBOOK REACHES THE ARTIFACT (D173), S+F's half. `skeleton.meta`
   // becomes `booklet.meta` on this pipeline, so the stamp goes here — outside
@@ -8727,6 +8776,8 @@ async function runSkeletonFleshPipeline(options) {
     progress('knowing', 'Working out how this world runs…');
     knowingOutput = await runJsonStage(settings, {
       stageKey:        'knowing',
+      providerStageKey: 'knowing',
+      upstreamDigests: sfOwnerDigests,
       stageName:       'World Detail',
       stageIndex:      stageNum,
       getTotalStages:  function () { return totalStages; },
@@ -8739,7 +8790,9 @@ async function runSkeletonFleshPipeline(options) {
       telemetryCollector: sfTelemetry,
       normalizeResult: normalizeKnowingShape,
       buildPrompt: function (retryState) {
-        return builders.knowing(skeleton, brief, { retryMode: retryState.attempt > 0 });
+        return withSfOwnerGiven(
+          builders.knowing(skeleton, brief, { retryMode: retryState.attempt > 0 })
+        );
       },
       validate: function (result) {
         return validateKnowingStage(result);
@@ -8775,6 +8828,8 @@ async function runSkeletonFleshPipeline(options) {
     progress('rules', 'Writing rules spread\u2026');
     rulesOutput = await runJsonStage(settings, {
       stageKey:        'rules',
+      providerStageKey: 'rules',
+      upstreamDigests: sfOwnerDigests,
       stageName:        'Rules Spread',
       stageIndex:       stageNum,
       getTotalStages:   function () { return totalStages; },
@@ -8796,7 +8851,9 @@ async function runSkeletonFleshPipeline(options) {
         // point-of-use subset OF THIS DOCUMENT. Passed explicitly rather than
         // left to the builder's skeleton fallback, so the hand-over is visible
         // at the call site where a future reader looks for it.
-        return builders.fleshRules(skeleton, { gameRulebook: sfGameRulebook });
+        return withSfOwnerGiven(
+          builders.fleshRules(skeleton, { gameRulebook: sfGameRulebook })
+        );
       },
       validate: function (result) {
         return validateRulesStage(result);
@@ -8929,6 +8986,8 @@ async function runSkeletonFleshPipeline(options) {
 
     var weekResult = await runJsonStage(settings, {
       stageKey:        ckKey,
+      providerStageKey: ckKey,
+      upstreamDigests: sfOwnerDigests,
       stageName:        'Week ' + weekNum + (isBoss ? ' (Boss)' : ''),
       stageIndex:       stageNum,
       getTotalStages:   function () { return totalStages; },
@@ -8940,7 +8999,7 @@ async function runSkeletonFleshPipeline(options) {
       budgetEnforce:    useGeminiBudget,
       telemetryCollector: sfTelemetry,
       buildPrompt: function (retryState) {
-        return builders.fleshWeek(skeleton, weekPlan, weekWorkout, weekSummariesSF, allComponentValuesSF, {
+        return withSfOwnerGiven(builders.fleshWeek(skeleton, weekPlan, weekWorkout, weekSummariesSF, allComponentValuesSF, {
           retryMode: retryState.attempt > 0,
           // The GIVEN and the floor below read the same row (D170); the identity
           // givens and the floor below read the same OPTIONS OBJECT (D173).
@@ -8952,7 +9011,7 @@ async function runSkeletonFleshPipeline(options) {
           // and the row the gate checks cannot be two readings.
           gameRulebook: sfGameRulebook,
           playSpine: sfWeekFloorOptions.playSpine
-        });
+        }));
       },
       normalizeResult: function (result) {
         if (result && Array.isArray(result.weeks) && result.weeks.length === 1) {
@@ -8961,6 +9020,11 @@ async function runSkeletonFleshPipeline(options) {
         normalizeCompanionComponents(result);
         if (result && Array.isArray(result.sessions) && result.sessions.length > 3) {
           result.overflow = true;
+        }
+        if (result) {
+          result.weekNumber = weekNum;
+          result.isBossWeek = isBoss;
+          result.isDeload = !!weekPlan.isDeload;
         }
         return result;
       },
@@ -9079,6 +9143,11 @@ async function runSkeletonFleshPipeline(options) {
 
     var fragResultSF = await runJsonStage(settings, {
       stageKey:        'fragments',
+      providerStageKey: 'fragments',
+      upstreamDigests: sfOwnerDigests,
+      outputDigestValue: function (result) {
+        return (result && result.fragments) || result;
+      },
       stageName:        'Fragments',
       stageIndex:       stageNum,
       getTotalStages:   function () { return totalStages; },
@@ -9091,7 +9160,7 @@ async function runSkeletonFleshPipeline(options) {
       telemetryCollector: sfTelemetry,
       unwrapKey:        'fragments',
       buildPrompt: function () {
-        return builders.fleshFragmentBatch(
+        return withSfOwnerGiven(builders.fleshFragmentBatch(
           skeleton,
           fullFragRegistry,
           weekSummariesSF,
@@ -9100,7 +9169,7 @@ async function runSkeletonFleshPipeline(options) {
           1,    // total batches
           // THE PROSE FUNDING (VISION §5) — the documents ARE the prose.
           { gameRulebook: sfGameRulebook }
-        );
+        ));
       },
       // THE GATE MUST JUDGE THE OBJECT THE PIPELINE BANKS (D168). `unwrapKey`
       // hands this stage a bare array, and the old validator built a throwaway
@@ -9209,6 +9278,11 @@ async function runSkeletonFleshPipeline(options) {
 
     var endingsResultSF = await runJsonStage(settings, {
       stageKey:        'endings',
+      providerStageKey: 'endings',
+      upstreamDigests: sfOwnerDigests,
+      outputDigestValue: function (result) {
+        return (result && result.endings) || result;
+      },
       stageName:        'Endings',
       stageIndex:       stageNum,
       getTotalStages:   function () { return totalStages; },
@@ -9225,12 +9299,16 @@ async function runSkeletonFleshPipeline(options) {
         // one is the default, and D150's lesson on this exact pair is that a
         // fix landed on the fallback alone reaches every path but the busiest.
         if (builders.fleshEndingsBundled) {
-          return builders.fleshEndingsBundled(skeleton, endingVariants, finalWeekSummary, weekSummariesSF,
-            { gameRulebook: sfGameRulebook });
+          return withSfOwnerGiven(
+            builders.fleshEndingsBundled(skeleton, endingVariants, finalWeekSummary, weekSummariesSF,
+              { gameRulebook: sfGameRulebook })
+          );
         }
         // Fallback: use single-ending builder for first variant (shouldn't reach here)
-        return builders.fleshEnding(skeleton, endingVariants[0], finalWeekSummary, weekSummariesSF,
-          { gameRulebook: sfGameRulebook });
+        return withSfOwnerGiven(
+          builders.fleshEnding(skeleton, endingVariants[0], finalWeekSummary, weekSummariesSF,
+            { gameRulebook: sfGameRulebook })
+        );
       },
       validate: function (result) {
         return validateCurrentSkeletonFleshEndings(result, endingsRestoreContextSF);
@@ -9286,6 +9364,17 @@ async function runSkeletonFleshPipeline(options) {
   var booklet = assembleSkeletonFleshBooklet(
     skeleton, rulesOutput, weekOutputs, allFragments, allEndings, nw
   );
+  var sfBossProjectionResult = materializeBossPlanProjection(booklet, skeleton.bossPlan, {
+    ownerPath: 'stages.skeleton.bossPlan'
+  });
+  booklet = sfBossProjectionResult.booklet;
+  if (sfBossProjectionResult.blocking) {
+    var sfBossProjectionError = new Error(sfBossProjectionResult.diagnostics.map(function (row) {
+      return row.path + ': ' + row.message;
+    }).join('; '));
+    sfBossProjectionError.findings = sfBossProjectionResult.diagnostics;
+    throw sfBossProjectionError;
+  }
   recordSeedOnBooklet(booklet, divergenceSeed);
   recordWorkoutLifecycle(booklet, sfWorkoutLifecycle);
 
@@ -9766,6 +9855,7 @@ window.LiftRPGAPI = {
     completeStandardAssembledBranch: completeStandardAssembledBranch,
     completeSkeletonFleshAssembledBranch: completeSkeletonFleshAssembledBranch,
     assembledProductionContracts: assembledProductionContracts,
+    publicRailOrderForPipeline: publicRailOrderForPipeline,
     restoreCheckpointedStage: restoreCheckpointedStage,
     validateRulesStage: validateRulesStage,
     validateEndingsStage: validateEndingsStage,
@@ -9900,7 +9990,6 @@ window.LiftRPGAPI = {
     readArtifactExperienceProjection: readArtifactExperienceProjection,
     compareArtifactExperienceMaterialization: compareArtifactExperienceMaterialization,
     artifactProofBarrierError: artifactProofBarrierError,
-    restoreStageContracts: restoreStageContracts,
     validateCriticVerdict: validateCriticVerdict,
     normalizeCriticVerdict: normalizeCriticVerdict,
     summarizeVerdict: summarizeVerdict,

@@ -6,6 +6,7 @@ import {
   splitParagraphs
 } from './utils.js?v=48';
 import { normalizeManifestPointer } from './document-models.js?v=48';
+import { deriveAssemblyTransferRows } from './assembly-transfer-rows.mjs';
 // Shell-family resolution is shared with the generator tree — one
 // implementation in contracts/contract-constants.mjs, co-located with the
 // VALID_SHELL_FAMILIES enum that gates it. The local copy that used to live
@@ -346,11 +347,9 @@ export function buildAssemblyPageModelWithVariant(data, layoutVariant) {
     layoutVariant: layoutVariant || 'standard',
     title: artifactIdentity.copy.assemblyTitle,
     subtitle: artifactIdentity.copy.assemblySubtitle,
-    rows: (data.weeks || [])
-      .filter((week) => !week.isBossWeek)
-      .map((week) => ({
-        weekLabel: 'Week ' + pad2(week.weekNumber)
-      })),
+    rows: deriveAssemblyTransferRows(data).map((row) => ({
+      weekLabel: 'Week ' + pad2(row.weekNumber)
+    })),
     passwordLength: meta.passwordLength
   };
 }

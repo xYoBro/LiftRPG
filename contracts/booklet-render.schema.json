@@ -439,7 +439,11 @@
             "properties": {
               "title": { "type": "string" },
               "narrative": { "type": "string" },
-              "mechanismDescription": { "type": "string" },
+              "whyItFeelsEarned": { "type": "string" },
+              "requiredPriorKnowledge": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
               "componentInputs": {
                 "type": "array"
               },

@@ -77,6 +77,8 @@ function bossContentWeight(week, bookletData) {
   const narrativeLen = (model.narrativeParagraphs || []).join(' ').length;
   const mechanismLen = (model.mechanismParagraphs || []).join(' ').length;
   const proofLen = (model.convergenceProofParagraphs || []).join(' ').length;
+  const rationaleLen = String(model.whyItFeelsEarned || '').length;
+  const prerequisiteLen = (model.requiredPriorKnowledge || []).join(' ').length;
   const branchLen = [
     ((model.binaryChoiceAcknowledgement || {}).ifA || ''),
     ((model.binaryChoiceAcknowledgement || {}).ifB || ''),
@@ -86,7 +88,8 @@ function bossContentWeight(week, bookletData) {
 
   return Math.min(
     1,
-    (narrativeLen + mechanismLen + proofLen + branchLen) / 1400
+    (narrativeLen + mechanismLen + proofLen + branchLen
+      + rationaleLen + prerequisiteLen) / 1400
       + tableLines * 0.04
       + componentCount * 0.03,
   );
