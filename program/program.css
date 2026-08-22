@@ -279,6 +279,105 @@ p {
   line-height: 1.45;
 }
 
+.workstream-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 34px;
+}
+
+.workstream-head h3 {
+  margin-bottom: 12px;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+
+.workstream-head > span {
+  color: var(--soft);
+  font-size: 11px;
+}
+
+.workstream {
+  border-top: 1px solid var(--line);
+}
+
+.agent-row {
+  display: grid;
+  grid-template-columns: 150px 1fr 88px;
+  gap: 20px;
+  align-items: start;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.agent-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.agent-identity strong,
+.agent-identity span {
+  display: block;
+}
+
+.agent-identity strong {
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.agent-identity span,
+.agent-signal time {
+  color: var(--soft);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.agent-row > p {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.agent-signal {
+  text-align: right;
+}
+
+.agent-signal > span {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 5px;
+  color: var(--soft);
+  font-size: 11px;
+}
+
+.agent-signal i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--soft);
+}
+
+.agent-row.active .agent-signal > span {
+  color: var(--blue);
+}
+
+.agent-row.active .agent-signal i {
+  background: var(--blue);
+  box-shadow: 0 0 0 4px rgba(23, 104, 229, 0.1);
+}
+
+.agent-row.complete .agent-signal > span {
+  color: var(--green);
+}
+
+.agent-row.complete .agent-signal i {
+  background: var(--green);
+}
+
 .section {
   padding-top: 54px;
 }
@@ -546,6 +645,23 @@ p {
   .activity-list li {
     grid-template-columns: 1fr;
     gap: 5px;
+  }
+
+  .agent-row {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .agent-signal {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    text-align: left;
+  }
+
+  .agent-signal > span {
+    justify-content: flex-start;
+    margin-bottom: 0;
   }
 
   .step-list li {
