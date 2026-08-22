@@ -4487,6 +4487,14 @@ export function shellStageLabel(stageKey) {
   return SHELL_STAGE_LABELS[String(stageKey || '')] || '';
 }
 
+function artifactPromiseOwnerError(meta, where) {
+  var promise = String((((meta || {}).artifactIntent || {}).artifactPromise) || '').trim();
+  var sentenceMarks = promise.match(/[.!?](?:\s|$)/g) || [];
+  if (promise && promise.length <= 280 && sentenceMarks.length <= 1) return '';
+  return (where || 'Stage') + ' → meta.artifactIntent.artifactPromise must be one concise sentence of at most 280 characters — '
+    + 'this is the exact experience the owner promises before any later seat is paid';
+}
+
 function validateShellStage(shell, expectedOptions, stageKey) {
   var arm = SHELL_ARM_SETS[stageKey] || SHELL_ARM_SETS.shell;
   var WHERE = SHELL_STAGE_LABELS[stageKey] || 'Shell';
@@ -4530,6 +4538,10 @@ function validateShellStage(shell, expectedOptions, stageKey) {
     }
     if (!('passwordEncryptedEnding' in shell.meta)) {
       errors.push('meta.passwordEncryptedEnding must exist (can be empty string)');
+    }
+    if (stageKey === 'shellIdentity' && (expectedOptions || {}).artifactExperienceRequired) {
+      var identityPromiseError = artifactPromiseOwnerError(shell.meta, WHERE);
+      if (identityPromiseError) errors.push(identityPromiseError);
     }
     // weekCount, totalSessions, passwordLength are injected by JS post-generation
     // (enforceBookletDerivedFields in assembly.js). Not validated against LLM output.
@@ -10851,6 +10863,10 @@ export function validateSkeletonStage(result, weekCount, options) {
   // ── meta ──
   var meta = result.meta;
   if (!meta) return 'Skeleton → meta: missing';
+  if ((options || {}).artifactExperienceRequired) {
+    var skeletonPromiseError = artifactPromiseOwnerError(meta, 'Skeleton');
+    if (skeletonPromiseError) return skeletonPromiseError;
+  }
   if (!meta.blockTitle) return 'Skeleton → meta.blockTitle: missing';
   if (!meta.worldContract) return 'Skeleton → meta.worldContract: missing';
   if (!meta.weeklyComponentType) return 'Skeleton → meta.weeklyComponentType: missing';

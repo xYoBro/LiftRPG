@@ -201,6 +201,9 @@ var artifactIntent = {
   required: [],
   additionalProperties: false,
   properties: {
+    // Required by the two live compiler owners; additive here so stored books
+    // remain ordinary documents rather than a backward-compatibility program.
+    artifactPromise: { type: 'string', minLength: 1, maxLength: 280 },
     briefMode: { type: 'string' },
     fidelityMode: { type: 'string' },
     arcFamily: { enum: VALID_ARC_FAMILIES },

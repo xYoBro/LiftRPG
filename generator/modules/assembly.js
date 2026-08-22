@@ -18,7 +18,9 @@ import {
   resolveFamilyBoardModes,
   DEFAULT_WORKSPACE_STYLE,
   VALID_COMPONENT_DIALECTS,
-  SPATIAL_GUARDRAILS
+  SPATIAL_GUARDRAILS,
+  parseSurfaceRef,
+  RENAMEABLE_REF_KINDS
 } from '../../contracts/contract-constants.mjs';
 
 // W5b — the difficulty instrument. The solvers measure how much work a puzzle
@@ -2108,11 +2110,84 @@ export function deriveMarkStripEconomy(booklet, diag) {
 // ── Booklet assemblers ──────────────────────────────────────────────────────
 // Merges partial JSON chunks from the 10-stage pipeline into a complete booklet.
 
+function materializeAcceptedRulebookRenames(booklet, amendments) {
+  var renames = amendments && Array.isArray(amendments.renames) ? amendments.renames.map(function (row) {
+    return { from: String((row || {}).from || ''), to: String((row || {}).to || '') };
+  }) : [];
+  if (!renames.length) return booklet;
+
+  // A rename is not materialized merely because its declaration and prose use
+  // the new ref. Move the authored surface name at the field that actually
+  // prints it, so buildSurfaceIndex can prove the renamed surface exists.
+  // Fixed-form map:W<n> is the one special source form: it names that week's
+  // map as a whole, whose authored free name is mapState.title.
+  function renameNamedSurface(row) {
+    var from = parseSurfaceRef(row.from);
+    var to = parseSurfaceRef(row.to);
+    if (!from.valid || !to.valid || from.kind !== to.kind || !from.id || !to.id
+        || RENAMEABLE_REF_KINDS.indexOf(from.kind) === -1) return;
+    var fromKey = toSlugWords(from.id);
+    function renameField(owner, key) {
+      if (owner && toSlugWords(owner[key]) === fromKey) owner[key] = to.id;
+    }
+    (Array.isArray((booklet || {}).weeks) ? booklet.weeks : []).forEach(function (week) {
+      if (!week) return;
+      if (from.kind === 'clock') {
+        (Array.isArray(week.gameplayClocks) ? week.gameplayClocks : []).forEach(function (clock) {
+          renameField(clock, 'clockName');
+        });
+        return;
+      }
+      var fieldOps = week.fieldOps || {};
+      if (from.kind === 'map') {
+        var mapState = fieldOps.mapState;
+        if (!mapState) return;
+        var weekMatch = /^w\s*(\d+)$/i.exec(from.id);
+        if (weekMatch && Number(week.weekNumber) === Number(weekMatch[1])) mapState.title = to.id;
+        else {
+          renameField(mapState, 'title');
+          (Array.isArray(mapState.nodes) ? mapState.nodes : []).forEach(function (node) { renameField(node, 'label'); renameField(node, 'id'); });
+          (Array.isArray(mapState.tiles) ? mapState.tiles : []).forEach(function (tile) { renameField(tile, 'label'); });
+          (Array.isArray(mapState.positions) ? mapState.positions : []).forEach(function (position) { renameField(position, 'label'); });
+        }
+        return;
+      }
+      if (from.kind === 'companion') {
+        function renameCompanions(pool) {
+          (Array.isArray(pool) ? pool : []).forEach(function (companion) {
+            ['title', 'label', 'statName', 'type'].forEach(function (key) { renameField(companion, key); });
+          });
+        }
+        renameCompanions(fieldOps.companionComponents);
+        renameCompanions((((week.interlude || {}).payload || {}).companionComponents));
+      }
+    });
+  }
+  renames.forEach(renameNamedSurface);
+
+  function rewrite(value) {
+    if (typeof value === 'string') {
+      var text = value;
+      renames.forEach(function (row) {
+        var from = String((row || {}).from || '');
+        var to = String((row || {}).to || '');
+        if (from && to) text = text.split(from).join(to);
+      });
+      return text;
+    }
+    if (Array.isArray(value)) return value.map(rewrite);
+    if (!value || typeof value !== 'object') return value;
+    Object.keys(value).forEach(function (key) { value[key] = rewrite(value[key]); });
+    return value;
+  }
+  return rewrite(booklet);
+}
+
 export function assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, endingsOutput, campaignPlan) {
   ensureArtifactIdentity(shell, campaignPlan || null);
   var diag = [];
   var booklet = {
-    meta: shell.meta || {},
+    meta: Object.assign({}, shell.meta || {}),
     cover: shell.cover || {},
     rulesSpread: shell.rulesSpread || {},
     theme: shell.theme || {},
@@ -2125,6 +2200,13 @@ export function assembleBooklet(shell, weekChunkOutputs, fragmentsOutput, ending
   weekChunkOutputs.forEach(function (chunk) {
     booklet.weeks = booklet.weeks.concat(chunk.weeks || []);
   });
+
+  // The paid identity bank keeps the complete amendment record for detached
+  // provenance. The delivered artifact carries only the effective names: an
+  // obsolete `from` token is not reader-facing provenance, it is stale copy.
+  var acceptedRulebookAmendments = booklet.meta.rulebookAmendments;
+  materializeAcceptedRulebookRenames(booklet, acceptedRulebookAmendments);
+  delete booklet.meta.rulebookAmendments;
 
   // Literal `\n` before anything reads the strings — every later normalizer,
   // every estimate and every gate should see the text the reader will see.

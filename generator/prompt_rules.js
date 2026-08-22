@@ -728,6 +728,7 @@
     '  Plus optional: artifactBlend?, authorialMode?, documentEcology?, materialCulture?, openingMode?, rulesDeliveryMode?, revealShape?, unlockLogic?',
     '- `artifactIntent` (object, required): The compiled planning contract from the Artifact Intent Compiler.',
     '  Required fields:',
+    '  - `artifactPromise` (string): one concise sentence, max 280 characters, stating the exact reader experience this book promises.',
     '  - `briefMode` (string): how the brief was classified',
     '  - `fidelityMode` (string): literal | interpretive | compositional',
     '  - `arcFamily` (string): chosen arc family from the menu',
@@ -832,6 +833,7 @@
         // the model can check its own answer against. Every field below them
         // chooses what the BOOK IS, and a sample there is an exemplar.
         briefMode: 'sparse', fidelityMode: 'interpretive',
+        artifactPromise: '',
         // ── BLANK BY RULING (D144), and this is D47's own argument applied to
         // the fields that were exempted from it. The comment two blocks up
         // states the rule correctly for `componentDialect`: a filled-in sample
@@ -1294,6 +1296,7 @@
           artifactIntent: {
             type: 'object',
             properties: {
+              artifactPromise: { type: 'string', minLength: 1, maxLength: 280 },
               briefMode: { type: 'string', enum: ['explicit', 'sparse', 'empty', 'mashup', 'reference-led', 'personal-subject'] },
               fidelityMode: { type: 'string', enum: ['literal', 'interpretive', 'compositional'] },
               arcFamily: { type: 'string', enum: ['slow-burn-investigation', 'institutional-collapse', 'witness-accumulation', 'contamination-spiral', 'procedural-deepening', 'pilgrimage-approach', 'false-order-to-rupture'] },
@@ -1372,7 +1375,7 @@
                 required: ['rejectedReadings']
               }
             },
-            required: ['briefMode', 'fidelityMode', 'arcFamily', 'mechanicGrammarFamily', 'documentEcology', 'exclusions', 'homePull', 'convergencePattern', 'endingMode', 'reading', 'selectionReason', '_x']
+            required: ['artifactPromise', 'briefMode', 'fidelityMode', 'arcFamily', 'mechanicGrammarFamily', 'documentEcology', 'exclusions', 'homePull', 'convergencePattern', 'endingMode', 'reading', 'selectionReason', '_x']
           },
           playSpine: STRUCTURED_SF_PLAY_SPINE,
           // The arrangement grammar, on the transport at BOTH seats. The shell
@@ -1733,7 +1736,8 @@
                 }
               }
             },
-            required: ['governingConceit', 'commitments']
+            required: ['governingConceit', 'commitments'],
+            additionalProperties: false
           },
           unprintableWants: { type: 'array', items: { type: 'string' } }
         },
@@ -3141,6 +3145,9 @@
     'After interpreting the brief, you MUST compile it into a concrete artifact planning',
     'bundle (`meta.artifactIntent`). This is a binding planning contract — later stages',
     'must preserve these commitments. Do not leave them implicit.',
+    'Write `artifactPromise` as one concise sentence (1–280 characters): the complete',
+    'experience this particular booklet promises its reader. It is not a second rulebook,',
+    'spread plan, typography plan, or a copy of the governing conceit.',
     '',
     '### Step 1: Classify the brief',
     'Set `briefMode` to one of:',
@@ -6991,6 +6998,8 @@
     'simple? Has the structural scaffold drowned the voice (institutional gravity the brief',
     'never asked for)? Are named references honored as templates, not decoration? Is the prose',
     'free of banned cliche patterns?',
+    'Treat `meta.artifactIntent.artifactPromise` as a named exhibit: does this promised reader',
+    'experience actually follow from the brief, or does it overreach what the brief gave?',
     'Grade against the booklet’s OWN recorded reading (`meta.artifactIntent.reading`) when it',
     'is present. THREE distinct failures live here and they cite differently: (a) the booklet',
     'departs from its recorded reading — cite the reading field and the prose that contradicts',
@@ -7145,6 +7154,8 @@
     'Whether this mechanic set was designed FOR this brief, or filled into a template that',
     'would have accepted any brief. `worldCohesion` asks whether the NOUNS come from the world',
     'contract; this asks whether the SHAPES do.',
+    'Treat `meta.artifactIntent.artifactPromise` as a named exhibit: is that promise realised',
+    'by this book’s actual mechanism, rather than a reskinned template?',
     'THE MAD LIBS TEST, the primary instrument: strip every proper noun and themed word from',
     'the book\'s mechanics and describe what is left as pure shape — what goes in, what',
     'transforms it, what comes out. Now re-skin that shape with a different archetype\'s',

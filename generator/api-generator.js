@@ -229,6 +229,12 @@ import {
   compareArtifactMaterialization
 } from './modules/sim-player.js';
 
+import {
+  validateArtifactExperienceContract,
+  readArtifactExperienceProjection,
+  compareArtifactExperienceMaterialization
+} from './modules/artifact-experience.js';
+
 // The third referee (FUSION §4 mechanism 6). Its pure half lives in its own
 // module for the same reason the walker's does: it is a distinct reading with
 // its own vocabulary, its own abstention rule, and its own projection of the
@@ -737,6 +743,10 @@ var STRUCTURED_SCHEMA_SHELL = {
         artifactIntent: {
           type: 'object',
           properties: {
+            // The book-level reader promise has one owner: Identity on the
+            // standard path, Skeleton on S+F. It is intentionally not a
+            // rulebook field; the rulebook remains the game contract.
+            artifactPromise: { type: 'string', minLength: 1, maxLength: 280 },
             briefMode: { type: 'string' },
             fidelityMode: { type: 'string' },
             arcFamily: { type: 'string' },
@@ -807,7 +817,7 @@ var STRUCTURED_SCHEMA_SHELL = {
               required: ['rejectedReadings']
             }
           },
-          required: ['briefMode', 'fidelityMode', 'arcFamily', 'mechanicGrammarFamily',
+          required: ['artifactPromise', 'briefMode', 'fidelityMode', 'arcFamily', 'mechanicGrammarFamily',
             'documentEcology', 'exclusions', 'homePull', 'convergencePattern', 'endingMode', 'reading',
             'selectionReason', '_x']
         },
@@ -3016,7 +3026,9 @@ function artifactProofBarrierError(findings, fallbackOwner) {
     var owner = detail.ownerStage || row.ownerStage || fallbackOwner;
     var ownerPath = detail.ownerPath || row.ownerPath || '';
     var label = owner === 'economyGraph' ? 'Economy Graph'
-      : owner === 'shellSpine' ? 'Shell Spine' : 'Skeleton';
+      : owner === 'shellSpine' ? 'Shell Spine'
+      : owner === 'gameRulebook' ? 'Game Rulebook'
+      : owner === 'shellIdentity' ? 'Identity' : 'Skeleton';
     return label + ' → ' + ownerPath + ': '
       + String(row.message || row.code || 'artifact proof failed');
   });
@@ -4975,6 +4987,7 @@ async function completeAssembledProduction(booklet, options) {
     : { valid: false, errors: ['Assembled validator is unavailable'] };
   var validatorMechanicalErrors = validatorErrors(mechanicalResult);
   var materializationDrifts = [];
+  var experienceMaterializationDrifts = [];
   if (options.preProofView) {
     materializationDrifts = compareArtifactMaterialization(options.preProofView, booklet).drifts || [];
     if (materializationDrifts.length) {
@@ -4984,6 +4997,19 @@ async function completeAssembledProduction(booklet, options) {
       mechanicalResult = Object.assign({}, mechanicalResult, {
         valid: false,
         errors: validatorMechanicalErrors.concat(materializationDrifts.map(function (drift) {
+          return drift.message;
+        }))
+      });
+    }
+  }
+  if (options.preExperienceView) {
+    experienceMaterializationDrifts = compareArtifactExperienceMaterialization(
+      options.preExperienceView, booklet
+    ).drifts || [];
+    if (experienceMaterializationDrifts.length) {
+      mechanicalResult = Object.assign({}, mechanicalResult, {
+        valid: false,
+        errors: validatorMechanicalErrors.concat(experienceMaterializationDrifts.map(function (drift) {
           return drift.message;
         }))
       });
@@ -5009,6 +5035,28 @@ async function completeAssembledProduction(booklet, options) {
         path: drift.ownerPath || drift.path || null,
         message: drift.message,
         evidence: { kind: drift.kind || '', ownerStage: drift.ownerStage || null }
+      });
+    });
+  }
+  if (experienceMaterializationDrifts.length) {
+    var hasBossSurface = (booklet.weeks || []).some(function (week) {
+      return !!(week || {}).bossEncounter;
+    });
+    var hasGameplayClock = (booklet.weeks || []).some(function (week) {
+      return Array.isArray((week || {}).gameplayClocks) && week.gameplayClocks.length > 0;
+    });
+    experienceMaterializationDrifts.forEach(function (drift, index) {
+      mechanicalErrors.push({
+        id: 'materialization:' + artifactRevisionIdFor(booklet) + ':experience:' + (index + 1),
+        artifactRevisionId: artifactRevisionIdFor(booklet),
+        source: 'validator',
+        class: 'conformance',
+        severity: 'error',
+        code: 'artifact-experience-materialization-drift',
+        path: drift.ownerPath || drift.path || null,
+        message: drift.message,
+        evidence: { kind: !hasBossSurface ? 'boss' : (!hasGameplayClock ? 'gameplay' : (drift.kind || '')),
+          ownerStage: drift.ownerStage || null }
       });
     });
   }
@@ -5092,6 +5140,7 @@ async function completeStandardAssembledBranch(booklet, options) {
       options.brief || '', options.editorialContext || {}],
     adaptEditorial: call.adaptEditorial,
     preProofView: options.preProofView || null,
+    preExperienceView: options.preExperienceView || null,
     receipt: options.receipt || { proof: 'not_run' }
   });
 }
@@ -5116,6 +5165,7 @@ async function completeSkeletonFleshAssembledBranch(booklet, options) {
       options.brief || '', options.editorialContext || {}],
     adaptEditorial: call.adaptEditorial,
     preProofView: options.preProofView || null,
+    preExperienceView: options.preExperienceView || null,
     receipt: options.receipt || { proof: 'not_run' }
   });
 }
@@ -6287,6 +6337,7 @@ async function runApiPipeline(options) {
       weekCount: weekCount,
       totalSessions: totalSessions,
       generationFloors: true,
+      artifactExperienceRequired: true,
       brief: brief,
       seedAssignments: seedAssignments,
       plannedWeeks: plannedWeekShapes,
@@ -6636,7 +6687,14 @@ async function runApiPipeline(options) {
       // spine-shaped axes are answered at the IDENTITY seat, which writes their
       // evidence field; this seat builds what that block declared.
       return builders.shellSpine(brief, layerBible, campaignPlan,
-        shellBuilderOptions(retryState, { shellIdentity: shellIdentityStage }));
+        shellBuilderOptions(retryState, {
+          shellIdentity: shellIdentityStage,
+          acceptedRulebookAmendments: {
+            renames: rulebookAmendment.applied.map(function (row) {
+              return { from: row.kind + ':' + row.from, to: row.kind + ':' + row.to };
+            })
+          }
+        }));
     }
   });
 
@@ -6825,6 +6883,18 @@ async function runApiPipeline(options) {
   // A transient view over already-banked facts; never a stage, budget row,
   // checkpoint key, provider call, or telemetry row. Restored owners reached
   // their real current validators above before this view is recomputed.
+  var artifactExperience = readArtifactExperienceProjection(checkpoint, {
+    pipeline: 'standard', commission: { brief: brief, workout: workout }
+  });
+  var artifactExperienceCodes = (artifactExperience.blocking || []).map(function (row) { return row.code; });
+  emitPipelineEvent(onProgress, stageNum, totalStages,
+    artifactExperienceCodes.length ? 'Artifact experience found blocking owner facts.' : 'Artifact experience closed before proof.', {
+      phase: 'artifact_experience', experienceDigest: ((artifactExperience || {}).projection || {}).experienceDigest || '',
+      blockingCodes: artifactExperienceCodes
+    });
+  if (artifactExperienceCodes.length) {
+    throw artifactProofBarrierError(artifactExperience.blocking || [], 'shellIdentity');
+  }
   var artifactRead = readArtifactContractView(checkpoint, {
     pipeline: 'standard',
     effectiveRulebook: gameRulebook,
@@ -7469,6 +7539,7 @@ async function runApiPipeline(options) {
     settings: settings,
     brief: brief,
     preProofView: artifactRead.view,
+    preExperienceView: artifactExperience.projection,
     editorialContext: {
       rateLimiter: rateLimiter,
       budgetEnforce: useGeminiBudget,
@@ -8466,6 +8537,7 @@ async function runSkeletonFleshPipeline(options) {
       }, {
         requestedWeekCount: weekCount,
         generationFloors: true,
+        artifactExperienceRequired: true,
         brief: brief,
         seedAssignments: seedAssignments,
         gameRulebook: sfGameRulebook
@@ -8528,6 +8600,7 @@ async function runSkeletonFleshPipeline(options) {
         // the brief, and this is the only seat that has it.
         return validateSkeletonStage(result, weekCount, {
           generationFloors: true,
+          artifactExperienceRequired: true,
           brief: brief,
           // D148, this seat's half: shown identityAxesForStage('skeleton')
           // above, checked on exactly that slice. One accessor, two readers.
@@ -8584,6 +8657,18 @@ async function runSkeletonFleshPipeline(options) {
   // S+F owns its complete topology and cadence ledger at the skeleton seat,
   // so the same transient proof runs immediately after that bank closes. No
   // Economy Pacing stage is invented for this pipeline.
+  var sfArtifactExperience = readArtifactExperienceProjection(checkpoint, {
+    pipeline: 'skeleton-flesh', commission: { brief: brief, workout: rawWorkout }
+  });
+  var sfArtifactExperienceCodes = (sfArtifactExperience.blocking || []).map(function (row) { return row.code; });
+  emitPipelineEvent(onProgress, stageNum, totalStages,
+    sfArtifactExperienceCodes.length ? 'Artifact experience found blocking owner facts.' : 'Artifact experience closed before proof.', {
+      phase: 'artifact_experience', experienceDigest: ((sfArtifactExperience || {}).projection || {}).experienceDigest || '',
+      blockingCodes: sfArtifactExperienceCodes
+    });
+  if (sfArtifactExperienceCodes.length) {
+    throw artifactProofBarrierError(sfArtifactExperience.blocking || [], 'skeleton');
+  }
   var sfArtifactRead = readArtifactContractView(checkpoint, { pipeline: 'skeleton-flesh' });
   var sfArtifactProof = sfArtifactRead.view ? proveArtifactContract(sfArtifactRead.view) : {
     hard: [], soft: [], semanticDigest: ''
@@ -9253,6 +9338,7 @@ async function runSkeletonFleshPipeline(options) {
     settings: settings,
     brief: brief,
     preProofView: sfArtifactRead.view,
+    preExperienceView: sfArtifactExperience.projection,
     editorialContext: {
       rateLimiter: rateLimiter,
       budgetEnforce: useGeminiBudget,
@@ -9810,6 +9896,10 @@ window.LiftRPGAPI = {
     readArtifactContractView: readArtifactContractView,
     proveArtifactContract: proveArtifactContract,
     compareArtifactMaterialization: compareArtifactMaterialization,
+    validateArtifactExperienceContract: validateArtifactExperienceContract,
+    readArtifactExperienceProjection: readArtifactExperienceProjection,
+    compareArtifactExperienceMaterialization: compareArtifactExperienceMaterialization,
+    artifactProofBarrierError: artifactProofBarrierError,
     restoreStageContracts: restoreStageContracts,
     validateCriticVerdict: validateCriticVerdict,
     normalizeCriticVerdict: normalizeCriticVerdict,

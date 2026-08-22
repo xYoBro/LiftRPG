@@ -523,6 +523,10 @@
       '- Fidelity mode: ' + (intent.fidelityMode || 'interpretive')
     ];
 
+    if (intent.artifactPromise) {
+      lines.push('- Promised reader experience: ' + intent.artifactPromise);
+    }
+
     if (intent.convergencePattern) {
       lines.push('- Convergence pattern: ' + intent.convergencePattern);
     }
@@ -2414,6 +2418,16 @@
       'This booklet fuses a real workout program with a branching narrative TTRPG.',
       'The workout IS the story clock. The story IS the workout meaning-making system.',
       '',
+      '## Workout Given (BINDING)',
+      String(workout || ''),
+      '',
+      '## Brief Given (BINDING)',
+      String(brief || ''),
+      '',
+      '## gameRulebook Artifact Design Given (BINDING)',
+      compactJson((options.gameRulebook && options.gameRulebook.gameRulebook
+        ? options.gameRulebook.gameRulebook : options.gameRulebook || {}).artifactDesign || {}),
+      '',
       '## Your Task',
       'Return a single JSON object containing ONLY structural decisions — no long prose,',
       'no session content, no fragment bodies, no exercise details. Just the scaffold that',
@@ -2649,7 +2663,7 @@
         : '',
       'Return ONLY the JSON object. No markdown fences, no commentary.'
     ];
-    return parts.filter(Boolean).join('\n');
+    return applyAcceptedPromptSurfaceRenames(parts.filter(Boolean).join('\n'), shell);
   };
 
   /**
@@ -3431,6 +3445,18 @@
     return ['## ' + heading, ''].concat(SHELL_GIVEN_LAW).concat(['', compactJson(trimmed)]).join('\n');
   }
 
+  function applyAcceptedPromptSurfaceRenames(prompt, source) {
+    var meta = ((source || {}).meta) || source || {};
+    var amendments = meta.rulebookAmendments || {};
+    var text = String(prompt || '');
+    (Array.isArray(amendments.renames) ? amendments.renames : []).forEach(function (row) {
+      var from = String((row || {}).from || '');
+      var to = String((row || {}).to || '');
+      if (from && to) text = text.split(from).join(to);
+    });
+    return text;
+  }
+
   /**
    * summarizeShellIdentityFor(identity, slice) -> object
    *
@@ -3557,6 +3583,16 @@
       'this same run author those, against what you decide here.',
       '',
       ctx.rulebookAmendableGiven ? ctx.rulebookAmendableGiven + '\n' : '',
+      '## Workout Given (BINDING)',
+      String(options.workout || ''),
+      '',
+      '## Brief Given (BINDING)',
+      String(brief || ''),
+      '',
+      '## gameRulebook Artifact Design Given (BINDING)',
+      compactJson((options.gameRulebook && options.gameRulebook.gameRulebook
+        ? options.gameRulebook.gameRulebook : options.gameRulebook || {}).artifactDesign || {}),
+      '',
       '## SCHEMA CONTRACT',
       window.buildStageSchema('shellIdentity'),
       '',
@@ -3693,7 +3729,7 @@
   window.generateApiShellSpinePrompt = function (brief, layerBible, campaignPlan, options) {
     options = options || {};
     var ctx = shellSubStageContext(brief, layerBible, campaignPlan, options);
-    return [
+    return applyAcceptedPromptSurfaceRenames([
       '# API Stage 3d — The Play Spine',
       '',
       'Generate ONLY `meta.playSpine`. Output a JSON object with exactly one top-level key:',
@@ -3734,7 +3770,7 @@
       options.retryMode ? 'Retry mode: fix the named cross-references. Preserve every edge, milestone and ledger row that already resolves.' : '',
       '',
       'JSON only.'
-    ].filter(Boolean).join('\n');
+    ].filter(Boolean).join('\n'), { rulebookAmendments: options.acceptedRulebookAmendments });
   };
 
   window.generateApiWeekChunkPrompt = function (workout, brief, layerBible, campaignPlan, weekNumbers, continuity, allComponentValues, shellContext, options) {
