@@ -1,7 +1,7 @@
 // Generated from docs/jobs/publishing-compiler-status.json. Do not edit.
 window.LIFTRPG_PROGRAM_STATUS = {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-22T18:13:24-04:00",
+  "updatedAt": "2026-08-22T18:19:00-04:00",
   "overallProgress": 40,
   "eyebrow": "Publishing compiler program",
   "headline": "The machinery is becoming trustworthy.",
@@ -12,10 +12,10 @@ window.LIFTRPG_PROGRAM_STATUS = {
     "progress": 90,
     "state": "in_progress",
     "situation": "The book validates. Its evidence identity is being reconciled.",
-    "risk": "No artifact defect",
-    "blocker": "Safari weekly-audit handshake",
-    "now": "Binding the weekly profile audit to the exact Safari tab it opens.",
-    "why": "The oracle repair is complete. Layout and mechanic profiles regenerate cleanly, but Safari never publishes the weekly audit result, so the atomic recorder correctly rolls all three profiles back.",
+    "risk": "Three S+F geometry defects",
+    "blocker": "Current-book visual profile",
+    "now": "Inspecting pages 13, 32, and 33 before changing the planner or density solver.",
+    "why": "The Safari handshake is fixed. The real audit now reaches the artifact and reports excess interlude space, boss-footer drift, and workout slack; the recorder still rolls back atomically.",
     "exit": "Canonical evidence is independently reproducible, current-book profiles replace historical references, and the cumulative mechanical baseline is green."
   },
   "nextMilestone": {
@@ -51,7 +51,15 @@ window.LIFTRPG_PROGRAM_STATUS = {
       },
       {
         "state": "active",
-        "text": "Reproducing the Safari failure and binding the audit harness to one exact tab before rerecording."
+        "text": "The Safari audit now owns and polls one exact tab; its regression contract passes 66/66."
+      },
+      {
+        "state": "found",
+        "text": "The first real weekly audit exposed three S+F geometry defects on pages 13, 32, and 33."
+      },
+      {
+        "state": "active",
+        "text": "Inspecting those pages to locate the smallest planner or density-solver correction."
       }
     ],
     "agents": [
@@ -59,15 +67,15 @@ window.LIFTRPG_PROGRAM_STATUS = {
         "name": "Orchestrator",
         "role": "Owns sequence and decisions",
         "state": "active",
-        "activity": "Reproduced the weekly-audit timeout; testing exact-tab binding as the leading cause.",
-        "lastSignal": "2026-08-22T18:13:24-04:00"
+        "activity": "Closed the Safari tab-identity race; now inspecting the three real S+F geometry failures it revealed.",
+        "lastSignal": "2026-08-22T18:19:00-04:00"
       },
       {
         "name": "Current-profile builder",
         "role": "Replaces retired-corpus evidence",
-        "state": "blocked",
-        "activity": "Layout and mechanic profiles passed; the weekly Safari audit did not enter audit mode, so all profile writes were rolled back.",
-        "lastSignal": "2026-08-22T17:53:00-04:00"
+        "state": "active",
+        "activity": "Safari audit reached the current S+F book and identified excess space on pages 13, 32, and 33; profile writes remain rolled back.",
+        "lastSignal": "2026-08-22T18:19:00-04:00"
       },
       {
         "name": "Oracle builder",
@@ -81,7 +89,7 @@ window.LIFTRPG_PROGRAM_STATUS = {
         "role": "Challenges production claims",
         "state": "waiting",
         "activity": "Waiting for both lanes; will review the combined producer transition before integration.",
-        "lastSignal": "2026-08-22T18:13:24-04:00"
+        "lastSignal": "2026-08-22T18:19:00-04:00"
       }
     ]
   },
@@ -349,6 +357,12 @@ window.LIFTRPG_PROGRAM_STATUS = {
     }
   ],
   "log": [
+    {
+      "date": "2026-08-22",
+      "state": "investigating",
+      "title": "Safari now reaches the book and reports three real geometry defects",
+      "detail": "The audit owns a unique tab and its 66-check regression contract is green. The current S+F witness now fails honestly on interlude dead space, boss-footer drift, and workout slack; no threshold was weakened."
+    },
     {
       "date": "2026-08-22",
       "state": "investigating",
