@@ -23,7 +23,13 @@
     active: "Active",
     found: "Found",
     investigating: "Investigating",
+    waiting: "Waiting",
   };
+  const signalTime = (value) =>
+    new Date(value).toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
 
   app.innerHTML = `
     <section class="command-header" id="top">
@@ -65,6 +71,28 @@
           )
           .join("")}
       </ol>
+      <div class="workstream-head">
+        <h3>Live workstream</h3>
+        <span>Latest agent signals</span>
+      </div>
+      <div class="workstream" aria-live="polite">
+        ${data.currentView.agents
+          .map(
+            (agent) => `
+              <article class="agent-row ${esc(agent.state)}">
+                <div class="agent-identity">
+                  <strong>${esc(agent.name)}</strong>
+                  <span>${esc(agent.role)}</span>
+                </div>
+                <p>${esc(agent.activity)}</p>
+                <div class="agent-signal">
+                  <span><i aria-hidden="true"></i>${esc(stateLabel[agent.state] ?? agent.state)}</span>
+                  <time datetime="${esc(agent.lastSignal)}">${esc(signalTime(agent.lastSignal))}</time>
+                </div>
+              </article>`,
+          )
+          .join("")}
+      </div>
     </section>
 
     <section class="section" aria-labelledby="route-title">
