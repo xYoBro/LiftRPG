@@ -1,7 +1,7 @@
 // Generated from docs/jobs/publishing-compiler-status.json. Do not edit.
 window.LIFTRPG_PROGRAM_STATUS = {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-22T18:19:00-04:00",
+  "updatedAt": "2026-08-22T18:41:00-04:00",
   "overallProgress": 40,
   "eyebrow": "Publishing compiler program",
   "headline": "The machinery is becoming trustworthy.",
@@ -11,11 +11,11 @@ window.LIFTRPG_PROGRAM_STATUS = {
     "label": "Executable book compiler",
     "progress": 90,
     "state": "in_progress",
-    "situation": "The book validates. Its evidence identity is being reconciled.",
-    "risk": "Three S+F geometry defects",
-    "blocker": "Current-book visual profile",
-    "now": "Inspecting pages 13, 32, and 33 before changing the planner or density solver.",
-    "why": "The Safari handshake is fixed. The real audit now reaches the artifact and reports excess interlude space, boss-footer drift, and workout slack; the recorder still rolls back atomically.",
+    "situation": "The book validates. One genuine composition defect remains visible.",
+    "risk": "A cosmetic fix could hide a page-architecture failure",
+    "blocker": "Sparse interlude composition",
+    "now": "Ratifying the delegated Phase C seam, then composing the sparse interlude through the real adapter-to-planner route.",
+    "why": "The oracle identity, Safari handshake, boss footer, and workout-flow measurement are closed. Page 13 still has roughly 375 px of unplanned space; the profile recorder correctly refuses to bless it.",
     "exit": "Canonical evidence is independently reproducible, current-book profiles replace historical references, and the cumulative mechanical baseline is green."
   },
   "nextMilestone": {
@@ -24,10 +24,10 @@ window.LIFTRPG_PROGRAM_STATUS = {
     "authorAction": "None. We will ask for a 20–40 minute canary read."
   },
   "currentView": {
-    "step": "2.4",
-    "title": "Canonical evidence closure",
-    "state": "investigating",
-    "objective": "Make the recorder and independent replay describe the same transaction before evidence is committed.",
+    "step": "2.5",
+    "title": "Current-book layout profiles",
+    "state": "building",
+    "objective": "Resolve the one real composition failure without padding the fixture, weakening the audit, or teaching the renderer a one-off exception.",
     "activity": [
       {
         "state": "complete",
@@ -42,24 +42,28 @@ window.LIFTRPG_PROGRAM_STATUS = {
         "text": "Independent replay changes the model identity, which changes persisted provenance."
       },
       {
-        "state": "active",
-        "text": "The oracle repair now passes four additional replay checks; seven genuine public-profile and browser checks remain."
+        "state": "complete",
+        "text": "The oracle now separates generated transcripts from fixed recipe inputs and preserves the production model identity."
       },
       {
         "state": "found",
         "text": "Layout and mechanic profiles regenerate with zero errors, then the Safari weekly audit times out and the recorder rolls the batch back."
       },
       {
-        "state": "active",
-        "text": "The Safari audit now owns and polls one exact tab; its regression contract passes 66/66."
+        "state": "complete",
+        "text": "The Safari audit owns one exact tab, ignores stale aggregate font state, and reaches a final verdict in seconds."
       },
       {
         "state": "found",
-        "text": "The first real weekly audit exposed three S+F geometry defects on pages 13, 32, and 33."
+        "text": "The first real weekly audit exposed three S+F geometry findings on the interlude, boss, and workout pages."
+      },
+      {
+        "state": "complete",
+        "text": "The boss footer and workout-flow findings are closed with shared renderer and measurement corrections."
       },
       {
         "state": "active",
-        "text": "Inspecting those pages to locate the smallest planner or density-solver correction."
+        "text": "The sparse interlude remains intentionally red while the delegated Phase C page-composition seam is recorded and implemented."
       }
     ],
     "agents": [
@@ -67,15 +71,15 @@ window.LIFTRPG_PROGRAM_STATUS = {
         "name": "Orchestrator",
         "role": "Owns sequence and decisions",
         "state": "active",
-        "activity": "Closed the Safari tab-identity race; now inspecting the three real S+F geometry failures it revealed.",
-        "lastSignal": "2026-08-22T18:19:00-04:00"
+        "activity": "Closed the browser and measurement defects; now owns the Phase C authority ruling and first systemic composition slice.",
+        "lastSignal": "2026-08-22T18:41:00-04:00"
       },
       {
         "name": "Current-profile builder",
         "role": "Replaces retired-corpus evidence",
-        "state": "active",
-        "activity": "Safari audit reached the current S+F book and identified excess space on pages 13, 32, and 33; profile writes remain rolled back.",
-        "lastSignal": "2026-08-22T18:19:00-04:00"
+        "state": "blocked",
+        "activity": "Profile writes remain atomically rolled back until the genuine sparse-interlude composition defect is resolved.",
+        "lastSignal": "2026-08-22T18:41:00-04:00"
       },
       {
         "name": "Oracle builder",
@@ -87,9 +91,9 @@ window.LIFTRPG_PROGRAM_STATUS = {
       {
         "name": "Independent reviewer",
         "role": "Challenges production claims",
-        "state": "waiting",
-        "activity": "Waiting for both lanes; will review the combined producer transition before integration.",
-        "lastSignal": "2026-08-22T18:19:00-04:00"
+        "state": "complete",
+        "activity": "Accepted the oracle, Safari ownership, boss, and shared workout-flow corrections; required the interlude to remain red for Phase C.",
+        "lastSignal": "2026-08-22T18:41:00-04:00"
       }
     ]
   },
@@ -147,7 +151,6 @@ window.LIFTRPG_PROGRAM_STATUS = {
         "Zero canonical, render-contract, and generation-floor errors after recording"
       ],
       "remaining": [
-        "Fix oracle input inventory and replay identity",
         "Replace historical profiles with current-book profiles",
         "Rerecord evidence and run cumulative proof"
       ],
@@ -170,12 +173,12 @@ window.LIFTRPG_PROGRAM_STATUS = {
         {
           "id": "2.4",
           "title": "Canonical evidence closure",
-          "state": "in_progress"
+          "state": "complete"
         },
         {
           "id": "2.5",
           "title": "Current-book layout profiles",
-          "state": "queued"
+          "state": "in_progress"
         },
         {
           "id": "2.6",
@@ -236,8 +239,8 @@ window.LIFTRPG_PROGRAM_STATUS = {
       "number": "04",
       "title": "Graphical language and composed spreads",
       "weight": 28,
-      "progress": 0,
-      "state": "queued",
+      "progress": 5,
+      "state": "foundation",
       "promise": "Typography, atoms, word economy, and spread architecture become the book's graphical voice.",
       "remaining": [
         "Measured attention and content budgets",
@@ -260,7 +263,7 @@ window.LIFTRPG_PROGRAM_STATUS = {
         {
           "id": "4.3",
           "title": "Phase C authority ruling",
-          "state": "queued"
+          "state": "in_progress"
         },
         {
           "id": "4.4",
@@ -357,6 +360,12 @@ window.LIFTRPG_PROGRAM_STATUS = {
     }
   ],
   "log": [
+    {
+      "date": "2026-08-22",
+      "state": "building",
+      "title": "One real composition defect remains",
+      "detail": "Oracle identity, Safari ownership, font settlement, boss-footer placement, and workout-flow measurement are closed. The sparse interlude remains red by design while the delegated Phase C adapter-to-planner seam is recorded and implemented."
+    },
     {
       "date": "2026-08-22",
       "state": "investigating",
