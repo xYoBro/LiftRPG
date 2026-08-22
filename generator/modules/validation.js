@@ -217,6 +217,9 @@ import {
   simCorrectionDirectives,
   simSoftFindings
 } from './sim-player.js';
+import {
+  resolveMaterializedSurfaceRef
+} from './materialized-surfaces.js';
 
 // ── Part 1: Continuity validators ─────────────────────────────────────────────
 
@@ -828,6 +831,9 @@ export function endingSettlementFloorErrors(ending, where, options) {
       errors.push(at + '.owed "' + owed + '" does not name a surface (expected `kind:id`, e.g.'
         + ' `fragment: F.03` or `clock: the tide`) — a debt naming nothing this book prints is'
         + ' a debt the book never incurred');
+    } else if (options.materializedSurfaceIndex) {
+      var owedMaterialized = resolveMaterializedSurfaceRef(options.materializedSurfaceIndex, owed);
+      if (!owedMaterialized.ok) errors.push(at + '.owed "' + owed + '" ' + owedMaterialized.reason);
     } else if (options.surfaceIndex) {
       var res = surfaceRefResolves(options.surfaceIndex, owed);
       if (!res.ok) errors.push(at + '.owed "' + owed + '" ' + res.reason);
@@ -855,6 +861,22 @@ export function endingSettlementFloorErrors(ending, where, options) {
         errors.push(at + ' inverts "' + owed + '" without naming where the evidence was seeded'
           + ' — `seededAt` must be a surface ref; an inversion with nothing planted behind it'
           + ' is a retraction, not a reversal');
+      } else if (options.materializedSurfaceIndex) {
+        var seedMaterialized = resolveMaterializedSurfaceRef(options.materializedSurfaceIndex, seeded);
+        if (!seedMaterialized.ok) {
+          errors.push(at + '.seededAt "' + seeded + '" ' + seedMaterialized.reason);
+        } else if (options.requirePreBossSeed) {
+          var bossWeekIndex = Number(options.bossWeekIndex);
+          var hasStrictPreBossOccurrence = (seedMaterialized.occurrences || []).some(function (entry) {
+            return Number.isInteger(Number(entry.weekIndex))
+              && Number(entry.weekIndex) >= 0
+              && Number(entry.weekIndex) < bossWeekIndex;
+          });
+          if (!hasStrictPreBossOccurrence) {
+            errors.push(at + '.seededAt "' + seeded
+              + '" has no materialized occurrence strictly before the boss');
+          }
+        }
       } else if (options.surfaceIndex) {
         var seedRes = surfaceRefResolves(options.surfaceIndex, seeded);
         if (!seedRes.ok) errors.push(at + '.seededAt "' + seeded + '" ' + seedRes.reason);
@@ -1570,6 +1592,179 @@ function collectConvergenceChainFloorErrors(boss, componentInputs) {
  * return beats, doors, prose budgets). See floorsOn() above for why they are
  * opt-in rather than default.
  */
+function normalizedWorkoutExercise(exercise) {
+  return {
+    name: String((exercise || {}).name || '').trim().toLowerCase(),
+    sets: Number((exercise || {}).sets),
+    reps: String((exercise || {}).repsPerSet || '').trim().toLowerCase()
+  };
+}
+
+function parseInlineWorkoutAuthority(rawWorkout) {
+  var weeks = [];
+  String(rawWorkout || '').split(/\r?\n/).forEach(function (line) {
+    var match = /^\s*Week\s+(\d+)\s*:\s*(.+?)\s*$/i.exec(line);
+    if (!match) return;
+    var exercises = match[2].split(',').map(function (item) {
+      var exercise = /^\s*(.+?)\s+(\d+)\s*x\s*([^\s,]+)\s*$/i.exec(item);
+      return exercise ? {
+        name: exercise[1].trim(),
+        sets: Number(exercise[2]),
+        repsPerSet: exercise[3].trim()
+      } : null;
+    }).filter(Boolean);
+    if (exercises.length) {
+      weeks.push({ weekNumber: Number(match[1]), sessions: [{ exercises: exercises }] });
+    }
+  });
+  return weeks;
+}
+
+function parseLiftoscriptWorkoutAuthority(rawWorkout) {
+  var weeks = [];
+  var currentWeek = null;
+  var currentSession = null;
+  String(rawWorkout || '').split(/\r?\n/).forEach(function (line) {
+    var weekMatch = /^\s*#(?!#)\s*Week\s+(\d+)\b/i.exec(line);
+    if (weekMatch) {
+      currentWeek = { weekNumber: Number(weekMatch[1]), sessions: [] };
+      weeks.push(currentWeek);
+      currentSession = null;
+      return;
+    }
+    if (/^\s*##\s+\S/.test(line)) {
+      if (!currentWeek) return;
+      currentSession = { exercises: [] };
+      currentWeek.sessions.push(currentSession);
+      return;
+    }
+    if (!currentSession || line.indexOf('/') === -1) return;
+    var parts = line.split('/');
+    var name = String(parts.shift() || '').trim();
+    if (!name || /^progress\s*:/i.test(name)) return;
+    var prescription = parts.join('/');
+    var matches = prescription.match(/\b\d+\s*x\s*[^\s,\/]+/ig) || [];
+    // The canonical wire has one {sets,repsPerSet} pair per exercise. Refuse
+    // to infer a lossy authority from mixed-set Liftoscript; the model remains
+    // responsible for those richer lines and the ordinary week gate still
+    // checks that exercises exist. A single prescription is exact and safe.
+    if (matches.length !== 1) return;
+    var setRep = /^(\d+)\s*x\s*([^\s,\/]+)$/i.exec(matches[0].trim());
+    if (!setRep) return;
+    currentSession.exercises.push({
+      name: name,
+      sets: Number(setRep[1]),
+      repsPerSet: setRep[2]
+    });
+  });
+  return weeks.filter(function (week) {
+    week.sessions = week.sessions.filter(function (session) {
+      return session.exercises.length > 0;
+    });
+    return week.sessions.length > 0;
+  });
+}
+
+function workoutAuthorityWeeks(authority) {
+  if (authority && typeof authority === 'object' && Array.isArray(authority.weeks)) {
+    return authority.weeks;
+  }
+  var inline = parseInlineWorkoutAuthority(authority);
+  return inline.length ? inline : parseLiftoscriptWorkoutAuthority(authority);
+}
+
+function exerciseListFidelityErrors(expectedExercises, actualExercises, at) {
+  var expected = (expectedExercises || []).map(normalizedWorkoutExercise);
+  var actual = (actualExercises || []).map(normalizedWorkoutExercise);
+  if (expected.length !== actual.length) {
+    return [at + ' exercises do not transcribe the workout: expected '
+      + expected.length + ', received ' + actual.length];
+  }
+  var errors = [];
+  expected.forEach(function (exercise, index) {
+    var received = actual[index] || {};
+    if (exercise.name !== received.name || exercise.sets !== received.sets
+        || exercise.reps !== received.reps) {
+      errors.push(at + '.exercises[' + index + '] does not transcribe the workout: expected "'
+        + exercise.name + ' ' + exercise.sets + 'x' + exercise.reps + '", received "'
+        + received.name + ' ' + received.sets + 'x' + received.reps + '"');
+    }
+  });
+  return errors;
+}
+
+export function canonicalWorkoutFidelityErrors(rawWorkout, canonicalWorkout) {
+  var expectedWeeks = workoutAuthorityWeeks(rawWorkout);
+  if (!expectedWeeks.length) return [];
+  var actualWeeks = Array.isArray((canonicalWorkout || {}).weeks)
+    ? canonicalWorkout.weeks : [];
+  if (actualWeeks.length !== expectedWeeks.length) {
+    return ['Canonical workout does not transcribe the workout: expected '
+      + expectedWeeks.length + ' weeks, received ' + actualWeeks.length];
+  }
+  var errors = [];
+  expectedWeeks.forEach(function (expectedWeek, index) {
+    var actualWeek = actualWeeks[index] || {};
+    if (Number(actualWeek.weekNumber) !== Number(expectedWeek.weekNumber)) {
+      errors.push('Canonical workout week[' + index + '] is numbered '
+        + String(actualWeek.weekNumber) + '; expected ' + expectedWeek.weekNumber);
+    }
+    var expectedSessions = Array.isArray(expectedWeek.sessions) ? expectedWeek.sessions : [];
+    var actualSessions = Array.isArray(actualWeek.sessions) ? actualWeek.sessions : [];
+    if (actualSessions.length !== expectedSessions.length) {
+      errors.push('Canonical workout week ' + expectedWeek.weekNumber
+        + ' must transcribe ' + expectedSessions.length + ' prescribed session(s), received '
+        + actualSessions.length);
+    } else {
+      expectedSessions.forEach(function (expectedSession, sessionIndex) {
+        errors = errors.concat(exerciseListFidelityErrors(
+          expectedSession.exercises,
+          actualSessions[sessionIndex].exercises,
+          'Canonical workout week ' + expectedWeek.weekNumber + ' session ' + (sessionIndex + 1)
+        ));
+      });
+    }
+  });
+  return errors;
+}
+
+export function workoutWeekFidelityErrors(authority, weekObj, weekNumber) {
+  var weeks = workoutAuthorityWeeks(authority);
+  if (!weeks.length) return [];
+  var expectedWeek = weeks.find(function (week, index) {
+    return Number(week.weekNumber || (index + 1)) === Number(weekNumber);
+  });
+  if (!expectedWeek) {
+    return ['Week ' + weekNumber + ' has no matching prescription in the workout authority'];
+  }
+  var expectedSessions = Array.isArray(expectedWeek.sessions) ? expectedWeek.sessions : [];
+  var actualSessions = Array.isArray((weekObj || {}).sessions) ? weekObj.sessions : [];
+  if (!expectedSessions.length) return [];
+  var errors = [];
+  if (expectedSessions.length > 1 && actualSessions.length !== expectedSessions.length) {
+    errors.push('Week ' + weekNumber + ' does not transcribe the workout session count: expected '
+      + expectedSessions.length + ', received ' + actualSessions.length);
+  }
+  actualSessions.forEach(function (session, index) {
+    // A one-session inline prescription is a weekly template. The prose layer
+    // may schedule several sessions, but it may never invent a different lift,
+    // set count, or rep target while doing so.
+    var expectedSession = expectedSessions.length === 1
+      ? expectedSessions[0] : expectedSessions[index];
+    if (!expectedSession) {
+      errors.push('Week ' + weekNumber + ' session ' + (index + 1)
+        + ' has no matching prescribed session');
+      return;
+    }
+    errors = errors.concat(exerciseListFidelityErrors(
+      expectedSession.exercises,
+      session.exercises,
+      'Week ' + weekNumber + ' session ' + (index + 1)
+    ));
+  });
+  return errors;
+}
+
 export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
   var errors = [];
   var warnings = [];
@@ -1580,6 +1775,14 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
   expectedOptions = expectedOptions || {};
   if (!weekObj) { return { valid: false, errors: ['Week object is null'] }; }
   if (!weekObj.title) errors.push('Missing week title');
+
+  if (expectedOptions.workoutAuthority) {
+    errors = errors.concat(workoutWeekFidelityErrors(
+      expectedOptions.workoutAuthority,
+      weekObj,
+      expectedOptions.weekNumber || expectedOptions.currentWeekNumber || weekObj.weekNumber
+    ));
+  }
 
   // Epigraph — renderer reads .text and .attribution for every week page
   if (!weekObj.epigraph || typeof weekObj.epigraph !== 'object') {
@@ -1685,12 +1888,30 @@ export function validateWeekSchema(weekObj, isBoss, expectedOptions) {
   if (!Array.isArray(weekObj.sessions) || weekObj.sessions.length === 0) {
     errors.push('Missing or empty sessions array');
   } else {
+    // Once one session authors the S+F mark economy, every session in the
+    // week must author it. This keeps the contract deletion-sensitive without
+    // imposing the new S+F wire shape on older generic week fixtures.
+    var authoredMarkEconomy = !!expectedOptions.requireAuthoredMarkTargets
+      || weekObj.sessions.some(function (session) {
+        return !!(session && session.markStrip
+          && Object.prototype.hasOwnProperty.call(session.markStrip, 'targets'));
+      });
     weekObj.sessions.forEach(function(s, si) {
       if (!s.storyPrompt) errors.push('Session ' + (si+1) + ' missing storyPrompt');
       if (!s.label) errors.push('Session ' + (si+1) + ' missing label');
       if (s.sessionNumber === undefined) errors.push('Session ' + (si+1) + ' missing sessionNumber');
       if (!Array.isArray(s.exercises) || s.exercises.length === 0) {
         errors.push('Session ' + (si+1) + ' missing exercises');
+      }
+      if (floorsOn(expectedOptions) && authoredMarkEconomy) {
+        var authoredTargets = ((s.markStrip || {}).targets);
+        if (!Array.isArray(authoredTargets)
+            || authoredTargets.length < MARK_STRIP.minTargets
+            || authoredTargets.length > MARK_STRIP.maxTargets) {
+          errors.push('Session ' + (si + 1) + ' markStrip.targets must be authored with '
+            + MARK_STRIP.minTargets + '-' + MARK_STRIP.maxTargets
+            + ' entries — assembly may not invent the workout\'s mark economy');
+        }
       }
       // ── Wave 4a optional richness ──────────────────────────────────────────
       // PRESENCE IS NOT DEMANDED, deliberately (D19). A week without micro-lines
@@ -6224,14 +6445,24 @@ export function artifactDesignStageFloorErrors(rulebook, options) {
       errors.push(S + '.governingConceit.source must be `brief` or `seed`');
     } else if (String(conceit.source || '').trim() === 'seed') {
       var assignedConceit = String((((options || {}).seedAssignments || {}).governingConceit) || '').trim();
-      if (assignedConceit && id !== assignedConceit) {
-        errors.push(S + '.governingConceit names `' + id + '` as seed-authored, but this run assigned `'
-          + assignedConceit + '` — generated provenance cannot rewrite what the seed said');
+      var seedOwnsConceit = (options || {}).seedAssignments
+        && Object.prototype.hasOwnProperty.call((options || {}).seedAssignments, 'governingConceit');
+      if ((seedOwnsConceit && !assignedConceit) || (assignedConceit && id !== assignedConceit)) {
+        errors.push(!assignedConceit
+          ? S + '.governingConceit names `' + id + '` as seed-authored, but the run seed carries no governingConceit assignment — generated provenance cannot rewrite what the seed said'
+          : S + '.governingConceit names `' + id + '` as seed-authored, but this run assigned `'
+            + assignedConceit + '` — generated provenance cannot rewrite what the seed said');
       }
-    } else if (!briefFundsEvidence((options || {}).brief, conceit.rationale, id)) {
-      errors.push(S + '.governingConceit names `' + id + '` as brief-authored, but its rationale '
-        + 'quotes no concrete phrase from the actual brief. A generated sentence naming the choice '
-        + 'is not independent evidence that the user funded it; take the seed assignment or cite the brief.');
+    } else {
+      var hasActualBrief = Object.prototype.hasOwnProperty.call((options || {}), 'brief');
+      var actualBrief = String((options || {}).brief || '').trim();
+      if (hasActualBrief && (!actualBrief || !briefFundsEvidence(actualBrief, conceit.rationale, id))) {
+        errors.push(!actualBrief
+          ? S + '.governingConceit names `' + id + '` as brief-authored, but the actual brief is empty — it quotes no concrete phrase from the actual brief'
+          : S + '.governingConceit names `' + id + '` as brief-authored, but its rationale '
+            + 'quotes no concrete phrase from the actual brief. A generated sentence naming the choice '
+            + 'is not independent evidence that the user funded it; take the seed assignment or cite the brief.');
+      }
     }
   }
 
@@ -8989,6 +9220,8 @@ function pointerTravelsCorrectly(direction, source, target) {
 function resolveLedgerRef(ledger, rawRef) {
   var ref = String(rawRef || '').trim();
   if (!ref) return { missing: 'empty' };
+  var surface = parseSurfaceRef(ref);
+  if (surface.valid && surface.kind === 'fragment') ref = surface.id;
   var weekRef = parseWeekRef(ref);
   if (weekRef !== null) {
     if (!ledger.weekNumbers[weekRef]) return { missing: 'week', weekRef: weekRef };
@@ -10955,6 +11188,10 @@ export function validateSkeletonStage(result, weekCount, options) {
   if (!meta.blockTitle) return 'Skeleton → meta.blockTitle: missing';
   if (!meta.worldContract) return 'Skeleton → meta.worldContract: missing';
   if (!meta.weeklyComponentType) return 'Skeleton → meta.weeklyComponentType: missing';
+  if ((options || {}).artifactExperienceRequired
+      && (!Number.isInteger(meta.passwordLength) || meta.passwordLength < 1)) {
+    return 'Skeleton → meta.passwordLength: missing or invalid — the skeleton authors the exact decode length before any week is written';
+  }
   if (!meta.narrativeVoice || !meta.narrativeVoice.person) {
     console.warn('Skeleton → meta.narrativeVoice: missing or incomplete (advisory)');
   }
@@ -11171,8 +11408,18 @@ export function validateSkeletonStage(result, weekCount, options) {
     console.warn('Skeleton → theme.visualArchetype: "' + theme.visualArchetype + '" normalized to "' + normalizedArchetype + '"');
     theme.visualArchetype = normalizedArchetype;
   }
-  if (!theme.palette || !theme.palette.ink || !theme.palette.paper) {
-    return 'Skeleton → theme.palette: missing or incomplete (need at least ink + paper)';
+  if ((options || {}).artifactExperienceRequired) {
+    if (!theme.palette || typeof theme.palette !== 'object') {
+      return 'Skeleton → theme.palette: missing';
+    }
+    var skeletonPaletteKeys = ['ink', 'paper', 'accent', 'muted', 'rule', 'fog'];
+    for (var paletteIndex = 0; paletteIndex < skeletonPaletteKeys.length; paletteIndex++) {
+      var paletteKey = skeletonPaletteKeys[paletteIndex];
+      if (!/^#[0-9a-fA-F]{6}$/.test(String(theme.palette[paletteKey] || ''))) {
+        return 'Skeleton → theme.palette.' + paletteKey
+          + ': missing or invalid — author all six renderer colors as #rrggbb';
+      }
+    }
   }
 
   // ── cover ──

@@ -650,6 +650,8 @@
   // Compact structural scaffold — no prose, just decisions and cross-refs.
   // One API call produces the entire planning layer; flesh calls fill content.
   window.SCHEMA_SKELETON = [
+    'A seed-authored governing conceit must preserve the assigned conceit exactly.',
+    'A brief-authored governing conceit must quote a concrete phrase from the actual brief.',
     '# Booklet Skeleton Schema',
     '',
     'Return a single JSON object with exactly this structure. Fill every field.',
@@ -660,6 +662,7 @@
     '- `blockSubtitle` (string): one-line diegetic designation',
     '- `worldContract` (string): one sentence — the governing tension that drives the entire booklet',
     '- `weeklyComponentType` (string): fiction-native measurement family (e.g., "gauge reading", "signal frequency")',
+    '- `passwordLength` (integer): exact number of non-boss weekly component values used by the decode. `meta.passwordLength` is authored here; tooling verifies it but does not invent it.',
     '- `economy` (object): { currencyId, currencyLabel } — the one currency the workout pays out.',
     '  currencyId: machine slug, lowercase and hyphen-separated, never printed.',
     '  currencyLabel: the printed name, in this world\'s own accounting language — a noun the artifact already counts, derived from THIS brief and portable to no other booklet.',
@@ -810,7 +813,7 @@
   window.SKELETON_OUTPUT_EXAMPLE = JSON.stringify({
     meta: {
       blockTitle: '', blockSubtitle: '', worldContract: '',
-      weeklyComponentType: '',
+      weeklyComponentType: '', passwordLength: 5,
       economy: { currencyId: '', currencyLabel: '' },
       narrativeVoice: { person: '', tense: '', narratorStance: '', voiceRationale: '' },
       literaryRegister: {
@@ -1181,6 +1184,7 @@
         properties: {
           blockTitle: { type: 'string' }, blockSubtitle: { type: 'string' },
           worldContract: { type: 'string' }, weeklyComponentType: { type: 'string' },
+          passwordLength: { type: 'integer', minimum: 1 },
           // The markStrip economy declaration (Session 1). currencyId is the
           // stable machine handle for future cross-references; currencyLabel is
           // the only half that ever prints.
@@ -1386,7 +1390,7 @@
           // before the floor that blocks on it ever sees it.
           arrangement: STRUCTURED_ARRANGEMENT
         },
-        required: ['blockTitle', 'blockSubtitle', 'worldContract', 'weeklyComponentType', 'economy', 'narrativeVoice', 'literaryRegister', 'structuralShape', 'storySpine', 'artifactIdentity', 'artifactIntent', 'playSpine', 'arrangement']
+        required: ['blockTitle', 'blockSubtitle', 'worldContract', 'weeklyComponentType', 'passwordLength', 'economy', 'narrativeVoice', 'literaryRegister', 'structuralShape', 'storySpine', 'artifactIdentity', 'artifactIntent', 'playSpine', 'arrangement']
       },
       theme: {
         type: 'object',

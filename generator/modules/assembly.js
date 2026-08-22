@@ -51,6 +51,7 @@ export function createDiagnostic(code, severity, phase, message, opts) {
     code: code,
     severity: severity,
     phase: phase,
+    action: phase,
     message: message,
     repairable: !!(opts && opts.repairable)
   };
@@ -2081,7 +2082,7 @@ export function deriveMarkStripEconomy(booklet, diag) {
     var bossReckoning = weeks[bossWeekIndex].reckoning;
     if (bossReckoning.threshold !== threshold) {
       if (diag) {
-        diag.push(createDiagnostic('reckoning-threshold-derived', 'warning', 'synthesize',
+        diag.push(createDiagnostic('threshold-derived', 'warning', 'derive',
           'Week ' + (weeks[bossWeekIndex].weekNumber || (bossWeekIndex + 1))
           + ' reckoning.threshold set to ' + threshold + ' — '
           + RECKONING_THRESHOLD_RATIO + ' x ' + totalAttainableTicks
@@ -3048,6 +3049,12 @@ export function assembleSkeletonFleshBooklet(skeleton, rulesOutput, weekOutputs,
   // a compatibility alias, so preserve exactly these two established homes.
   if (meta.gameRulebook) booklet.meta.gameRulebook = meta.gameRulebook;
   if (meta.playSpine) booklet.meta.playSpine = meta.playSpine;
+  if (Number.isInteger(meta.passwordLength) && meta.passwordLength > 0) {
+    booklet.meta.passwordLength = meta.passwordLength;
+  }
+  if (String(meta.demoPassword || '').trim()) {
+    booklet.meta.demoPassword = String(meta.demoPassword);
+  }
   // Same conditional rule for the knowing (§11 Wave 1.5). It is authored by the
   // knowing stage onto skeleton.meta; without this line the field would reach
   // every prose prompt and then vanish from the shipped booklet, and nothing

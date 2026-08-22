@@ -2410,6 +2410,12 @@
     var rulebookGiven = (typeof window.formatGameRulebookGiven === 'function')
       ? window.formatGameRulebookGiven(options.gameRulebook)
       : '';
+    var artifactDesign = (options.gameRulebook && options.gameRulebook.gameRulebook
+      ? options.gameRulebook.gameRulebook : options.gameRulebook || {}).artifactDesign || {};
+    var conceitSource = ((artifactDesign.governingConceit || {}).source || '');
+    var conceitProvenanceTeaching = conceitSource === 'brief'
+      ? 'A brief-authored governing conceit must quote a concrete phrase from the actual brief.'
+      : 'A seed-authored governing conceit must preserve the assigned conceit exactly.';
     return [
       '# LiftRPG Booklet Skeleton',
       '',
@@ -2427,6 +2433,7 @@
       '## gameRulebook Artifact Design Given (BINDING)',
       compactJson((options.gameRulebook && options.gameRulebook.gameRulebook
         ? options.gameRulebook.gameRulebook : options.gameRulebook || {}).artifactDesign || {}),
+      conceitProvenanceTeaching,
       '',
       '## Your Task',
       'Return a single JSON object containing ONLY structural decisions — no long prose,',
@@ -2509,6 +2516,9 @@
       '- Password word length = ' + (weekCount - 1) + ' letters (one componentValue per non-boss week).',
       '- Each non-boss componentValue must be an integer 1-26 (A1Z26 encoding).',
       '- The boss week\'s componentValue is null.',
+      '- `meta.passwordLength` is authored here and must equal ' + (weekCount - 1) + '.',
+      '- Every session authors `markStrip.targets`; `markStrip.targets` carries 3-5 entries.',
+      '- Never author `reckoning.threshold`; the compiler derives it from all authored mark targets.',
       '- Fragment IDs: use pattern F.01, F.02, etc. Create 12-30 fragments.',
       '- Every fragmentId referenced in weekPlan must exist in fragmentRegistry.',
       '- Overflow weeks (sessionCount > 3) must have an overflowFragmentId.',
@@ -2581,7 +2591,7 @@
     var blend = deriveDesignBlend(brief, workout);
 
     var parts = [
-      '# LiftRPG Game Rulebook Stage — design the game before anything is written',
+      '# LiftRPG Game Rulebook Stage',
       '',
       armed.contextBlock,
       '',
@@ -2699,7 +2709,7 @@
     }
 
     var parts = [
-      '# LiftRPG Knowing Stage — Process Particulars',
+      '# LiftRPG Knowing Stage',
       '',
       'You are writing down how this booklet\'s world actually works, before any',
       'of its prose exists. Later stages will write every session prompt, found',
@@ -2844,7 +2854,7 @@
     var weekNum = weekPlan.weekNumber;
 
     var contextLines = [
-      '# LiftRPG Flesh Stage — Week ' + weekNum + (isBoss ? ' (BOSS WEEK)' : ''),
+      '# LiftRPG Flesh Stage — Week ' + weekNum,
       '',
       'You are writing the COMPLETE CONTENT for Week ' + weekNum + ' of a LiftRPG booklet.',
       '',
@@ -3002,7 +3012,7 @@
       : '';
 
     return [
-      '# LiftRPG Flesh Stage — Fragment Batch ' + (batchIndex + 1) + '/' + totalBatches,
+      '# LiftRPG Flesh Stage — Fragment Batch',
       '',
       'You are writing FOUND DOCUMENTS for a LiftRPG booklet.',
       'These are in-world documents discovered during play — memos, reports, field notes, etc.',

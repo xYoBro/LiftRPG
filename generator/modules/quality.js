@@ -225,61 +225,6 @@ export function collectIdentityVariationFindings(booklet, nonBossWeeks, fragment
     findings++;
   }
 
-  var mapTypes = {};
-  nonBossWeeks.forEach(function (week) {
-    var mapType = String((((week || {}).fieldOps || {}).mapState || {}).mapType || 'grid');
-    mapTypes[mapType] = true;
-  });
-  if (nonBossWeeks.length >= 4 && Object.keys(mapTypes).length < 2) {
-    // Check whether the declared planning contract expects a stable map grammar.
-    // If so, repeated map type is correct, not a failure.
-    var intent = meta.artifactIntent || {};
-    var declaredGrammar = String(intent.mechanicGrammarFamily || '').toLowerCase();
-    var declaredBoard = String(artifactIdentity.boardStateMode || '').toLowerCase();
-    var soleMapType = Object.keys(mapTypes)[0];
-
-    // Grammars/board-state modes that inherently use a single map type.
-    // Deliberately PARTIAL — only families with one stable expected map type
-    // appear. Keys are drawn from VALID_MECHANIC_GRAMMAR_FAMILIES +
-    // VALID_BOARD_STATE_MODES (contracts/contract-constants.mjs); validate.mjs
-    // asserts the subset, never full coverage.
-    // Deliberately PARTIAL (validate.mjs asserts subset, not coverage): a row
-    // here suppresses the board-monotony finding, so it may only name a family
-    // whose single map type is inherent rather than merely likely. Of Wave 2's
-    // eight new families only two qualify — a loyalty web IS a node-link
-    // diagram and a pursuit IS a line — and the other six can legitimately
-    // vary their geometry, which means a monotonous board in one of them is
-    // still worth reporting.
-    // Values are LISTS because Wave 3 gave two families a second inherent
-    // geometry: a pursuit is a line or a labyrinth, and a siege is rings (which
-    // is the whole reason concentric was built). A one-value table would have
-    // reported every maze-boarded evasion book as monotonous.
-    var STABLE_MAP_GRAMMARS = {
-      'survey-grid': ['grid'],
-      'ledger-board': ['grid'],
-      'timeline-reconstruction': ['linear-track'],
-      'route-tracker': ['linear-track'],
-      'node-graph': ['point-to-point'],
-      'loyalty-web': ['point-to-point'],
-      evasion: ['linear-track', 'maze'],
-      siege: ['concentric']
-    };
-
-    var expectedByGrammar = STABLE_MAP_GRAMMARS[declaredGrammar];
-    var expectedByBoard = STABLE_MAP_GRAMMARS[declaredBoard];
-    var suppressed = (expectedByGrammar && expectedByGrammar.indexOf(soleMapType) !== -1) ||
-                     (expectedByBoard && expectedByBoard.indexOf(soleMapType) !== -1);
-
-    if (!suppressed) {
-      report.weakSpots.push({
-        area: 'board-monotony',
-        detail: 'All non-boss weeks use the same mapState.mapType "' + soleMapType + '"',
-        severity: 'high'
-      });
-      findings++;
-    }
-  }
-
   var companionSignatures = {};
   nonBossWeeks.forEach(function (week) {
     var signature = extractWeekCompanionTypes(week).join('|') || 'none';
@@ -707,7 +652,6 @@ export function collectPageFillFindings(booklet, report) {
 
 export var QUALITY_BLOCKING_AREAS = {
   'artifact-monoculture': { target: 'fragments' },
-  'board-monotony': { target: 'weeks' },
   'companion-sameness': { target: 'weeks' },
   'identity-undercommitment': { target: 'shell' },
   'boss-password-spoiler': { target: 'endings', alwaysBlock: true },

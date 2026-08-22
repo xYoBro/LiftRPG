@@ -143,6 +143,7 @@ import {
   validateEndingsContinuity,
   validateBookletSchema,
   validateWeekSchema,
+  canonicalWorkoutFidelityErrors,
   normalizeShellShape,
   validateShellSchema,
   validateShellIdentitySchema,
@@ -161,6 +162,7 @@ import {
   // gates inside validation.js and never called from here: a pipeline that
   // called it directly would be a second opinion about a stage's verdict.
   validateGameRulebookStage,
+  validateGameRulebookStage as validateGameRulebookStageOwner,
   validateEconomyGraphStage,
   deriveWeeklySurfaceLedger,
   classifyValidationErrors,
@@ -7834,6 +7836,12 @@ async function runCanonicalizeStage(settings, config) {
       // why the stub and the fault injector still route this stage by its
       // '# LiftRPG Canonicalization Stage' prefix.
       schema: (typeof window !== 'undefined' && window.STRUCTURED_SCHEMA_CANONICAL_WORKOUT) || null,
+      validate: function (result) {
+        var fidelityErrors = canonicalWorkoutFidelityErrors(rawText, result);
+        return fidelityErrors.length
+          ? { valid: false, errors: fidelityErrors, warnings: [] }
+          : '';
+      },
       buildPrompt: function (retryState) {
         return window.generateCanonicalizePrompt(rawText, { retryMode: retryState.attempt > 0 });
       }
@@ -7910,6 +7918,12 @@ async function runCanonicalizeStage(settings, config) {
  * verbatim (D98's four touchpoints stay four).
  */
 async function runGameRulebookStage(settings, config) {
+  function validateGameRulebookStage(payload, context) {
+    return typeof config.invokeStageValidator === 'function'
+      ? config.invokeStageValidator('gameRulebook', validateGameRulebookStageOwner,
+        [payload, context])
+      : validateGameRulebookStageOwner(payload, context);
+  }
   var cached = config.cached;
   if (cached && typeof config.restoreCached === 'function') {
     var restored = await config.restoreCached('gameRulebook', cached, function (payload, context) {
@@ -8358,6 +8372,12 @@ async function runSkeletonFleshPipeline(options) {
   var nw            = options.nw;
   var trialMode     = !!(options.trialMode || settings.trialMode);
 
+  function invokeSkeletonFleshStageValidator(stageKey, validator, args) {
+    var invoked = typeof options.wrapStageValidator === 'function'
+      ? options.wrapStageValidator(stageKey, validator) : validator;
+    return invoked.apply(null, args || []);
+  }
+
   // Trial mode: one attempt per stage, no retries — preserves diagnostics and fail-fast
   var TRIAL_ATTEMPTS = 1;
 
@@ -8529,6 +8549,7 @@ async function runSkeletonFleshPipeline(options) {
     divergenceSeed: divergenceSeed,
     seedAssignments: seedAssignments,
     repairDirective: sfRepairDirectiveFor('gameRulebook'),
+    invokeStageValidator: invokeSkeletonFleshStageValidator,
     progress: progress,
     getStageIndex: function () { return stageNum; },
     getTotalStages: function () { return totalStages; },
@@ -8566,7 +8587,8 @@ async function runSkeletonFleshPipeline(options) {
   if (cached('skeleton')) {
     var restoredSkeleton = await restoreSkeletonFleshCheckpointedStage('skeleton',
       checkpoint.stages.skeleton, function (payload, context) {
-        return validateSkeletonStage(payload, context.requestedWeekCount, context);
+        return invokeSkeletonFleshStageValidator('skeleton', validateSkeletonStage,
+          [payload, context.requestedWeekCount, context]);
       }, {
         requestedWeekCount: weekCount,
         generationFloors: true,
@@ -8636,7 +8658,7 @@ async function runSkeletonFleshPipeline(options) {
         // classified-packet shell over a brief that names no institution owes a
         // written selectionReason. The floor cannot ask that question without
         // the brief, and this is the only seat that has it.
-        return validateSkeletonStage(result, weekCount, {
+        return invokeSkeletonFleshStageValidator('skeleton', validateSkeletonStage, [result, weekCount, {
           generationFloors: true,
           artifactExperienceRequired: true,
           brief: brief,
@@ -8646,7 +8668,7 @@ async function runSkeletonFleshPipeline(options) {
           // D173 — the parity floor's evidence, the same object the builder
           // above is handed.
           gameRulebook: sfGameRulebook
-        });
+        }]);
       }
     });
     recordSeedOnStage(skeleton, divergenceSeed);
@@ -8766,7 +8788,9 @@ async function runSkeletonFleshPipeline(options) {
   var knowingOutput;
   if (cached('knowing')) {
     var restoredSfKnowing = await restoreSkeletonFleshCheckpointedStage('knowing',
-      checkpoint.stages.knowing, validateKnowingStage, { skeleton: skeleton });
+      checkpoint.stages.knowing, function (payload) {
+        return invokeSkeletonFleshStageValidator('knowing', validateKnowingStage, [payload]);
+      }, { skeleton: skeleton });
     knowingOutput = restoredSfKnowing.accepted ? restoredSfKnowing.payload : null;
   }
   if (knowingOutput) {
@@ -8799,7 +8823,7 @@ async function runSkeletonFleshPipeline(options) {
         );
       },
       validate: function (result) {
-        return validateKnowingStage(result);
+        return invokeSkeletonFleshStageValidator('knowing', validateKnowingStage, [result]);
       }
     });
     checkpoint = saveCheckpoint('knowing', knowingOutput, checkpoint);
@@ -8815,7 +8839,9 @@ async function runSkeletonFleshPipeline(options) {
   var rulesOutput;
   if (cached('rules')) {
     var restoredRules = await restoreSkeletonFleshCheckpointedStage('rules',
-      checkpoint.stages.rules, validateRulesStage, {
+      checkpoint.stages.rules, function (payload) {
+        return invokeSkeletonFleshStageValidator('rules', validateRulesStage, [payload]);
+      }, {
         skeleton: skeleton,
         gameRulebook: sfGameRulebook
       });
@@ -8860,7 +8886,7 @@ async function runSkeletonFleshPipeline(options) {
         );
       },
       validate: function (result) {
-        return validateRulesStage(result);
+        return invokeSkeletonFleshStageValidator('rules', validateRulesStage, [result]);
       }
     });
     checkpoint = saveCheckpoint('rules', rulesOutput, checkpoint);
@@ -8939,6 +8965,10 @@ async function runSkeletonFleshPipeline(options) {
       // the multi-stage weekFloorOptions row. Both carry it or one pipeline
       // writes its reckoning sentences ungated.
       currencyLabel: (((skeleton || {}).meta || {}).economy || {}).currencyLabel || '',
+      // The workout is user-owned input. A prose stage may repeat a one-line
+      // weekly prescription across its sessions, but may not substitute lifts,
+      // sets, or reps while doing so.
+      workoutAuthority: sfCanonState.applied ? nw : rawWorkout,
       // This pipeline's twin of the multi-stage shellFamily row (D170).
       shellFamily: (((skeleton || {}).meta || {}).artifactIdentity || {}).shellFamily || '',
       // The brief, arming W1's transcription floor (W3). Both pipelines carry
@@ -8954,7 +8984,10 @@ async function runSkeletonFleshPipeline(options) {
       if (!Array.isArray(result.sessions) || result.sessions.length === 0) {
         return 'Week ' + weekNum + ': missing or empty sessions';
       }
-      var vResult = validateWeekSchema(result, isBoss, sfWeekFloorOptions);
+      var vResult = invokeSkeletonFleshStageValidator(ckKey, validateWeekSchema, [
+        result, isBoss, Object.assign(
+          { requireAuthoredMarkTargets: true }, sfWeekFloorOptions)
+      ]);
       if (vResult && typeof vResult === 'object' && !vResult.valid) return vResult;
       return '';
     }
@@ -9061,6 +9094,8 @@ async function runSkeletonFleshPipeline(options) {
 
     // Surface advisory warnings from schema validation
     var sfWeekValidation = validateWeekSchema(weekResult, isBoss, {
+      requireAuthoredMarkTargets: true,
+      workoutAuthority: sfCanonState.applied ? nw : rawWorkout,
       componentInputs: isBoss ? allComponentValuesSF.map(String) : undefined,
       approvedFragmentIds: weekPlan.fragmentIds || [],
       currentWeekNumber: weekNum,
@@ -9120,7 +9155,8 @@ async function runSkeletonFleshPipeline(options) {
     if (!result || !Array.isArray(result.fragments) || result.fragments.length === 0) {
       return 'Fragments: missing or empty fragments array';
     }
-    return validateFragmentsStage(result, context.registry, context);   // W3-ARM fragment-sf · W7-ARM seal-sf
+    return invokeSkeletonFleshStageValidator('fragments', validateFragmentsStage,
+      [result, context.registry, context]);   // W3-ARM fragment-sf · W7-ARM seal-sf
   }
   var restoredFragmentsSF = false;
 
@@ -9189,7 +9225,8 @@ async function runSkeletonFleshPipeline(options) {
         if (!result || !Array.isArray(result.fragments) || result.fragments.length === 0) {
           return 'Fragments: missing or empty fragments array';
         }
-        return validateFragmentsStage(result, fullFragRegistry, fragmentsRestoreContextSF);
+        return invokeSkeletonFleshStageValidator('fragments', validateFragmentsStage,
+          [result, fullFragRegistry, fragmentsRestoreContextSF]);
       }
     });
 
@@ -9233,7 +9270,8 @@ async function runSkeletonFleshPipeline(options) {
   };
   function validateCurrentSkeletonFleshEndings(result, context) {
     var endingsArray = Array.isArray(result) ? result : (result && result.endings ? result.endings : null);
-    var shapeError = validateEndingsStage(result, context);
+    var shapeError = invokeSkeletonFleshStageValidator('endings', validateEndingsStage,
+      [result, context]);
     if (shapeError) return shapeError;
     var errors = [];
     collectBudgetBreaches({ endings: endingsArray }).forEach(function (breach) {
@@ -9244,13 +9282,25 @@ async function runSkeletonFleshPipeline(options) {
       fragments: allFragments,
       endings: endingsArray
     });
+    var settlementArtifactSF = {
+      weeks: weekOutputs,
+      fragments: allFragments,
+      endings: endingsArray
+    };
+    var materializedSettlementIndexSF = buildMaterializedSurfaceIndex(settlementArtifactSF);
+    var settlementBossWeekIndexSF = weekOutputs.findIndex(function (week) {
+      return week && week.isBossWeek === true;
+    });
     var settlementModeSF = ((skeleton || {}).meta || {}).artifactIntent
       ? (((skeleton || {}).meta || {}).artifactIntent || {}).endingMode
       : ((skeleton || {}).artifactIntent || {}).endingMode;
     endingsArray.forEach(function (ending, ei) {
       endingSettlementFloorErrors(ending, 'Ending "' + ((ending || {}).variant || ei) + '"', {
         endingMode: settlementModeSF,
-        surfaceIndex: settlementIndexSF
+        surfaceIndex: settlementIndexSF,
+        materializedSurfaceIndex: materializedSettlementIndexSF,
+        bossWeekIndex: settlementBossWeekIndexSF,
+        requirePreBossSeed: true
       }).forEach(function (message) { errors.push(message); });
     });
     endingSettlementSetFloorErrors(endingsArray, 'Endings')
@@ -9498,7 +9548,7 @@ async function runSkeletonFleshPipeline(options) {
   });
 }
 
-async function generateSkeletonFlesh(settings, workout, brief, onProgress) {
+async function generateSkeletonFlesh(settings, workout, brief, onProgress, runtimeHooks) {
   var resolvedSettings = resolveStructuredPipelineSettings(settings);
 
   if (!resolvedSettings.apiKey && resolvedSettings.format !== 'anthropic') {
@@ -9527,7 +9577,8 @@ async function generateSkeletonFlesh(settings, workout, brief, onProgress) {
     weekCount:     weekCount,
     totalSessions: totalSessions,
     nw:            nw,
-    trialMode:     !!(settings.trialMode)
+    trialMode:     !!(settings.trialMode),
+    wrapStageValidator: runtimeHooks && runtimeHooks.wrapStageValidator
   });
 }
 
